@@ -29,12 +29,11 @@
         #userInfo {
             display: flex;
             align-items: center;
-            flex-grow: 1;
-            justify-content: flex-end; /* 모바일에서 사용자 정보를 오른쪽으로 정렬 */
+            margin-left: auto; /* 사용자 정보 영역을 오른쪽으로 정렬 */
         }
         #userName {
             font-size: 18px;
-            margin-right: 20px;
+            margin-right: 20px; /* 이름과 버튼 사이의 간격 */
         }
         #logoutButton {
             background-color: #f44336;
@@ -106,8 +105,8 @@
 
         @media (max-width: 480px) {
             header {
-                flex-direction: column; /* 모바일에서 헤더를 세로 방향으로 나열 */
-                align-items: flex-start; /* 헤더 항목들을 왼쪽 정렬 */
+                flex-direction: row; /* 모바일에서 헤더를 가로 방향으로 나열 */
+                align-items: center; /* 헤더 항목들을 세로로 중앙 정렬 */
             }
         }
     </style>
