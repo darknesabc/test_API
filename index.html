@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 페이지</title>
+</head>
+<body>
+    <h1>로그인</h1>
+    <input type="text" id="nameInput" placeholder="이름 입력">
+    <input type="text" id="numberInput" placeholder="숫자 4자리 입력">
+    <button id="loginButton">로그인</button>
+
+    <script>
+        document.getElementById('loginButton').addEventListener('click', function() {
+            const name = document.getElementById('nameInput').value;
+            const number = document.getElementById('numberInput').value;
+
+            // 이름과 숫자가 모두 입력된 경우에만 진행
+            if (name && number && number.length === 4 && !isNaN(number)) {
+                // 입력한 이름과 숫자를 localStorage에 저장
+                localStorage.setItem('name', name);
+                localStorage.setItem('number', number);
+                // 로그인 후 다른 페이지로 이동
+                window.location.href = 'welcome.html'; // 다음 페이지로 이동
+            } else {
+                alert('이름과 4자리 숫자를 올바르게 입력하세요.');
+            }
+        });
+    </script>
+</body>
+</html>
