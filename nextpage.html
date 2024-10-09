@@ -35,7 +35,7 @@
             margin-right: 20px; /* 이름과 버튼 사이의 간격 */
             white-space: nowrap; /* 줄 바꿈 방지 */
             overflow: hidden; /* 넘치는 텍스트 숨김 */
-            text-overflow: ellipsis; /* 넘치는 텍스트에 점(...) 표시 */
+            flex-shrink: 1; /* 공간이 부족할 경우 텍스트 줄이기 */
         }
         #logoutButton {
             background-color: #f44336;
