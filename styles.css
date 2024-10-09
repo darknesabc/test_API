@@ -21,6 +21,7 @@ body {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); /* 그림자 효과 강화 */
     width: 400px; /* 박스 너비 증가 */
     text-align: center; /* 텍스트 중앙 정렬 */
+    margin: 0 20px; /* 왼쪽과 오른쪽 여백 동일하게 설정 */
 }
 
 h2 {
@@ -59,4 +60,9 @@ button {
     border-radius: 6px; /* 버튼 모서리 둥글게 */
     font-size: 16px; /* 버튼 텍스트 크기 */
     cursor: pointer;
-    trans
+    transition: background-color 0.3s; /* 배경 색상 변화 효과 */
+}
+
+button:hover {
+    background-color: #0056b3; /* 호버 시 버튼 색상 */
+}
