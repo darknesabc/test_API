@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 페이지</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        #loginForm {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #usernameInput {
+            padding: 10px;
+            font-size: 16px;
+        }
+        #loginButton {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        #loginButton:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>로그인</h1>
+    <div id="loginForm">
+        <input type="text" id="usernameInput" placeholder="사용자 이름을 입력하세요" required />
+        <button id="loginButton">로그인</button>
+    </div>
+
+    <script>
+        // 로그인 버튼 클릭 시 사용자 이름 저장
+        document.getElementById('loginButton').addEventListener('click', function() {
+            const userName = document.getElementById('usernameInput').value;
+            if (userName) {
+                localStorage.setItem('name', userName); // 사용자 이름 저장
+                window.location.href = 'welcome.html'; // 환영 페이지로 이동
+            } else {
+                alert('사용자 이름을 입력하세요.');
+            }
+        });
+    </script>
+</body>
+</html>
