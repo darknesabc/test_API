@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 페이지</title>
+</head>
+<body>
+    <h1>로그인</h1>
+    <input type="text" id="nameInput" placeholder="이름 입력">
+    <button id="loginButton">로그인</button>
+
+    <script>
+        document.getElementById('loginButton').addEventListener('click', function() {
+            const name = document.getElementById('nameInput').value;
+
+            if (name) {
+                // 입력한 이름을 localStorage에 저장
+                localStorage.setItem('name', name);
+                // 로그인 후 다른 페이지로 이동
+                window.location.href = 'welcome.html'; // 다음 페이지로 이동
+            } else {
+                alert('이름을 입력하세요.');
+            }
+        });
+    </script>
+</body>
+</html>
