@@ -50,6 +50,7 @@
             display: flex;
             justify-content: center;
             margin-top: 20px;
+            flex-wrap: wrap; /* 모바일에서 메뉴를 줄바꿈할 수 있도록 설정 */
         }
         .menu a {
             margin: 0 15px;
@@ -69,6 +70,7 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            text-align: center; /* 중앙 정렬 */
         }
         h1 {
             color: #4CAF50;
@@ -77,6 +79,29 @@
         p {
             font-size: 18px;
             margin-bottom: 30px;
+        }
+
+        /* 미디어 쿼리 */
+        @media (max-width: 768px) {
+            #userName {
+                font-size: 16px; /* 모바일에서 사용자 이름 크기 조정 */
+            }
+            .menu a {
+                font-size: 16px; /* 모바일에서 메뉴 글꼴 크기 조정 */
+                margin: 0 10px; /* 모바일에서 여백 조정 */
+            }
+            h1 {
+                font-size: 24px; /* 모바일에서 제목 크기 조정 */
+            }
+            p {
+                font-size: 16px; /* 모바일에서 본문 글꼴 크기 조정 */
+            }
+        }
+
+        @media (max-width: 480px) {
+            #logoutButton {
+                padding: 5px 8px; /* 모바일에서 로그아웃 버튼 크기 조정 */
+            }
         }
     </style>
 </head>
