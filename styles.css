@@ -16,13 +16,14 @@ body {
 
 .box {
     background-color: white;
-    padding: 40px; /* 패딩을 늘려서 공간 확보 */
-    border-radius: 12px; /* 모서리를 부드럽게 */
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); /* 그림자 효과 강화 */
-    width: 400px; /* 박스 너비 증가 */
-    text-align: center; /* 텍스트 중앙 정렬 */
-    margin: 0 20px; /* 왼쪽과 오른쪽 여백 동일하게 설정 */
+    padding: 40px; /* 기존 패딩 유지 */
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    width: 400px; /* 박스 너비 */
+    text-align: center;
+    margin: 40px auto; /* 위아래 여백 40px, 좌우 중앙 정렬 */
 }
+
 
 h2 {
     margin-bottom: 20px; /* 제목과 입력란 사이의 간격 */
