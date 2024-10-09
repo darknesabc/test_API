@@ -29,7 +29,6 @@
         #userInfo {
             display: flex;
             align-items: center;
-            margin-left: auto; /* 사용자 정보 영역을 오른쪽으로 정렬 */
         }
         #userName {
             font-size: 18px;
@@ -39,7 +38,7 @@
             background-color: #f44336;
             color: white;
             border: none;
-            padding: 5px 10px;
+            padding: 8px 15px; /* 버튼 패딩 */
             font-size: 14px;
             cursor: pointer;
             border-radius: 5px;
@@ -51,7 +50,7 @@
         .menu {
             display: flex;
             justify-content: center;
-            margin-top: 20px;
+            margin-top: 10px;
             flex-wrap: wrap; /* 메뉴 항목이 줄바꿈되도록 설정 */
             width: 100%; /* 메뉴가 화면 전체 너비를 차지하도록 설정 */
             text-align: center; /* 메뉴 항목을 중앙 정렬 */
@@ -92,7 +91,7 @@
                 font-size: 16px; /* 모바일에서 사용자 이름 크기 조정 */
             }
             #logoutButton {
-                padding: 5px 8px; /* 모바일에서 로그아웃 버튼 크기 조정 */
+                padding: 5px 10px; /* 모바일에서 로그아웃 버튼 크기 조정 */
                 font-size: 12px; /* 모바일에서 버튼 글꼴 크기 조정 */
             }
             h1 {
@@ -105,8 +104,11 @@
 
         @media (max-width: 480px) {
             header {
-                flex-direction: row; /* 모바일에서 헤더를 가로 방향으로 나열 */
-                align-items: center; /* 헤더 항목들을 세로로 중앙 정렬 */
+                flex-direction: column; /* 모바일에서 헤더를 세로 방향으로 나열 */
+                align-items: flex-start; /* 헤더 항목들을 왼쪽 정렬 */
+            }
+            .menu {
+                margin-top: 0; /* 모바일에서 메뉴 위쪽 여백 제거 */
             }
         }
     </style>
