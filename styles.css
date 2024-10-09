@@ -21,7 +21,7 @@ body {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
     width: 400px; /* 박스 너비 */
     text-align: center;
-    margin: 60px auto; /* 위아래 여백 60px, 좌우 중앙 정렬 */
+    margin: 200px auto; /* 위아래 여백 200px, 좌우 중앙 정렬 */
 }
 
 
