@@ -31,23 +31,30 @@
         function displayData(values) {
             // 테이블 생성
             let output = '<table border="1"><tr>';
-            output += '<th>자리번호</th><th>이름</th>';
+            output += '<th>자리번호</th><th>이름</th><th>교시</th>';
 
-            // A, B, G부터 U열까지 헤더 추가
-            for (let i = 6; i < values[0].length; i++) {
+            // I, K, M, O, Q, S, U열의 2행 데이터를 1행으로 옮김
+            for (let i = 8; i <= 20; i += 2) {
+                if (values[1][i]) {
+                    values[0][i] = values[1][i]; // 2행 값을 1행으로 옮김
+                }
+            }
+
+            // G부터 U열까지 헤더 추가 (U열까지만 표시)
+            for (let i = 6; i < values[0].length && i <= 20; i++) {
                 output += `<th>${values[0][i]}</th>`;
             }
             output += '</tr>';
 
             // 데이터 행 추가
-            for (let i = 1; i < values.length; i++) {
-                if (i === 1) continue; // 2행 숨김
+            for (let i = 2; i < values.length; i++) {
                 output += '<tr>';
-                output += `<td>${values[i][0]}</td>`; // A열 (자리번호)
-                output += `<td>${values[i][1]}</td>`; // B열 (이름)
+                output += `<td>${values[i][0]}</td>`; // 자리번호
+                output += `<td>${values[i][1]}</td>`; // 이름
+                output += `<td>${values[i][6]}</td>`; // 교시 (G열)
 
                 // G부터 U열까지 데이터 추가
-                for (let j = 6; j < values[i].length; j++) {
+                for (let j = 6; j < values[i].length && j <= 20; j++) {
                     output += `<td>${values[i][j]}</td>`;
                 }
                 output += '</tr>';
