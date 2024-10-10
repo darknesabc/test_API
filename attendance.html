@@ -36,8 +36,10 @@
 
                 if (rows) {
                     rows.forEach(row => {
-                        if (row[0] === seatNumber && row[1] === date) {
-                            attendance = `출결 상태: ${row[8]}`; // 출석 상태가 I열에 있다고 가정
+                        const dateColumns = [row[8], row[10], row[12], row[14], row[16], row[17], row[18], row[20]]; // I2, K2, M2, O2, Q2, R2, S2, U2에 해당하는 열 인덱스
+                        if (row[0] === seatNumber && dateColumns.includes(date)) {
+                            const attendanceIndex = dateColumns.indexOf(date) + 8; // 출결 상태가 I열에 있으므로, 날짜 열 인덱스에 8을 더해 맞춤
+                            attendance = `출결 상태: ${row[attendanceIndex]}`; // 출석 상태 가져오기
                         }
                     });
                 }
