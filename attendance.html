@@ -123,7 +123,9 @@
 
         function displayData(values) {
             // 로컬 스토리지에서 자리번호 가져오기
-            const seatNumber = localStorage.getItem('seatNumber');
+            const seatNumber = localStorage.getItem('seatNumber').trim(); // 공백 제거
+            console.log(`로컬 스토리지에서 가져온 자리번호: ${seatNumber}`); // 디버깅 출력
+
             // 테이블 생성
             let output = '<div class="table-container"><table><tr>';
             output += '<th>자리번호</th><th>이름</th><th>교시</th>';
@@ -143,8 +145,10 @@
 
             // 데이터 행 추가
             for (let i = 2; i < values.length; i++) {
-                const rowSeatNumber = values[i][0]; // 현재 행의 자리번호
-                if (rowSeatNumber == seatNumber) { // 자리번호가 매칭되는 경우만 추가
+                const rowSeatNumber = values[i][0].trim(); // 현재 행의 자리번호 (공백 제거)
+                console.log(`현재 행의 자리번호: ${rowSeatNumber}`); // 디버깅 출력
+                
+                if (rowSeatNumber === seatNumber) { // 자리번호가 매칭되는 경우만 추가
                     output += '<tr>';
                     output += `<td>${values[i][0]}</td>`; // 자리번호
                     output += `<td>${values[i][1]}</td>`; // 이름
@@ -163,6 +167,11 @@
                     }
                     output += '</tr>';
                 }
+            }
+
+            // 데이터가 없을 경우 메시지 출력
+            if (output === '<div class="table-container"><table><tr><th>자리번호</th><th>이름</th><th>교시</th>') {
+                output += '<tr><td colspan="3">일치하는 데이터가 없습니다.</td></tr>';
             }
             output += '</table></div>';
             $('#output').html(output);
