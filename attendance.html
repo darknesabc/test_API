@@ -79,15 +79,14 @@
             white-space: nowrap; /* 줄 바꿈 방지 */
         }
         /* 체크박스와 날짜 선택 스타일 */
-        .header-right {
+        .header-left {
             display: flex;
             align-items: center;
-        }
-        .header-right label {
-            margin-right: 10px; /* 체크박스와 날짜 사이의 간격 */
+            margin-left: 20px; /* 왼쪽 여백 추가 */
         }
         input[type="date"] {
             padding: 5px;
+            margin-left: 10px; /* 체크박스와 날짜 선택 사이 여백 추가 */
         }
     </style>
     <script>
@@ -194,7 +193,7 @@
 <body>
     <header>
         <div id="userName"></div>
-        <div class="header-right">
+        <div class="header-left">
             <label>
                 <input type="checkbox" id="attendanceCheckbox"> 
             </label>
