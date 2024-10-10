@@ -10,92 +10,55 @@
         const SHEET_NAME = '출결'; // 시트 이름
         const API_KEY = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // 구글 API 키
 
-        window.onload = function() {
-            const seatNumber = localStorage.getItem('username'); // 자리번호 가져오기
-            const today = new Date().toISOString().split('T')[0]; // 오늘 날짜 가져오기
-            document.getElementById('dateInput').value = today; // 날짜 입력 필드에 오늘 날짜 기본값 설정
+        $(document).ready(function() {
+            fetchSheetData();
+        });
+
+        function fetchSheetData() {
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`;
             
-            if (seatNumber) {
-                fetchAttendanceData(seatNumber, today);
-                document.getElementById('userName').innerText = seatNumber; // 자리번호 표시
-            }
-
-            // 날짜 선택기 이벤트 리스너
-            document.getElementById('dateInput').addEventListener('change', function() {
-                fetchAttendanceData(seatNumber, this.value);
-            });
-        };
-
-        function fetchAttendanceData(seatNumber, date) {
-            const range = `${SHEET_NAME}!A4:U`; // A열과 U열의 범위 설정
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?key=${API_KEY}`;
-
             $.get(url, function(data) {
-                const rows = data.values;
-                let attendance = '출결 정보를 찾을 수 없습니다.'; // 기본 메시지
-
-                if (rows) {
-                    rows.forEach(row => {
-                        const dateColumns = [row[8], row[10], row[12], row[14], row[16], row[17], row[18], row[20]]; // I2, K2, M2, O2, Q2, R2, S2, U2에 해당하는 열 인덱스
-                        if (row[0] === seatNumber && dateColumns.includes(date)) {
-                            const attendanceIndex = dateColumns.indexOf(date) + 8; // 출결 상태가 I열에 있으므로, 날짜 열 인덱스에 8을 더해 맞춤
-                            attendance = `출결 상태: ${row[attendanceIndex]}`; // 출석 상태 가져오기
-                        }
-                    });
+                if (data.values && data.values.length > 0) {
+                    displayData(data.values);
+                } else {
+                    $('#output').html('<p>데이터가 없습니다.</p>');
                 }
-
-                document.getElementById('attendanceInfo').innerText = attendance; // 정보 표시
+            }).fail(function() {
+                $('#output').html('<p>데이터를 불러오는 데 실패했습니다.</p>');
             });
+        }
+
+        function displayData(values) {
+            // 테이블 생성
+            let output = '<table border="1"><tr>';
+            output += '<th>자리번호</th><th>이름</th>';
+
+            // 날짜 열 추가
+            for (let i = 7; i < values[0].length; i++) {
+                const date = values[0][i]; // 10/7, 10/8 형태의 날짜
+                output += `<th>${date}</th>`;
+            }
+            output += '</tr>';
+
+            // 데이터 행 추가
+            for (let i = 1; i < values.length; i++) {
+                output += '<tr>';
+                output += `<td>${values[i][0]}</td>`; // 자리번호
+                output += `<td>${values[i][1]}</td>`; // 이름
+
+                // 출석 데이터 추가
+                for (let j = 7; j < values[i].length; j++) {
+                    output += `<td>${values[i][j]}</td>`;
+                }
+                output += '</tr>';
+            }
+            output += '</table>';
+            $('#output').html(output);
         }
     </script>
-    <style>
-        /* 추가 스타일 */
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-            color: #333;
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-        }
-        header {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            width: 100%;
-            padding: 10px 20px;
-            background-color: #4CAF50;
-            color: white;
-        }
-        #userInfo {
-            display: flex;
-            align-items: center;
-        }
-        #userName {
-            font-size: 18px;
-            margin-right: 20px;
-            white-space: nowrap;
-        }
-        #dateInput {
-            margin-right: 10px; /* 날짜 선택기와 자리번호 사이의 간격 */
-            padding: 5px; /* 날짜 선택기 패딩 */
-        }
-    </style>
 </head>
 <body>
-    <header>
-        <div id="userInfo">
-            <input type="date" id="dateInput"> <!-- 날짜 선택기 추가 -->
-            <div id="userName"></div>
-        </div>
-    </header>
-
-    <main>
-        <h1>출결 현황</h1>
-        <div id="attendanceInfo">여기에 출결 정보가 표시됩니다.</div>
-    </main>
+    <h1>출결 현황</h1>
+    <div id="output">데이터를 불러오는 중...</div>
 </body>
 </html>
