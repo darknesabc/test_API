@@ -31,34 +31,24 @@
         function displayData(values) {
             // 테이블 생성
             let output = '<table border="1"><tr>';
-            output += '<th>자리번호</th><th>이름</th><th>교시</th>';
+            output += '<th>자리번호</th><th>이름</th>';
 
-            // I, K, M, O, Q, S, U 열 헤더 추가
-            const headers = ['출석', '결석', '결석', '출석', '결석', '출석', '결석'];
-            for (let i = 0; i < headers.length; i++) {
-                output += `<th>${headers[i]}</th>`;
+            // A, B, G부터 U열까지 헤더 추가
+            for (let i = 6; i < values[0].length; i++) {
+                output += `<th>${values[0][i]}</th>`;
             }
-
             output += '</tr>';
-            
+
             // 데이터 행 추가
             for (let i = 1; i < values.length; i++) {
                 if (i === 1) continue; // 2행 숨김
                 output += '<tr>';
-                output += `<td>${values[i][0]}</td>`; // 자리번호
-                output += `<td>${values[i][1]}</td>`; // 이름
-                output += `<td>${values[i][6]}</td>`; // 교시 (G열)
+                output += `<td>${values[i][0]}</td>`; // A열 (자리번호)
+                output += `<td>${values[i][1]}</td>`; // B열 (이름)
 
-                // 출석 데이터 추가 (I, K, M, O, Q, S, U 열)
-                for (let j = 8; j < values[i].length; j += 2) {
-                    let attendance = values[i][j]; // 출석 데이터
-                    if (attendance == 1) {
-                        output += '<td>출석</td>';
-                    } else if (attendance == 3) {
-                        output += '<td>결석</td>';
-                    } else {
-                        output += '<td></td>'; // 데이터가 없을 경우
-                    }
+                // G부터 U열까지 데이터 추가
+                for (let j = 6; j < values[i].length; j++) {
+                    output += `<td>${values[i][j]}</td>`;
                 }
                 output += '</tr>';
             }
