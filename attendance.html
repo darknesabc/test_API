@@ -5,11 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>출결 현황</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <style>
-        .hidden {
-            display: none; /* 2행 숨기기 */
-        }
-    </style>
     <script>
         const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
         const SHEET_NAME = '출결'; // 시트 이름
@@ -36,33 +31,39 @@
         function displayData(values) {
             // 테이블 생성
             let output = '<table border="1"><tr>';
-            output += '<th>자리번호</th><th>이름</th><th>교시</th>'; // "교시" 추가
+            output += '<th>자리번호</th><th>이름</th><th>교시</th>';
 
-            // I, K, M, O, Q, S, U열의 첫 번째 행 데이터를 열 제목으로 추가
-            const headers = [8, 10, 12, 14, 16, 18, 20]; // I, K, M, O, Q, S, U 열의 인덱스
-            headers.forEach(index => {
-                output += `<th>${values[0][index]}</th>`;
-            });
+            // I, K, M, O, Q, S, U 열 헤더 추가
+            const headers = ['출석', '결석', '결석', '출석', '결석', '출석', '결석'];
+            for (let i = 0; i < headers.length; i++) {
+                output += `<th>${headers[i]}</th>`;
+            }
+
             output += '</tr>';
-
+            
             // 데이터 행 추가
             for (let i = 1; i < values.length; i++) {
+                if (i === 1) continue; // 2행 숨김
                 output += '<tr>';
                 output += `<td>${values[i][0]}</td>`; // 자리번호
                 output += `<td>${values[i][1]}</td>`; // 이름
-                output += `<td>${values[i][6]}</td>`; // 교시
+                output += `<td>${values[i][6]}</td>`; // 교시 (G열)
 
                 // 출석 데이터 추가 (I, K, M, O, Q, S, U 열)
-                headers.forEach(index => {
-                    output += `<td>${values[i][index]}</td>`;
-                });
+                for (let j = 8; j < values[i].length; j += 2) {
+                    let attendance = values[i][j]; // 출석 데이터
+                    if (attendance == 1) {
+                        output += '<td>출석</td>';
+                    } else if (attendance == 3) {
+                        output += '<td>결석</td>';
+                    } else {
+                        output += '<td></td>'; // 데이터가 없을 경우
+                    }
+                }
                 output += '</tr>';
             }
             output += '</table>';
             $('#output').html(output);
-
-            // 2행 숨기기
-            $('#output table tr:nth-child(2)').addClass('hidden');
         }
     </script>
 </head>
