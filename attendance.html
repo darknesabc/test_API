@@ -11,12 +11,15 @@
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0;
-            font-size: 18px;
+            font-size: 16px; /* 기본 폰트 크기 */
             text-align: left;
         }
         th, td {
-            padding: 12px;
+            padding: 10px;
             border: 1px solid #ddd;
+            white-space: nowrap; /* 한 줄로 표시되도록 */
+            overflow: hidden;
+            text-overflow: ellipsis; /* 긴 텍스트는 생략 표시 */
         }
         th {
             background-color: #f4f4f4;
@@ -32,6 +35,38 @@
         .absence {
             background-color: #f8d7da; /* 결석: 연한 빨간색 */
             color: #721c24;
+        }
+
+        /* 작은 화면에서도 스크롤 가능하게 */
+        .table-container {
+            width: 100%;
+            overflow-x: auto; /* 가로 스크롤 활성화 */
+        }
+
+        /* 반응형 폰트 및 테이블 패딩 조정 */
+        @media only screen and (max-width: 1024px) {
+            table {
+                font-size: 14px;
+            }
+            th, td {
+                padding: 8px;
+            }
+        }
+        @media only screen and (max-width: 768px) {
+            table {
+                font-size: 12px;
+            }
+            th, td {
+                padding: 6px;
+            }
+        }
+        @media only screen and (max-width: 480px) {
+            table {
+                font-size: 10px;
+            }
+            th, td {
+                padding: 4px;
+            }
         }
     </style>
     <script>
@@ -59,7 +94,7 @@
 
         function displayData(values) {
             // 테이블 생성
-            let output = '<table><tr>';
+            let output = '<div class="table-container"><table><tr>';
             output += '<th>자리번호</th><th>이름</th><th>교시</th>';
 
             // I, K, M, O, Q, S, U열의 2행 데이터를 1행으로 옮김
@@ -95,7 +130,7 @@
                 }
                 output += '</tr>';
             }
-            output += '</table>';
+            output += '</table></div>';
             $('#output').html(output);
         }
     </script>
