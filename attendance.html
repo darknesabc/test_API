@@ -44,7 +44,7 @@
         });
 
         function fetchSheetData() {
-            const url = https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${API_KEY};
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`;
             
             $.get(url, function(data) {
                 if (data.values && data.values.length > 0) {
@@ -71,26 +71,26 @@
 
             // H부터 U열까지 헤더 추가 (U열까지만 표시)
             for (let i = 7; i < values[0].length && i <= 20; i++) {
-                output += <th>${values[0][i]}</th>;
+                output += `<th>${values[0][i]}</th>`;
             }
             output += '</tr>';
 
             // 데이터 행 추가
             for (let i = 2; i < values.length; i++) {
                 output += '<tr>';
-                output += <td>${values[i][0]}</td>; // 자리번호
-                output += <td>${values[i][1]}</td>; // 이름
-                output += <td>${values[i][6]}</td>; // 교시 (G열)
+                output += `<td>${values[i][0]}</td>`; // 자리번호
+                output += `<td>${values[i][1]}</td>`; // 이름
+                output += `<td>${values[i][6]}</td>`; // 교시 (G열)
 
                 // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
                 for (let j = 7; j < values[i].length && j <= 20; j++) {
                     let cellValue = values[i][j];
                     if (cellValue == '1') {
-                        output += <td class="attendance">출석</td>;
+                        output += `<td class="attendance">출석</td>`;
                     } else if (cellValue == '3') {
-                        output += <td class="absence">결석</td>;
+                        output += `<td class="absence">결석</td>`;
                     } else {
-                        output += <td>${cellValue}</td>;
+                        output += `<td>${cellValue}</td>`;
                     }
                 }
                 output += '</tr>';
