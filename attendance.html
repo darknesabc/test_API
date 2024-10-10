@@ -5,6 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>출결 현황</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        /* 테이블 스타일링 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 18px;
+            text-align: left;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        /* 출석 및 결석 색상 */
+        .attendance {
+            background-color: #d4edda; /* 출석: 연한 초록색 */
+            color: #155724;
+        }
+        .absence {
+            background-color: #f8d7da; /* 결석: 연한 빨간색 */
+            color: #721c24;
+        }
+    </style>
     <script>
         const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
         const SHEET_NAME = '출결'; // 시트 이름
@@ -30,7 +59,7 @@
 
         function displayData(values) {
             // 테이블 생성
-            let output = '<table border="1"><tr>';
+            let output = '<table><tr>';
             output += '<th>자리번호</th><th>이름</th><th>교시</th>';
 
             // I, K, M, O, Q, S, U열의 2행 데이터를 1행으로 옮김
@@ -53,9 +82,16 @@
                 output += `<td>${values[i][1]}</td>`; // 이름
                 output += `<td>${values[i][6]}</td>`; // 교시 (G열)
 
-                // H부터 U열까지 데이터 추가
+                // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
                 for (let j = 7; j < values[i].length && j <= 20; j++) {
-                    output += `<td>${values[i][j]}</td>`;
+                    let cellValue = values[i][j];
+                    if (cellValue == '1') {
+                        output += `<td class="attendance">출석</td>`;
+                    } else if (cellValue == '3') {
+                        output += `<td class="absence">결석</td>`;
+                    } else {
+                        output += `<td>${cellValue}</td>`;
+                    }
                 }
                 output += '</tr>';
             }
