@@ -33,6 +33,30 @@
             background-color: #f8d7da; /* 결석: 연한 빨간색 */
             color: #721c24;
         }
+
+        /* 테이블을 작은 화면에서도 스크롤 가능하게 */
+        .table-container {
+            width: 100%;
+            overflow-x: auto; /* 가로 스크롤 활성화 */
+        }
+
+        /* 모바일 화면 대응 */
+        @media only screen and (max-width: 768px) {
+            table {
+                font-size: 16px; /* 작은 화면에서 폰트 크기 조절 */
+            }
+            th, td {
+                padding: 10px; /* 패딩도 줄임 */
+            }
+        }
+        @media only screen and (max-width: 480px) {
+            table {
+                font-size: 14px; /* 더 작은 화면에서는 폰트 더 줄임 */
+            }
+            th, td {
+                padding: 8px;
+            }
+        }
     </style>
     <script>
         const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
@@ -59,7 +83,7 @@
 
         function displayData(values) {
             // 테이블 생성
-            let output = '<table><tr>';
+            let output = '<div class="table-container"><table><tr>';
             output += '<th>자리번호</th><th>이름</th><th>교시</th>';
 
             // I, K, M, O, Q, S, U열의 2행 데이터를 1행으로 옮김
@@ -95,7 +119,7 @@
                 }
                 output += '</tr>';
             }
-            output += '</table>';
+            output += '</table></div>';
             $('#output').html(output);
         }
     </script>
