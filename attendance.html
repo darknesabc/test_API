@@ -66,7 +66,7 @@
         /* 헤더 스타일 */
         header {
             display: flex;
-            justify-content: flex-end; /* 사용자 정보를 오른쪽으로 배치 */
+            justify-content: space-between; /* 자리번호와 이름, 체크박스와 날짜를 양쪽에 배치 */
             align-items: center;
             width: 100%;
             padding: 10px 20px;
@@ -75,14 +75,13 @@
         }
         #userName {
             font-size: 18px;
-            margin-right: 20px; /* 이름과 버튼 사이의 간격 */
+            margin-left: auto; /* 오른쪽으로 배치 */
             white-space: nowrap; /* 줄 바꿈 방지 */
         }
         /* 체크박스와 날짜 선택 스타일 */
         .header-right {
             display: flex;
             align-items: center;
-            margin-left: auto; /* 오른쪽으로 밀기 */
         }
         .header-right label {
             margin-right: 10px; /* 체크박스와 날짜 사이의 간격 */
@@ -197,7 +196,7 @@
         <div id="userName"></div>
         <div class="header-right">
             <label>
-                <input type="checkbox" id="attendanceCheckbox"> 출석 체크
+                <input type="checkbox" id="attendanceCheckbox"> 
             </label>
             <input type="date" id="attendanceDate" onchange="updateDate()">
         </div>
