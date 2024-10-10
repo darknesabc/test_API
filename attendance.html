@@ -13,10 +13,17 @@
         window.onload = function() {
             const seatNumber = localStorage.getItem('username'); // 자리번호 가져오기
             const today = new Date().toISOString().split('T')[0]; // 오늘 날짜 가져오기
+            document.getElementById('dateInput').value = today; // 날짜 입력 필드에 오늘 날짜 기본값 설정
+            
             if (seatNumber) {
                 fetchAttendanceData(seatNumber, today);
                 document.getElementById('userName').innerText = seatNumber; // 자리번호 표시
             }
+
+            // 날짜 선택기 이벤트 리스너
+            document.getElementById('dateInput').addEventListener('change', function() {
+                fetchAttendanceData(seatNumber, this.value);
+            });
         };
 
         function fetchAttendanceData(seatNumber, date) {
@@ -70,11 +77,16 @@
             margin-right: 20px;
             white-space: nowrap;
         }
+        #dateInput {
+            margin-right: 10px; /* 날짜 선택기와 자리번호 사이의 간격 */
+            padding: 5px; /* 날짜 선택기 패딩 */
+        }
     </style>
 </head>
 <body>
     <header>
         <div id="userInfo">
+            <input type="date" id="dateInput"> <!-- 날짜 선택기 추가 -->
             <div id="userName"></div>
         </div>
     </header>
