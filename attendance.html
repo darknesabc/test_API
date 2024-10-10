@@ -11,10 +11,11 @@
         const API_KEY = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // 구글 API 키
 
         window.onload = function() {
-            const seatNumber = document.getElementById('userName').innerText; // 자리번호 가져오기
+            const seatNumber = localStorage.getItem('username'); // 자리번호 가져오기
             const today = new Date().toISOString().split('T')[0]; // 오늘 날짜 가져오기
             if (seatNumber) {
                 fetchAttendanceData(seatNumber, today);
+                document.getElementById('userName').innerText = seatNumber; // 자리번호 표시
             }
         };
 
@@ -38,9 +39,49 @@
             });
         }
     </script>
+    <style>
+        /* 추가 스타일 */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+        header {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            width: 100%;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+        }
+        #userInfo {
+            display: flex;
+            align-items: center;
+        }
+        #userName {
+            font-size: 18px;
+            margin-right: 20px;
+            white-space: nowrap;
+        }
+    </style>
 </head>
 <body>
-    <h1>출결 현황</h1>
-    <div id="attendanceInfo">여기에 출결 정보가 표시됩니다.</div>
+    <header>
+        <div id="userInfo">
+            <div id="userName"></div>
+        </div>
+    </header>
+
+    <main>
+        <h1>출결 현황</h1>
+        <div id="attendanceInfo">여기에 출결 정보가 표시됩니다.</div>
+    </main>
 </body>
 </html>
