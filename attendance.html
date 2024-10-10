@@ -66,7 +66,7 @@
         /* 헤더 스타일 */
         header {
             display: flex;
-            justify-content: flex-start; /* 자리번호와 이름, 체크박스와 날짜를 왼쪽에 배치 */
+            justify-content: flex-start; /* 자리번호와 이름, 날짜를 왼쪽에 배치 */
             align-items: center;
             width: 100%;
             padding: 10px 20px;
@@ -84,7 +84,7 @@
             align-items: center;
             margin-left: 20px; /* 왼쪽 여백 추가 */
         }
-        input[type="date"] {
+        input[type="text"] {
             padding: 5px;
             margin-left: 10px; /* 날짜 선택의 왼쪽 여백 */
         }
@@ -193,20 +193,24 @@
 <body>
     <header>
         <div class="header-left">
-            <input type="date" id="attendanceDate" onchange="updateDate()" max="2099-12-31" onfocus="this.removeAttribute('readonly');">
+            <label for="attendanceDate">날짜:</label>
+            <input type="text" id="attendanceDate" placeholder="MM/DD" maxlength="5" onfocus="this.removeAttribute('readonly');">
         </div>
         <div id="userName"></div>
     </header>
     <h1>출결 현황</h1>
     <div id="output">데이터를 불러오는 중...</div>
     <script>
-        function updateDate() {
-            const dateInput = document.getElementById('attendanceDate');
-            const selectedDate = new Date(dateInput.value);
-            const options = { month: '2-digit', day: '2-digit' };
-            const formattedDate = selectedDate.toLocaleDateString('en-US', options);
-            console.log('선택한 날짜:', formattedDate); // 선택한 날짜 출력 (mm/dd 형식)
-        }
+        // 날짜 입력 검증 및 출력
+        document.getElementById('attendanceDate').addEventListener('input', function() {
+            const dateInput = this.value;
+            const isValidDate = /^\d{2}\/\d{2}$/.test(dateInput); // MM/DD 형식 검증
+            if (!isValidDate) {
+                console.log('잘못된 날짜 형식입니다. MM/DD 형식으로 입력하세요.');
+            } else {
+                console.log('선택한 날짜:', dateInput); // 선택한 날짜 출력 (MM/DD 형식)
+            }
+        });
     </script>
 </body>
 </html>
