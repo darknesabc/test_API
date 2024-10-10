@@ -68,6 +68,34 @@
                 padding: 4px;
             }
         }
+        
+        /* 헤더 스타일링 */
+        header {
+            display: flex;
+            justify-content: flex-end; /* 사용자 정보를 오른쪽으로 배치 */
+            align-items: center;
+            width: 100%;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+        }
+        #userName {
+            font-size: 18px;
+            margin-right: 20px; /* 이름과 버튼 사이의 간격 */
+        }
+        #logoutButton {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 8px 15px; /* 버튼 패딩 */
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        #logoutButton:hover {
+            background-color: #d32f2f;
+        }
     </style>
     <script>
         const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
@@ -76,6 +104,22 @@
 
         $(document).ready(function() {
             fetchSheetData();
+
+            // 첫 로그인 페이지에서 저장된 자리번호와 사용자 이름 불러오기
+            const userName = localStorage.getItem('username'); // 자리번호와 이름이 함께 저장됨
+
+            if (userName) {
+                $('#userName').text(userName); // 자리번호와 사용자 이름 표시
+            } else {
+                $('#userName').text('사용자'); // 이름이 없을 경우 기본값
+            }
+
+            // 로그아웃 버튼 동작 설정
+            $('#logoutButton').on('click', function() {
+                localStorage.clear(); // 로그아웃 시 localStorage에서 사용자 정보 삭제
+                alert('로그아웃되었습니다.');
+                window.location.href = 'index.html'; // 로그인 페이지로 돌아가기
+            });
         });
 
         function fetchSheetData() {
@@ -136,6 +180,10 @@
     </script>
 </head>
 <body>
+    <header>
+        <div id="userName"></div>
+        <button id="logoutButton">로그아웃</button>
+    </header>
     <h1>출결 현황</h1>
     <div id="output">데이터를 불러오는 중...</div>
 </body>
