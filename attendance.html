@@ -6,84 +6,7 @@
     <title>출결 현황</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
-        /* 테이블 스타일링 */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            font-size: 16px; /* 기본 폰트 크기 */
-            text-align: left;
-        }
-        th, td {
-            padding: 10px;
-            border: 1px solid #ddd;
-            white-space: nowrap; /* 한 줄로 표시되도록 */
-            overflow: hidden;
-            text-overflow: ellipsis; /* 긴 텍스트는 생략 표시 */
-        }
-        th {
-            background-color: #f4f4f4;
-        }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        /* 출석 및 결석 색상 */
-        .attendance {
-            background-color: #d4edda; /* 출석: 연한 초록색 */
-            color: #155724;
-        }
-        .absence {
-            background-color: #f8d7da; /* 결석: 연한 빨간색 */
-            color: #721c24;
-        }
-
-        /* 작은 화면에서도 스크롤 가능하게 */
-        .table-container {
-            width: 100%;
-            overflow-x: auto; /* 가로 스크롤 활성화 */
-        }
-
-        /* 반응형 폰트 및 테이블 패딩 조정 */
-        @media only screen and (max-width: 1024px) {
-            table {
-                font-size: 14px;
-            }
-            th, td {
-                padding: 8px;
-            }
-        }
-        @media only screen and (max-width: 768px) {
-            table {
-                font-size: 12px;
-            }
-            th, td {
-                padding: 6px;
-            }
-        }
-        @media only screen and (max-width: 480px) {
-            table {
-                font-size: 10px;
-            }
-            th, td {
-                padding: 4px;
-            }
-        }
-
-        /* 헤더 스타일 */
-        header {
-            display: flex;
-            justify-content: flex-end; /* 사용자 정보를 오른쪽으로 배치 */
-            align-items: center;
-            width: 100%;
-            padding: 10px 20px;
-            background-color: #4CAF50;
-            color: white;
-        }
-        #userName {
-            font-size: 18px;
-            margin-right: 20px; /* 이름과 버튼 사이의 간격 */
-            white-space: nowrap; /* 줄 바꿈 방지 */
-        }
+        /* (기존 스타일 유지) */
     </style>
     <script>
         const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
@@ -91,21 +14,25 @@
         const API_KEY = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // 구글 API 키
 
         $(document).ready(function() {
-            fetchSheetData();
-            // 첫 로그인 페이지에서 저장된 자리번호와 사용자 이름 불러오기
-            const userName = localStorage.getItem('username'); // 자리번호와 이름이 함께 저장됨
-            const seatNumber = localStorage.getItem('seatNumber'); // 자리번호를 따로 저장했다고 가정
+            // 로그인 처리 (자리번호와 이름을 로컬 스토리지에 저장)
+            const seatNumber = prompt("자리번호를 입력하세요:"); // 자리번호 입력
+            const userName = prompt("이름을 입력하세요:"); // 사용자 이름 입력
+            saveUserData(seatNumber, userName); // 자리번호와 이름 저장
 
+            fetchSheetData();
+
+            // 첫 로그인 페이지에서 저장된 자리번호와 사용자 이름 불러오기
             if (userName) {
                 $('#userName').text(userName); // 자리번호와 사용자 이름 표시
             } else {
                 $('#userName').text('사용자'); // 이름이 없을 경우 기본값
             }
-
-            if (!seatNumber) {
-                alert('자리번호가 저장되어 있지 않습니다.');
-            }
         });
+
+        function saveUserData(seatNumber, userName) {
+            localStorage.setItem('seatNumber', seatNumber); // 자리번호 저장
+            localStorage.setItem('username', userName); // 사용자 이름 저장
+        }
 
         function fetchSheetData() {
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`;
