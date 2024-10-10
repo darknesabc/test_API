@@ -95,10 +95,11 @@
             const userName = localStorage.getItem('username'); // 자리번호와 이름이 함께 저장됨
             const userSeatNumber = localStorage.getItem('seatNumber'); // 자리번호 추가
 
-            if (userName) {
+            // 자리번호와 사용자 이름이 모두 있을 때만 표시
+            if (userSeatNumber && userName) {
                 $('#userName').text(`${userSeatNumber} - ${userName}`); // 자리번호와 사용자 이름 표시
             } else {
-                $('#userName').text('사용자'); // 이름이 없을 경우 기본값
+                $('#userName').text('사용자'); // 이름이나 자리번호가 없을 경우 기본값
             }
         });
 
