@@ -12,10 +12,14 @@
 
         window.onload = function() {
             const userName = localStorage.getItem('username'); // 자리번호 가져오기
-            const today = new Date().toISOString().split('T')[0]; // 오늘 날짜 가져오기
-            if (userName) {
-                fetchAttendanceData(userName, today);
-            }
+            document.getElementById('fetchButton').onclick = function() {
+                const date = document.getElementById('dateInput').value; // 선택된 날짜 가져오기
+                if (userName && date) {
+                    fetchAttendanceData(userName, date);
+                } else {
+                    alert('자리번호와 날짜를 모두 입력하세요.');
+                }
+            };
         };
 
         function fetchAttendanceData(seatNumber, date) {
@@ -29,7 +33,7 @@
                 if (rows) {
                     rows.forEach(row => {
                         if (row[0] === seatNumber && row[1] === date) {
-                            attendance = `출결 상태: ${row[2]}`; // 예를 들어 C열에 출결 상태가 있다고 가정
+                            attendance = `출결 상태: ${row[2]}`; // C열에 출결 상태가 있다고 가정
                         }
                     });
                 }
@@ -41,6 +45,9 @@
 </head>
 <body>
     <h1>출결 현황</h1>
+    <label for="dateInput">날짜 선택:</label>
+    <input type="date" id="dateInput">
+    <button id="fetchButton">출결 확인</button>
     <div id="attendanceInfo">여기에 출결 정보가 표시됩니다.</div>
 </body>
 </html>
