@@ -31,7 +31,7 @@
         function displayData(values) {
             // 테이블 생성
             let output = '<table border="1"><tr>';
-            output += '<th>자리번호</th><th>이름</th>';
+            output += '<th>자리번호</th><th>이름</th><th>의무</th>'; // 의무 열 추가
 
             // 날짜 열 추가 (U열까지, 21은 0부터 시작)
             for (let i = 7; i < values[0].length && i < 21; i++) { 
@@ -45,6 +45,7 @@
                 output += '<tr>';
                 output += `<td>${values[i][0]}</td>`; // 자리번호
                 output += `<td>${values[i][1]}</td>`; // 이름
+                output += `<td>${values[i][2]}</td>`; // 의무
 
                 // 출석 데이터 추가 (U열까지)
                 for (let j = 7; j < values[i].length && j < 21; j++) { 
