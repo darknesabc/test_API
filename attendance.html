@@ -66,7 +66,7 @@
         /* 헤더 스타일 */
         header {
             display: flex;
-            justify-content: space-between; /* 자리번호와 이름, 체크박스와 날짜를 양쪽에 배치 */
+            justify-content: flex-start; /* 자리번호와 이름, 체크박스와 날짜를 왼쪽에 배치 */
             align-items: center;
             width: 100%;
             padding: 10px 20px;
@@ -78,7 +78,7 @@
             margin-left: auto; /* 오른쪽으로 배치 */
             white-space: nowrap; /* 줄 바꿈 방지 */
         }
-        /* 체크박스와 날짜 선택 스타일 */
+        /* 날짜 선택 스타일 */
         .header-left {
             display: flex;
             align-items: center;
@@ -86,7 +86,7 @@
         }
         input[type="date"] {
             padding: 5px;
-            margin-left: 10px; /* 체크박스와 날짜 선택 사이 여백 추가 */
+            margin-left: 10px; /* 날짜 선택의 왼쪽 여백 */
         }
     </style>
     <script>
@@ -192,13 +192,10 @@
 </head>
 <body>
     <header>
-        <div id="userName"></div>
         <div class="header-left">
-            <label>
-                <input type="checkbox" id="attendanceCheckbox"> 
-            </label>
-            <input type="date" id="attendanceDate" onchange="updateDate()">
+            <input type="date" id="attendanceDate" onchange="updateDate()" max="2099-12-31" onfocus="this.removeAttribute('readonly');">
         </div>
+        <div id="userName"></div>
     </header>
     <h1>출결 현황</h1>
     <div id="output">데이터를 불러오는 중...</div>
