@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>출결 현황</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
+        const SHEET_NAME = '출결'; // 시트 이름
+        const API_KEY = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // 구글 API 키
+
+        window.onload = function() {
+            const userName = localStorage.getItem('username'); // 자리번호 가져오기
+            const today = new Date().toISOString().split('T')[0]; // 오늘 날짜 가져오기
+            if (userName) {
+                fetchAttendanceData(userName, today);
+            }
+        };
+
+        function fetchAttendanceData(seatNumber, date) {
+            const range = `${SHEET_NAME}!A:U`; // A열과 U열의 범위 설정
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?key=${API_KEY}`;
+
+            $.get(url, function(data) {
+                const rows = data.values;
+                let attendance = '출결 정보를 찾을 수 없습니다.'; // 기본 메시지
+
+                if (rows) {
+                    rows.forEach(row => {
+                        if (row[0] === seatNumber && row[1] === date) {
+                            attendance = `출결 상태: ${row[2]}`; // 예를 들어 C열에 출결 상태가 있다고 가정
+                        }
+                    });
+                }
+
+                document.getElementById('attendanceInfo').innerText = attendance; // 정보 표시
+            });
+        }
+    </script>
+</head>
+<body>
+    <h1>출결 현황</h1>
+    <div id="attendanceInfo">여기에 출결 정보가 표시됩니다.</div>
+</body>
+</html>
