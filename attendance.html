@@ -155,7 +155,9 @@
                     output += '</tr>';
                 }
                 // 3행 데이터도 표시
-                if (i === 3 || i === 2) { // 사용자와 3행 모두 표시
+                for (let i = 2; i < values.length; i++) {
+    // 3행 데이터만 표시
+    if (i === 3) {
                     output += '<tr>';
                     output += `<td>${values[i][0]}</td>`; // 자리번호
                     output += `<td>${values[i][1]}</td>`; // 이름
