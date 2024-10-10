@@ -78,6 +78,18 @@
             margin-right: 20px; /* 이름과 버튼 사이의 간격 */
             white-space: nowrap; /* 줄 바꿈 방지 */
         }
+        /* 체크박스와 날짜 선택 스타일 */
+        .header-right {
+            display: flex;
+            align-items: center;
+            margin-left: auto; /* 오른쪽으로 밀기 */
+        }
+        .header-right label {
+            margin-right: 10px; /* 체크박스와 날짜 사이의 간격 */
+        }
+        input[type="date"] {
+            padding: 5px;
+        }
     </style>
     <script>
         const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
@@ -183,8 +195,23 @@
 <body>
     <header>
         <div id="userName"></div>
+        <div class="header-right">
+            <label>
+                <input type="checkbox" id="attendanceCheckbox"> 출석 체크
+            </label>
+            <input type="date" id="attendanceDate" onchange="updateDate()">
+        </div>
     </header>
     <h1>출결 현황</h1>
     <div id="output">데이터를 불러오는 중...</div>
+    <script>
+        function updateDate() {
+            const dateInput = document.getElementById('attendanceDate');
+            const selectedDate = new Date(dateInput.value);
+            const options = { month: '2-digit', day: '2-digit' };
+            const formattedDate = selectedDate.toLocaleDateString('en-US', options);
+            console.log('선택한 날짜:', formattedDate); // 선택한 날짜 출력 (mm/dd 형식)
+        }
+    </script>
 </body>
 </html>
