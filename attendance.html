@@ -1,71 +1,45 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>출결 현황</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script>
-        const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
-        const SHEET_NAME = '출결'; // 시트 이름
-        const API_KEY = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // 구글 API 키
+function displayData(values) {
+    // 테이블 생성
+    let output = '<table border="1"><tr>';
+    output += '<th>자리번호</th><th>이름</th><th>교시</th>';
 
-        $(document).ready(function() {
-            fetchSheetData();
-        });
-
-        function fetchSheetData() {
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`;
-            
-            $.get(url, function(data) {
-                if (data.values && data.values.length > 0) {
-                    displayData(data.values);
-                } else {
-                    $('#output').html('<p>데이터가 없습니다.</p>');
-                }
-            }).fail(function() {
-                $('#output').html('<p>데이터를 불러오는 데 실패했습니다.</p>');
-            });
+    // I, K, M, O, Q, S, U열의 2행 데이터를 1행으로 옮김
+    for (let i = 8; i <= 20; i += 2) {
+        if (values[1][i]) {
+            values[0][i] = values[1][i]; // 2행 값을 1행으로 옮김
         }
+    }
 
-        function displayData(values) {
-            // 테이블 생성
-            let output = '<table border="1"><tr>';
-            output += '<th>자리번호</th><th>이름</th><th>교시</th>';
+    // H부터 U열까지 헤더 추가 (U열까지만 표시)
+    for (let i = 7; i < values[0].length && i <= 20; i++) {
+        output += `<th>${values[0][i]}</th>`;
+    }
+    output += '</tr>';
 
-            // I, K, M, O, Q, S, U열의 2행 데이터를 1행으로 옮김
-            for (let i = 8; i <= 20; i += 2) {
-                if (values[1][i]) {
-                    values[0][i] = values[1][i]; // 2행 값을 1행으로 옮김
+    // 데이터 행 추가
+    for (let i = 2; i < values.length; i++) {
+        output += '<tr>';
+        output += `<td>${values[i][0]}</td>`; // 자리번호
+        output += `<td>${values[i][1]}</td>`; // 이름
+        output += `<td>${values[i][6]}</td>`; // 교시 (G열)
+
+        // H부터 U열까지 데이터 추가
+        for (let j = 7; j < values[i].length && j <= 20; j++) {
+            let cellValue = values[i][j];
+
+            // If the column is I, K, M, O, Q, S, or U, replace 1 with "출석" and 3 with "결석"
+            if (j === 8 || j === 10 || j === 12 || j === 14 || j === 16 || j === 18 || j === 20) {
+                if (cellValue === '1') {
+                    cellValue = '출석';
+                } else if (cellValue === '3') {
+                    cellValue = '결석';
                 }
             }
 
-            // H부터 U열까지 헤더 추가 (U열까지만 표시)
-            for (let i = 7; i < values[0].length && i <= 20; i++) {
-                output += `<th>${values[0][i]}</th>`;
-            }
-            output += '</tr>';
-
-            // 데이터 행 추가
-            for (let i = 2; i < values.length; i++) {
-                output += '<tr>';
-                output += `<td>${values[i][0]}</td>`; // 자리번호
-                output += `<td>${values[i][1]}</td>`; // 이름
-                output += `<td>${values[i][6]}</td>`; // 교시 (G열)
-
-                // H부터 U열까지 데이터 추가
-                for (let j = 7; j < values[i].length && j <= 20; j++) {
-                    output += `<td>${values[i][j]}</td>`;
-                }
-                output += '</tr>';
-            }
-            output += '</table>';
-            $('#output').html(output);
+            output += `<td>${cellValue}</td>`;
         }
-    </script>
-</head>
-<body>
-    <h1>출결 현황</h1>
-    <div id="output">데이터를 불러오는 중...</div>
-</body>
-</html>
+        output += '</tr>';
+    }
+    output += '</table>';
+    $('#output').html(output);
+}
