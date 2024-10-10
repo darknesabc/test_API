@@ -31,10 +31,11 @@
         function displayData(values) {
             // 테이블 생성
             let output = '<table border="1"><tr>';
-            output += '<th>자리번호</th><th>이름</th>';
-
-            // 날짜 열 추가 (U열까지, 21은 0부터 시작)
-            for (let i = 7; i < values[0].length && i < 21; i++) { 
+            output += '<th>자리번호</th><th>이름</th><th>G열 데이터</th>'; // G열 데이터 표시
+            output += '<th>의무</th>'; // 의무 열 추가
+            
+            // 첫 번째 행에 날짜 및 요일 추가
+            for (let i = 7; i < values[0].length && i < 21; i++) {
                 const date = values[0][i]; // 날짜
                 output += `<th>${date}</th>`;
             }
@@ -45,10 +46,19 @@
                 output += '<tr>';
                 output += `<td>${values[i][0]}</td>`; // 자리번호
                 output += `<td>${values[i][1]}</td>`; // 이름
+                output += `<td>${values[i][6]}</td>`; // G열 데이터
 
-                // 출석 데이터 추가 (U열까지)
+                // 출석 데이터 추가 (I, K, M, O, Q, S, U열)
                 for (let j = 7; j < values[i].length && j < 21; j++) { 
-                    output += `<td>${values[i][j]}</td>`;
+                    let attendance = values[i][j];
+                    // 1은 출석, 3은 결석으로 변환
+                    if (attendance === '1') {
+                        output += '<td>출석</td>';
+                    } else if (attendance === '3') {
+                        output += '<td>결석</td>';
+                    } else {
+                        output += `<td>${attendance}</td>`;
+                    }
                 }
                 output += '</tr>';
             }
