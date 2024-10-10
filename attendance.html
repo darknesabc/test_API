@@ -68,6 +68,22 @@
                 padding: 4px;
             }
         }
+
+        /* 헤더 스타일 */
+        header {
+            display: flex;
+            justify-content: flex-end; /* 사용자 정보를 오른쪽으로 배치 */
+            align-items: center;
+            width: 100%;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+        }
+        #userName {
+            font-size: 18px;
+            margin-right: 20px; /* 이름과 버튼 사이의 간격 */
+            white-space: nowrap; /* 줄 바꿈 방지 */
+        }
     </style>
     <script>
         const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
@@ -76,6 +92,14 @@
 
         $(document).ready(function() {
             fetchSheetData();
+            // 첫 로그인 페이지에서 저장된 자리번호와 사용자 이름 불러오기
+            const userName = localStorage.getItem('username'); // 자리번호와 이름이 함께 저장됨
+
+            if (userName) {
+                $('#userName').text(userName); // 자리번호와 사용자 이름 표시
+            } else {
+                $('#userName').text('사용자'); // 이름이 없을 경우 기본값
+            }
         });
 
         function fetchSheetData() {
@@ -136,6 +160,9 @@
     </script>
 </head>
 <body>
+    <header>
+        <div id="userName"></div>
+    </header>
     <h1>출결 현황</h1>
     <div id="output">데이터를 불러오는 중...</div>
 </body>
