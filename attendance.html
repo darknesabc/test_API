@@ -93,9 +93,10 @@
 
             // 첫 로그인 페이지에서 저장된 자리번호와 사용자 이름 불러오기
             const userName = localStorage.getItem('username'); // 자리번호와 이름이 함께 저장됨
+            const userSeatNumber = localStorage.getItem('seatNumber'); // 자리번호 추가
 
             if (userName) {
-                $('#userName').text(userName); // 자리번호와 사용자 이름 표시
+                $('#userName').text(`${userSeatNumber} - ${userName}`); // 자리번호와 사용자 이름 표시
             } else {
                 $('#userName').text('사용자'); // 이름이 없을 경우 기본값
             }
@@ -116,6 +117,9 @@
         }
 
         function displayData(values) {
+            const userSeatNumber = localStorage.getItem('seatNumber'); // 자리번호
+            const userName = localStorage.getItem('username'); // 이름
+
             // 테이블 생성
             let output = '<div class="table-container"><table><tr>';
             output += '<th>자리번호</th><th>이름</th><th>교시</th>';
@@ -133,25 +137,27 @@
             }
             output += '</tr>';
 
-            // 데이터 행 추가
+            // 데이터 행 추가 (지정된 자리번호 및 이름에 해당하는 데이터만 필터링)
             for (let i = 2; i < values.length; i++) {
-                output += '<tr>';
-                output += `<td>${values[i][0]}</td>`; // 자리번호
-                output += `<td>${values[i][1]}</td>`; // 이름
-                output += `<td>${values[i][6]}</td>`; // 교시 (G열)
+                if (values[i][0] === userSeatNumber && values[i][1] === userName) {
+                    output += '<tr>';
+                    output += `<td>${values[i][0]}</td>`; // 자리번호
+                    output += `<td>${values[i][1]}</td>`; // 이름
+                    output += `<td>${values[i][6]}</td>`; // 교시 (G열)
 
-                // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
-                for (let j = 7; j < values[i].length && j <= 20; j++) {
-                    let cellValue = values[i][j];
-                    if (cellValue == '1') {
-                        output += `<td class="attendance">출석</td>`;
-                    } else if (cellValue == '3') {
-                        output += `<td class="absence">결석</td>`;
-                    } else {
-                        output += `<td>${cellValue}</td>`;
+                    // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
+                    for (let j = 7; j < values[i].length && j <= 20; j++) {
+                        let cellValue = values[i][j];
+                        if (cellValue == '1') {
+                            output += `<td class="attendance">출석</td>`;
+                        } else if (cellValue == '3') {
+                            output += `<td class="absence">결석</td>`;
+                        } else {
+                            output += `<td>${cellValue}</td>`;
+                        }
                     }
+                    output += '</tr>';
                 }
-                output += '</tr>';
             }
             output += '</table></div>';
             $('#output').html(output);
