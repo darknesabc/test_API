@@ -18,7 +18,7 @@
         }
         header {
             display: flex;
-            justify-content: space-between; /* 메뉴와 사용자 정보를 양쪽으로 배치 */
+            justify-content: space-between; /* 사용자 정보를 양쪽으로 배치 */
             align-items: center;
             width: 100%;
             padding: 10px 20px;
@@ -52,7 +52,7 @@
         }
         .menu {
             display: flex;
-            margin: 0; /* 메뉴 항목의 여백 제거 */
+            margin: 10px 0 0 20px; /* 메뉴 항목의 여백 조정 */
             padding: 0; /* 메뉴 항목의 패딩 제거 */
             list-style: none; /* 기본 목록 스타일 제거 */
         }
@@ -105,18 +105,18 @@
 </head>
 <body>
     <header>
-        <nav class="menu">
-            <a href="#">출결 현황</a>
-            <a href="#">성적</a>
-            <a href="#">교육 점수</a>
-            <a href="#">기타</a>
-        </nav>
-
         <div id="userInfo">
             <div id="userName"></div>
             <button id="logoutButton">로그아웃</button>
         </div>
     </header>
+
+    <nav class="menu">
+        <a href="#">출결 현황</a>
+        <a href="#">성적</a>
+        <a href="#">교육 점수</a>
+        <a href="#">기타</a>
+    </nav>
 
     <main>
         <h1>환영합니다!</h1>
@@ -140,3 +140,5 @@
         window.location.href = 'index.html'; // 로그인 페이지로 돌아가기
     });
 </script>
+</body>
+</html>
