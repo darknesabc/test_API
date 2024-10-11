@@ -108,20 +108,7 @@
             output += '<th>자리번호</th>';
             output += '<th>이름</th>';
             output += '<th>교시</th>';
-            output += '<th>요일</th>';
-            output += '<th>날짜</th>';
-            output += '<th>요일</th>';
-            output += '<th>날짜</th>';
-            output += '<th>요일</th>';
-            output += '<th>날짜</th>';
-            output += '<th>요일</th>';
-            output += '<th>날짜</th>';
-            output += '<th>요일</th>';
-            output += '<th>날짜</th>';
-            output += '<th>요일</th>';
-            output += '<th>날짜</th>';
-            output += '<th>요일</th>';
-            output += '<th>날짜</th>';
+            // H열부터 U열까지의 헤더는 포함하지 않음
             output += '</tr>';
 
             // 테이블 데이터 생성
@@ -137,13 +124,9 @@
                 // 교시 (G열)
                 output += `<td>${values[i][6]}</td>`;
                 
-                // 요일과 날짜 (H, I, K, M, O, Q, S, U 열)
+                // H열부터 U열까지의 데이터 가져오기
                 for (let j = 7; j <= 20; j++) {
-                    if (values[i][j] !== undefined) {
-                        output += `<td>${values[i][j]}</td>`; // 요일 또는 날짜
-                    } else {
-                        output += '<td></td>'; // 비어있는 경우
-                    }
+                    output += `<td>${values[i][j] !== undefined ? values[i][j] : ''}</td>`; // H열부터 U열 데이터
                 }
                 
                 output += '</tr>';
