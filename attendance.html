@@ -31,7 +31,8 @@
             padding: 10px;
             text-align: left;
             border: 1px solid #ddd;
-            word-wrap: break-word; /* 단어가 길면 줄바꿈 */
+            word-wrap: normal; /* 줄바꿈을 방지 */
+            white-space: nowrap; /* 텍스트가 한 줄로 유지되도록 설정 */
         }
 
         th {
@@ -40,6 +41,8 @@
 
         td {
             max-width: 200px; /* 셀에 들어가는 내용이 너무 길면 자동으로 줄바꿈 */
+            overflow: hidden; /* 넘치는 내용 숨김 */
+            text-overflow: ellipsis; /* 넘치는 내용에 '...' 표시 */
         }
 
         /* 모바일 대응 */
