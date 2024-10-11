@@ -31,8 +31,8 @@
             padding: 10px;
             text-align: left;
             border: 1px solid #ddd;
-            word-wrap: normal;
-            white-space: nowrap;
+            word-wrap: normal; /* 줄바꿈을 방지 */
+            white-space: nowrap; /* 텍스트가 한 줄로 유지되도록 설정 */
         }
 
         th {
@@ -40,9 +40,9 @@
         }
 
         td {
-            max-width: 200px;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            max-width: 200px; /* 셀에 들어가는 내용이 너무 길면 자동으로 줄바꿈 */
+            overflow: hidden; /* 넘치는 내용 숨김 */
+            text-overflow: ellipsis; /* 넘치는 내용에 '...' 표시 */
         }
 
         /* 모바일 대응 */
@@ -78,28 +78,14 @@
                 padding: 9px;
             }
         }
-
-        /* 날짜 선택 스타일 */
-        #datePicker {
-            display: block;
-            margin: 20px auto;
-            padding: 10px;
-            font-size: 1em;
-        }
     </style>
     <script>
         const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
         const SHEET_NAME = '출결'; // 시트 이름
         const API_KEY = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // 구글 API 키
 
-        let allData = []; // 전체 데이터를 저장할 변수
-
         $(document).ready(function() {
             fetchSheetData();
-            $('#datePicker').on('change', function() {
-                const selectedDate = $(this).val();
-                filterDataByDate(selectedDate);
-            });
         });
 
         function fetchSheetData() {
@@ -107,8 +93,7 @@
             
             $.get(url, function(data) {
                 if (data.values && data.values.length > 0) {
-                    allData = data.values; // 전체 데이터 저장
-                    displayData(allData); // 처음 데이터 표시
+                    displayData(data.values);
                 } else {
                     $('#output').html('<p>데이터가 없습니다.</p>');
                 }
@@ -120,93 +105,26 @@
         function displayData(values) {
             let output = '<table border="1"><tr>';
             // 테이블 헤더 생성
-            output += '<th>자리번호</th>';
-            output += '<th>이름</th>';
-            output += '<th>교시</th>';
-
-            // 금주 시작 요일과 날짜 설정
-            const startDays = ["월", "화", "수", "목", "금", "토", "일"];
-            const currentDate = new Date();
-            const startDate = new Date(currentDate);
-            startDate.setDate(currentDate.getDate() - currentDate.getDay() + 1); // 월요일로 설정
-            const startDates = [];
-
-            for (let i = 0; i < 7; i++) {
-                const date = new Date(startDate);
-                date.setDate(startDate.getDate() + i);
-                const day = date.getDate().toString().padStart(2, '0');
-                const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                startDates.push(`${month}/${day}`); // MM/DD 포맷
-            }
-
-            // H열부터 U열까지의 헤더 설정
-            for (let i = 0; i < 7; i++) {
-                output += `<th>${startDays[i]}</th>`; // 요일
-                output += `<th>${startDates[i]}</th>`; // 날짜
-            }
-
-            output += '</tr>'; // 헤더 종료
-
-            // 2행 숨김을 위해 <tr> 추가
-            output += '<tr style="display: none;"></tr>'; 
+            values[0].forEach(header => {
+                output += `<th>${header}</th>`;
+            });
+            output += '</tr>';
 
             // 테이블 데이터 생성
-            for (let i = 2; i < values.length; i++) { // 3행부터 데이터 표시
+            for (let i = 1; i < values.length; i++) {
                 output += '<tr>';
-                
-                // 자리번호 (A열)
-                output += `<td>${values[i][0]}</td>`;
-                
-                // 이름 (B열)
-                output += `<td>${values[i][1]}</td>`;
-                
-                // 교시 (G열)
-                output += `<td>${values[i][6]}</td>`;
-                
-                // H열부터 U열까지의 데이터 가져오기
-                for (let j = 7; j <= 20; j++) {
-                    let cellValue = values[i][j] !== undefined ? values[i][j] : '';
-                    if ([8, 10, 12, 14, 16, 18].includes(j)) { // I, K, M, O, Q, S, U 열
-                        if (cellValue == '1') {
-                            output += `<td>출석</td>`;
-                        } else if (cellValue == '3') {
-                            output += `<td>결석</td>`;
-                        } else {
-                            output += `<td>${cellValue}</td>`;
-                        }
-                    } else {
-                        output += `<td>${cellValue}</td>`;
-                    }
-                }
-                
+                values[i].forEach(cell => {
+                    output += `<td>${cell}</td>`;
+                });
                 output += '</tr>';
             }
             output += '</table>';
             $('#output').html(output);
         }
-
-        function filterDataByDate(selectedDate) {
-            // 선택한 날짜를 MM/DD 형식으로 변환
-            const dateParts = selectedDate.split('-');
-            const formattedDate = `${dateParts[1].padStart(2, '0')}/${dateParts[2].padStart(2, '0')}`; // MM/DD 포맷
-
-            // 선택한 날짜와 매칭되는 데이터만 필터링
-            const filteredData = allData.filter(row => {
-                // H열부터 U열까지의 데이터와 비교 (즉, 8, 10, 12, 14, 16, 18 열)
-                return row.slice(8, 20).includes(formattedDate);
-            });
-
-            if (filteredData.length > 0) {
-                displayData(filteredData);
-            } else {
-                $('#output').html('<p>선택한 날짜에 대한 데이터가 없습니다.</p>');
-            }
-        }
     </script>
 </head>
 <body>
     <h1>출결 현황</h1>
-    <input type="date" id="datePicker" placeholder="날짜 선택" />
     <div id="output">데이터를 불러오는 중...</div>
 </body>
 </html>
