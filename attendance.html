@@ -104,21 +104,26 @@
 
         function displayData(values) {
             let output = '<table border="1"><tr>';
-            // 필요한 열만 테이블 헤더에 추가
-            output += '<th>자리번호</th><th>이름</th><th>교시</th>';
-            for (let col = 7; col < 21; col++) { // H열(7)부터 U열(20)까지
-                output += `<th>${values[0][col]}</th>`;
+            // 테이블 헤더 생성 (A열 2행, B열 2행, G열 2행 숨기기)
+            for (let i = 0; i < values[0].length; i++) {
+                if (i !== 0 && i !== 1 && i !== 6) { // A, B, G열은 숨김
+                    output += `<th>${values[0][i]}</th>`;
+                }
             }
             output += '</tr>';
 
-            // 테이블 데이터 생성 (2행부터 시작)
+            // 테이블 데이터 생성
             for (let i = 1; i < values.length; i++) {
                 output += '<tr>';
-                output += `<td>${values[i][0]}</td>`; // A열: 자리번호
-                output += `<td>${values[i][1]}</td>`; // B열: 이름
-                output += `<td>${values[i][6]}</td>`; // G열: 교시
-                for (let col = 7; col < 21; col++) { // H열(7)부터 U열(20)까지
-                    output += `<td>${values[i][col]}</td>`;
+                for (let j = 0; j < values[i].length; j++) {
+                    if (j !== 0 && j !== 1 && j !== 6) { // A, B, G열은 숨김
+                        // H, J, L, N, P, R, T의 1행 데이터를 2행으로 옮김
+                        if (j === 7 || j === 9 || j === 11 || j === 13 || j === 15 || j === 17 || j === 19) {
+                            output += `<td>${values[0][j]}</td>`;
+                        } else {
+                            output += `<td>${values[i][j]}</td>`;
+                        }
+                    }
                 }
                 output += '</tr>';
             }
