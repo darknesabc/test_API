@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>출결 현황</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> <!-- Font Awesome CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         /* 테이블 스타일링 */
@@ -18,9 +18,9 @@
         th, td {
             padding: 10px;
             border: 1px solid #ddd;
-            white-space: nowrap; /* 한 줄로 표시되도록 */
+            white-space: nowrap;
             overflow: hidden;
-            text-overflow: ellipsis; /* 긴 텍스트는 생략 표시 */
+            text-overflow: ellipsis;
         }
         th {
             background-color: #f4f4f4;
@@ -30,11 +30,11 @@
         }
         /* 출석 및 결석 색상 */
         .attendance {
-            background-color: #d4edda; /* 출석: 연한 초록색 */
+            background-color: #d4edda;
             color: #155724;
         }
         .absence {
-            background-color: #f8d7da; /* 결석: 연한 빨간색 */
+            background-color: #f8d7da;
             color: #721c24;
         }
         
@@ -67,7 +67,7 @@
         /* 헤더 스타일 */
         header {
             display: flex;
-            justify-content: space-between; /* 아이콘과 사용자 정보를 양쪽으로 배치 */
+            justify-content: space-between;
             align-items: center;
             width: 100%;
             padding: 10px 20px;
@@ -76,13 +76,13 @@
         }
         #userName {
             font-size: 18px;
-            margin-right: 20px; /* 이름과 버튼 사이의 간격 */
-            white-space: nowrap; /* 줄 바꿈 방지 */
+            margin-right: 20px;
+            white-space: nowrap;
         }
         .home-icon {
-            cursor: pointer; /* 마우스 포인터가 아이콘 위에 올 때 손가락 모양으로 변경 */
-            font-size: 24px; /* 아이콘 크기 조정 */
-            color: white; /* 아이콘 색상 */
+            cursor: pointer;
+            font-size: 24px;
+            color: white;
         }
     </style>
     <script>
@@ -138,8 +138,8 @@
 
             // 테이블 생성
             let output = '<table><tr>';
-            // 헤더 추가 부분 주석 처리
-            // output += '<th>자리번호</th><th>이름</th><th>교시</th>';
+            // A, B, G열 헤더 추가
+            output += '<th>자리번호</th><th>이름</th><th>교시</th>'; // A, B, G열 헤더 추가
 
             // I, K, M, O, Q, S, U열의 2행 데이터를 1행으로 옮김
             for (let i = 8; i <= 20; i += 2) {
@@ -219,15 +219,13 @@
 </head>
 <body>
     <header>
-        <span id="userName"></span> <!-- 사용자 이름 표시 -->
-        <i class="fas fa-home home-icon" onclick="window.location.href='nextpage.html'"></i> <!-- 홈 아이콘 클릭 시 nextpage.html로 이동 -->
+        <span id="userName"></span> <!-- 자리번호와 사용자 이름 -->
+        <span class="home-icon" onclick="location.href='nextpage.html'"><i class="fas fa-home"></i></span> <!-- 홈 아이콘 -->
     </header>
-    
     <div>
         <label for="dateSelect">날짜 선택:</label>
         <input type="date" id="dateSelect">
     </div>
-    
-    <div id="output"></div>
+    <div id="output"></div> <!-- 데이터 출력 영역 -->
 </body>
 </html>
