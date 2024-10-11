@@ -107,7 +107,7 @@
             });
 
             // 초기 데이터 불러오기 (날짜 선택 없이)
-            fetchSheetData();
+            fetchSheetData(); // 이 함수가 모든 데이터를 불러오도록 수정
         });
 
         function fetchSheetData(selectedDate) {
@@ -161,7 +161,8 @@
                         }
                     }
 
-                    if (dateMatches) {
+                    // 선택된 날짜가 없을 경우, 모든 데이터 표시
+                    if (!selectedDate || dateMatches) {
                         output += '<tr>';
                         output += `<td>${values[i][0]}</td>`; // 자리번호
                         output += `<td>${values[i][1]}</td>`; // 이름
@@ -199,10 +200,10 @@
     </header>
     <h1>출결 현황</h1>
     
-    <!-- 날짜 선택 입력 필드 추가 (달력 선택으로 변경) -->
+    <!-- 날짜 선택 입력 필드 추가 (달력) -->
     <label for="dateSelect">날짜 선택:</label>
     <input type="date" id="dateSelect" />
-    
+
     <div id="output">데이터를 불러오는 중...</div>
 </body>
 </html>
