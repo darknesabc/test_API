@@ -138,7 +138,8 @@
 
             // 테이블 생성
             let output = '<table><tr>';
-            output += '<th>자리번호</th><th>이름</th><th>교시</th>';
+            // 헤더 추가 부분 주석 처리
+            // output += '<th>자리번호</th><th>이름</th><th>교시</th>';
 
             // I, K, M, O, Q, S, U열의 2행 데이터를 1행으로 옮김
             for (let i = 8; i <= 20; i += 2) {
@@ -212,26 +213,21 @@
                 }
             }
             output += '</table>';
-            $('#output').html(output); // 기존 박스에 데이터 삽입
-        }
-
-        // 아이콘 클릭 시 nextpage.html로 이동
-        function goHome() {
-            window.location.href = 'nextpage.html';
+            $('#output').html(output); // 결과 표시
         }
     </script>
 </head>
 <body>
     <header>
-        <i class="fas fa-home home-icon" onclick="goHome()"></i> <!-- 집 아이콘 추가 -->
-        <div id="userName"></div>
+        <span id="userName"></span> <!-- 사용자 이름 표시 -->
+        <i class="fas fa-home home-icon" onclick="window.location.href='nextpage.html'"></i> <!-- 홈 아이콘 클릭 시 nextpage.html로 이동 -->
     </header>
-    <h1>출결 현황</h1>
     
-    <!-- 날짜 선택 입력 필드 추가 (달력 선택 가능) -->
-    <label for="dateSelect">날짜 선택:</label>
-    <input type="date" id="dateSelect" />
+    <div>
+        <label for="dateSelect">날짜 선택:</label>
+        <input type="date" id="dateSelect">
+    </div>
     
-    <div id="output">데이터를 불러오는 중...</div>
+    <div id="output"></div>
 </body>
 </html>
