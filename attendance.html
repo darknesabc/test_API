@@ -1,69 +1,22 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Attendance</title>
-    <script src="https://apis.google.com/js/api.js"></script>
-    <script>
-        // Google Sheets API 설정
-        const API_KEY = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk';
-        const SHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0';
-        const RANGE = '출결!A1:U43'; // 데이터 범위 설정
+async function fetchData() {
+    const spreadsheetId = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
+    const range = '출결!A1:U43'; // 데이터 범위
+    const apiKey = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // API 키
 
-        function init() {
-            gapi.load('client', function() {
-                gapi.client.init({
-                    'apiKey': API_KEY,
-                }).then(loadData);
-            });
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?key=${apiKey}`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.values && data.values.length) {
+            console.log('데이터:', data.values);
+        } else {
+            console.log('데이터가 없습니다.');
         }
+    } catch (error) {
+        console.error('오류:', error);
+    }
+}
 
-        function loadData() {
-            gapi.client.sheets.spreadsheets.values.get({
-                spreadsheetId: SHEET_ID,
-                range: RANGE,
-            }).then(function(response) {
-                const data = response.result.values;
-                if (data.length) {
-                    displayData(data);
-                } else {
-                    console.log('데이터가 없습니다.');
-                }
-            }, function(response) {
-                console.error('API 호출에 실패했습니다: ' + response.result.error.message);
-            });
-        }
-
-        function displayData(data) {
-            const table = document.getElementById('attendanceTable');
-            data.forEach((row) => {
-                const tr = document.createElement('tr');
-                row.forEach((cell) => {
-                    const td = document.createElement('td');
-                    td.textContent = cell;
-                    tr.appendChild(td);
-                });
-                table.appendChild(tr);
-            });
-        }
-
-        window.onload = init;
-    </script>
-</head>
-<body>
-    <h1>출결 데이터</h1>
-    <table id="attendanceTable" border="1">
-        <thead>
-            <tr>
-                <th>열 제목 1</th>
-                <th>열 제목 2</th>
-                <!-- 필요한 만큼 열 제목 추가 -->
-            </tr>
-        </thead>
-        <tbody>
-            <!-- 데이터가 여기에 추가됩니다 -->
-        </tbody>
-    </table>
-</body>
-</html>
+fetchData();
