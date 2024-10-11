@@ -103,28 +103,20 @@
         }
 
         function displayData(values) {
-            let output = '<table border="1"><tr>';
-            // 테이블 헤더 생성 (A열 2행, B열 2행, G열 2행 숨기기)
-            for (let i = 0; i < values[0].length; i++) {
-                if (i !== 0 && i !== 1 && i !== 6) { // A, B, G열은 숨김
-                    output += `<th>${values[0][i]}</th>`;
-                }
-            }
+            let output = '<table border="1"><tr style="display: none;">'; // 1행 숨김
+            // 테이블 헤더 생성
+            values[0].forEach(header => {
+                output += `<th>${header}</th>`;
+            });
             output += '</tr>';
 
             // 테이블 데이터 생성
             for (let i = 1; i < values.length; i++) {
                 output += '<tr>';
-                for (let j = 0; j < values[i].length; j++) {
-                    if (j !== 0 && j !== 1 && j !== 6) { // A, B, G열은 숨김
-                        // H, J, L, N, P, R, T의 1행 데이터를 2행으로 옮김
-                        if (j === 7 || j === 9 || j === 11 || j === 13 || j === 15 || j === 17 || j === 19) {
-                            output += `<td>${values[0][j]}</td>`;
-                        } else {
-                            output += `<td>${values[i][j]}</td>`;
-                        }
-                    }
-                }
+                // A열(자리번호), B열(이름), G열(교시)만 표시
+                output += `<td>${values[i][0] || ''}</td>`; // 자리번호
+                output += `<td>${values[i][1] || ''}</td>`; // 이름
+                output += `<td>${values[i][6] || ''}</td>`; // 교시
                 output += '</tr>';
             }
             output += '</table>';
