@@ -140,22 +140,15 @@
             let output = '<table><tr>';
             output += '<th>자리번호</th><th>이름</th><th>교시</th>';
 
-            // I, K, M, O, Q, S, U열의 2행 데이터를 1행으로 옮김
-            for (let i = 8; i <= 20; i += 2) {
-                if (values[1][i]) {
-                    values[0][i] = values[1][i]; // 2행 값을 1행으로 옮김
-                }
-            }
-
             // H부터 U열까지 헤더 추가 (U열까지만 표시)
             for (let i = 7; i < values[0].length && i <= 20; i++) {
                 output += `<th>${values[0][i]}</th>`;
             }
             output += '</tr>';
 
-            // 3행 데이터는 무조건 표시
+            // 3행 데이터는 항상 표시
             for (let i = 2; i < values.length; i++) {
-                // 3행 데이터는 무조건 표시
+                // 3행 데이터 출력
                 if (i === 2) {
                     output += '<tr>';
                     output += `<td>${values[i][0]}</td>`; // 자리번호
@@ -177,7 +170,7 @@
                 }
 
                 // 선택한 날짜와 데이터가 일치하는지 확인 (3행 제외)
-                if (values[i][0] === userSeatNumber && values[i][1] === userName) {
+                if (i > 2 && values[i][0] === userSeatNumber && values[i][1] === userName) {
                     let dateMatches = !selectedDate; // 날짜가 선택되지 않았을 경우 기본적으로 true
                     const formattedSelectedDate = selectedDate ? formatDate(selectedDate) : ''; // 선택한 날짜 포맷
 
@@ -190,7 +183,6 @@
                         }
                     }
 
-                    // 날짜가 매칭되면 데이터 추가
                     if (dateMatches) {
                         output += '<tr>';
                         output += `<td>${values[i][0]}</td>`; // 자리번호
@@ -220,24 +212,17 @@
                 $('#output').html('<p>데이터가 없습니다.</p>');
             }
         }
-
-        // 아이콘 클릭 시 nextpage.html로 이동
-        function goHome() {
-            window.location.href = 'nextpage.html';
-        }
     </script>
 </head>
 <body>
     <header>
-        <i class="fas fa-home home-icon" onclick="goHome()"></i> <!-- 집 아이콘 추가 -->
         <div id="userName"></div>
+        <i class="fas fa-home home-icon" onclick="location.href='nextpage.html'"></i> <!-- 홈 아이콘 -->
     </header>
-    <h1>출결 현황</h1>
-    
-    <!-- 날짜 선택 입력 필드 추가 (달력 선택 가능) -->
-    <label for="dateSelect">날짜 선택:</label>
-    <input type="date" id="dateSelect" />
-    
-    <div id="output">데이터를 불러오는 중...</div>
+    <div>
+        <label for="dateSelect">날짜 선택:</label>
+        <input type="date" id="dateSelect" />
+    </div>
+    <div id="output"></div> <!-- 데이터가 표시될 부분 -->
 </body>
 </html>
