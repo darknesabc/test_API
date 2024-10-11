@@ -145,12 +145,15 @@
             // 데이터 행 추가
             for (let i = 2; i < values.length; i++) {
                 if (values[i][0] === userSeatNumber && values[i][1] === userName) {
+                    // 첫 번째 행 (자리번호, 이름, 교시)
                     output += '<tr>';
                     output += `<td>${values[i][0]}</td>`; // 자리번호
                     output += `<td>${values[i][1]}</td>`; // 이름
                     output += `<td>${values[i][6]}</td>`; // 교시 (G열)
+                    output += '</tr>';
 
-                    // 모든 날짜의 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
+                    // 두 번째 행 (출석 데이터)
+                    output += '<tr>';
                     for (let j = 7; j < values[i].length; j++) {
                         let cellValue = values[i][j];
                         if (cellValue == '1') {
