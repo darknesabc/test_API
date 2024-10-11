@@ -154,6 +154,7 @@
             output += '</tr>';
 
             // 데이터 행 추가
+            let showDateRow = false; // 선택된 날짜에 해당하는 행이 있는지 확인하는 변수
             for (let i = 2; i < values.length; i++) {
                 // 3행 데이터는 무조건 표시
                 if (i === 2) {
@@ -185,12 +186,12 @@
                         // I, K, M, O, Q, S, U열에서 날짜 비교
                         const cellDate = values[0][j] ? formatDate(values[0][j]) : ''; // 셀 날짜 포맷
                         if (cellDate === formattedSelectedDate) {
-                            dateMatches = true;
+                            showDateRow = true; // 선택한 날짜와 일치하는 행 발견
                             break;
                         }
                     }
 
-                    if (dateMatches) {
+                    if (showDateRow) {
                         output += '<tr>';
                         output += `<td>${values[i][0]}</td>`; // 자리번호
                         output += `<td>${values[i][1]}</td>`; // 이름
@@ -211,27 +212,28 @@
                     }
                 }
             }
-            output += '</table>';
-            $('#output').html(output); // 기존 박스에 데이터 삽입
-        }
 
-        // 아이콘 클릭 시 nextpage.html로 이동
-        function goHome() {
-            window.location.href = 'nextpage.html';
+            output += '</table>';
+
+            if (!showDateRow) {
+                output += '<p>선택한 날짜에 해당하는 데이터가 없습니다.</p>'; // 데이터가 없을 경우 메시지 추가
+            }
+
+            $('#output').html(output); // 결과를 HTML로 출력
         }
     </script>
 </head>
 <body>
     <header>
-        <i class="fas fa-home home-icon" onclick="goHome()"></i> <!-- 집 아이콘 추가 -->
-        <div id="userName"></div>
+        <div id="userName">사용자</div> <!-- 사용자 정보 -->
+        <div class="home-icon" onclick="window.location.href='nextpage.html'">
+            <i class="fas fa-home"></i> <!-- 홈 아이콘 -->
+        </div>
     </header>
-    <h1>출결 현황</h1>
-    
-    <!-- 날짜 선택 입력 필드 추가 (달력 선택 가능) -->
-    <label for="dateSelect">날짜 선택:</label>
-    <input type="date" id="dateSelect" />
-    
-    <div id="output">데이터를 불러오는 중...</div>
+    <div>
+        <label for="dateSelect">날짜 선택:</label>
+        <input type="date" id="dateSelect">
+    </div>
+    <div id="output"></div> <!-- 데이터 출력 영역 -->
 </body>
 </html>
