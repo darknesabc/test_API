@@ -108,11 +108,24 @@
             output += '<th>자리번호</th>';
             output += '<th>이름</th>';
             output += '<th>교시</th>';
-            // H열부터 U열까지의 헤더는 포함하지 않음
-            output += '</tr>';
+
+            // 금주 시작 요일과 날짜 설정 (H1, I1)
+            const startDays = ["월", "화", "수", "목", "금", "토", "일"];
+            const startDates = ["01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07"]; // 예시 날짜
+
+            // H열부터 U열까지의 헤더 설정
+            for (let i = 0; i < 7; i++) { // 7일 동안
+                output += `<th>${startDays[i]}</th>`; // 요일
+                output += `<th>${startDates[i]}</th>`; // 날짜
+            }
+
+            output += '</tr>'; // 헤더 종료
+
+            // 2행 숨김을 위해 <tr> 추가
+            output += '<tr style="display: none;"></tr>'; 
 
             // 테이블 데이터 생성
-            for (let i = 1; i < values.length; i++) {
+            for (let i = 2; i < values.length; i++) { // 3행부터 데이터 표시
                 output += '<tr>';
                 
                 // 자리번호 (A열)
