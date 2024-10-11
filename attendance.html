@@ -128,7 +128,13 @@
 
             // 선택된 날짜 가져오기
             const selectedDate = document.getElementById('attendanceDate').value;
-            const selectedMonthDay = selectedDate ? new Date(selectedDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' }) : null;
+            let selectedMonthDay = null;
+            if (selectedDate) {
+                const date = new Date(selectedDate);
+                const month = date.getMonth() + 1; // getMonth()는 0부터 시작하므로 +1 필요
+                const day = date.getDate();
+                selectedMonthDay = `${month}/${day}`; // 한 자리 숫자에 0 붙지 않도록 처리
+            }
 
             // 테이블 생성
             let output = '<table><tr>';
@@ -149,7 +155,7 @@
 
             // 데이터 행 추가
             for (let i = 2; i < values.length; i++) {
-                const cellDate = values[i][6]; // G열의 날짜 (예: '10/01')
+                const cellDate = values[i][6]; // G열의 날짜 (예: '10/1')
 
                 if (values[i][0] === userSeatNumber && values[i][1] === userName) {
                     // 선택된 날짜가 없거나, 매칭되는 경우에만 출력
@@ -210,14 +216,5 @@
     </header>
     <h1>출결 현황</h1>
     <div id="output">데이터를 불러오는 중...</div>
-    <script>
-        function updateDate() {
-            const dateInput = document.getElementById('attendanceDate');
-            const selectedDate = new Date(dateInput.value);
-            const options = { month: '2-digit', day: '2-digit' };
-            const formattedDate = selectedDate.toLocaleDateString('en-US', options);
-            console.log('선택한 날짜:', formattedDate); // 선택한 날짜 출력 (mm/dd 형식)
-        }
-    </script>
 </body>
 </html>
