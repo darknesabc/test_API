@@ -103,7 +103,7 @@
         }
 
         function displayData(values) {
-            let output = '<table border="1"><tr style="display: none;">'; // 1행 숨김
+            let output = '<table border="1"><tr>';
             // 테이블 헤더 생성
             values[0].forEach(header => {
                 output += `<th>${header}</th>`;
@@ -113,10 +113,9 @@
             // 테이블 데이터 생성
             for (let i = 1; i < values.length; i++) {
                 output += '<tr>';
-                // A열(자리번호), B열(이름), G열(교시)만 표시
-                output += `<td>${values[i][0] || ''}</td>`; // 자리번호
-                output += `<td>${values[i][1] || ''}</td>`; // 이름
-                output += `<td>${values[i][6] || ''}</td>`; // 교시
+                values[i].forEach(cell => {
+                    output += `<td>${cell}</td>`;
+                });
                 output += '</tr>';
             }
             output += '</table>';
