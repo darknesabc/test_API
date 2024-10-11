@@ -137,21 +137,10 @@
                 // 교시 (G열)
                 output += `<td>${values[i][6]}</td>`;
                 
-                // 요일 (H열)
-                output += `<td>${values[i][7]}</td>`;
-                
-                // 날짜 (I열)
-                output += `<td>${values[i][8]}</td>`;
-                
-                // 나머지 요일과 날짜 (K, M, O, Q, S, U 열)
-                for (let j = 10; j <= 20; j += 2) {
-                    if (values[i][j]) {
-                        output += `<td>${values[i][j]}</td>`; // 요일
-                    } else {
-                        output += '<td></td>'; // 비어있는 경우
-                    }
-                    if (values[i][j + 1]) {
-                        output += `<td>${values[i][j + 1]}</td>`; // 날짜
+                // 요일과 날짜 (H, I, K, M, O, Q, S, U 열)
+                for (let j = 7; j <= 20; j++) {
+                    if (values[i][j] !== undefined) {
+                        output += `<td>${values[i][j]}</td>`; // 요일 또는 날짜
                     } else {
                         output += '<td></td>'; // 비어있는 경우
                     }
