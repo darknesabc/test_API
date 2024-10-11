@@ -5,6 +5,77 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>출결 현황</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        /* 기본 스타일 */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2em;
+            margin: 20px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 1em;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #ddd;
+            word-wrap: break-word; /* 단어가 길면 줄바꿈 */
+        }
+
+        th {
+            background-color: #f4f4f4;
+        }
+
+        td {
+            max-width: 200px; /* 셀에 들어가는 내용이 너무 길면 자동으로 줄바꿈 */
+        }
+
+        /* 모바일 대응 */
+        @media screen and (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+
+            table {
+                font-size: 0.9em;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+        }
+
+        /* 태블릿 대응 */
+        @media screen and (max-width: 900px) and (min-width: 601px) {
+            h1 {
+                font-size: 1.75em;
+            }
+
+            table {
+                font-size: 1em;
+            }
+
+            th, td {
+                padding: 9px;
+            }
+        }
+    </style>
     <script>
         const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
         const SHEET_NAME = '출결'; // 시트 이름
