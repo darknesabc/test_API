@@ -132,21 +132,22 @@
             let output = '<table><tr>';
             output += '<th>자리번호</th><th>이름</th><th>교시</th>';
 
-            for (let i = 7; i < values[0].length && i <= 20; i++) {
-                output += `<th>${values[0][i]}</th>`;
+            // 3행 데이터를 헤더로 사용
+            for (let i = 7; i < values[2].length && i <= 20; i++) {
+                output += `<th>${values[2][i]}</th>`; // 3행 데이터를 사용
             }
             output += '</tr>';
 
             let dataExists = false;
 
-            // 데이터 행 추가 (2행부터 시작)
-            for (let i = 2; i < values.length; i++) {
+            // 데이터 행 추가 (4행부터 시작)
+            for (let i = 3; i < values.length; i++) {
                 if (values[i][0] === userSeatNumber && values[i][1] === userName) {
                     let dateMatches = !selectedDate;
                     const formattedSelectedDate = selectedDate ? formatDate(selectedDate) : '';
 
                     for (let j = 7; j < values[i].length && j <= 20; j++) {
-                        const cellDate = values[0][j] ? formatDate(values[0][j]) : '';
+                        const cellDate = values[2][j] ? formatDate(values[2][j]) : ''; // 3행 날짜 사용
                         if (cellDate === formattedSelectedDate) {
                             dateMatches = true;
                             break;
