@@ -152,6 +152,12 @@
             for (let i = 2; i < values.length; i++) {
                 // 선택한 날짜와 데이터가 일치하는지 확인
                 if (values[i][0] === userSeatNumber && values[i][1] === userName) {
+                    // 자리번호 및 이름을 항상 표시
+                    output += '<tr>';
+                    output += `<td>${values[i][0]}</td>`; // 자리번호
+                    output += `<td>${values[i][1]}</td>`; // 이름
+                    output += `<td>${values[i][6]}</td>`; // 교시 (G열)
+                    
                     let dateMatches = !selectedDate; // 날짜가 선택되지 않았을 경우 기본적으로 true
                     const formattedSelectedDate = selectedDate ? formatDate(selectedDate) : ''; // 선택한 날짜 포맷
 
@@ -166,10 +172,6 @@
 
                     if (dateMatches) {
                         isDataMatched = true; // 매칭된 데이터가 있음을 표시
-                        output += '<tr>';
-                        output += `<td>${values[i][0]}</td>`; // 자리번호
-                        output += `<td>${values[i][1]}</td>`; // 이름
-                        output += `<td>${values[i][6]}</td>`; // 교시 (G열)
 
                         // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
                         for (let j = 7; j < values[i].length && j <= 20; j++) {
@@ -182,8 +184,13 @@
                                 output += `<td>${cellValue}</td>`;
                             }
                         }
-                        output += '</tr>';
+                    } else {
+                        // 날짜 매칭이 안되면 빈 셀로 처리
+                        for (let j = 7; j < values[i].length && j <= 20; j++) {
+                            output += `<td></td>`;
+                        }
                     }
+                    output += '</tr>';
                 }
             }
 
