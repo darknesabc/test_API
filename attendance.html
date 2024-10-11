@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>출결 현황</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> <!-- Font Awesome CSS -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         /* 테이블 스타일링 */
@@ -66,7 +67,7 @@
         /* 헤더 스타일 */
         header {
             display: flex;
-            justify-content: flex-end; /* 사용자 정보를 오른쪽으로 배치 */
+            justify-content: space-between; /* 아이콘과 사용자 정보를 양쪽으로 배치 */
             align-items: center;
             width: 100%;
             padding: 10px 20px;
@@ -77,6 +78,11 @@
             font-size: 18px;
             margin-right: 20px; /* 이름과 버튼 사이의 간격 */
             white-space: nowrap; /* 줄 바꿈 방지 */
+        }
+        .home-icon {
+            cursor: pointer; /* 마우스 포인터가 아이콘 위에 올 때 손가락 모양으로 변경 */
+            font-size: 24px; /* 아이콘 크기 조정 */
+            color: white; /* 아이콘 색상 */
         }
     </style>
     <script>
@@ -178,10 +184,16 @@
             output += '</table>';
             $('#output').html(output); // 기존 박스에 데이터 삽입
         }
+        
+        // 아이콘 클릭 시 nextpage.html로 이동
+        function goHome() {
+            window.location.href = 'nextpage.html';
+        }
     </script>
 </head>
 <body>
     <header>
+        <i class="fas fa-home home-icon" onclick="goHome()"></i> <!-- 집 아이콘 추가 -->
         <div id="userName"></div>
     </header>
     <h1>출결 현황</h1>
