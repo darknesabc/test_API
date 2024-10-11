@@ -86,7 +86,6 @@
         }
     </style>
     <script>
-        // 스프레드시트 ID와 API 키
         const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
         const SHEET_NAME = '출결'; // 시트 이름
         const API_KEY = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // 구글 API 키
@@ -101,15 +100,17 @@
                 $('#userName').text('사용자'); // 이름이 없을 경우 기본값
             }
 
-            // 날짜 선택 시 데이터 불러오기
-            fetchSheetData();
-
+            // 날짜 선택 이벤트 리스너 추가
             $('#dateSelect').change(function() {
-                fetchSheetData($(this).val());
+                const selectedDate = $(this).val();
+                fetchSheetData(selectedDate);
             });
+
+            // 초기 데이터 불러오기 (날짜 선택 없이)
+            fetchSheetData();
         });
 
-        function fetchSheetData(selectedDate = '') {
+        function fetchSheetData(selectedDate) {
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`;
             
             $.get(url, function(data) {
@@ -150,9 +151,11 @@
             for (let i = 2; i < values.length; i++) {
                 if (values[i][0] === userSeatNumber && values[i][1] === userName) {
                     // 선택한 날짜와 데이터가 일치하는지 확인
-                    let dateMatches = !selectedDate; // 날짜가 선택되지 않았을 경우 기본적으로 true
-                    for (let j = 7; j < values[i].length && j <= 20; j++) {
-                        if (values[0][j] === selectedDate) {
+                    let dateMatches = false;
+                    for (let j = 8; j < values[i].length && j <= 20; j += 2) { // I, K, M, O, Q, S, U열 확인
+                        const dateString = values[0][j];
+                        const formattedDate = dateString.startsWith('0') ? dateString.slice(1) : dateString; // "0" 제외
+                        if (formattedDate === selectedDate) {
                             dateMatches = true;
                             break;
                         }
@@ -196,9 +199,9 @@
     </header>
     <h1>출결 현황</h1>
     
-    <!-- 날짜 선택 입력 필드 추가 (달력 선택 가능) -->
+    <!-- 날짜 선택 입력 필드 추가 -->
     <label for="dateSelect">날짜 선택:</label>
-    <input type="date" id="dateSelect" />
+    <input type="text" id="dateSelect" placeholder="mm/d" maxlength="4" pattern="(0?[1-9]|1[0-2])\/([1-9]|[12][0-9]|3[01])" title="형식: mm/d" />
     
     <div id="output">데이터를 불러오는 중...</div>
 </body>
