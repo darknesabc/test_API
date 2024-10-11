@@ -35,30 +35,6 @@
             background-color: #f8d7da;
             color: #721c24;
         }
-        @media only screen and (max-width: 1024px) {
-            table {
-                font-size: 14px;
-            }
-            th, td {
-                padding: 8px;
-            }
-        }
-        @media only screen and (max-width: 768px) {
-            table {
-                font-size: 12px;
-            }
-            th, td {
-                padding: 6px;
-            }
-        }
-        @media only screen and (max-width: 480px) {
-            table {
-                font-size: 10px;
-            }
-            th, td {
-                padding: 4px;
-            }
-        }
         header {
             display: flex;
             justify-content: space-between;
@@ -86,7 +62,6 @@
 
         $(document).ready(function() {
             const userInfo = localStorage.getItem('username');
-
             if (userInfo) {
                 $('#userName').text(userInfo);
             } else {
@@ -98,15 +73,13 @@
 
         function fetchSheetData() {
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`;
-            
             $.get(url, function(data) {
                 if (data.values && data.values.length > 0) {
                     displayData(data.values);
                 } else {
                     $('#output').html('<p>데이터가 없습니다.</p>');
                 }
-            }).fail(function(jqXHR, textStatus, errorThrown) {
-                console.error("데이터를 불러오는 데 실패했습니다:", textStatus, errorThrown);
+            }).fail(function() {
                 $('#output').html('<p>데이터를 불러오는 데 실패했습니다.</p>');
             });
         }
