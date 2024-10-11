@@ -124,6 +124,13 @@
             });
         }
 
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const month = (date.getMonth() + 1).toString().padStart(2, '0'); // 월 (01-12)
+            const day = date.getDate().toString().padStart(2, '0'); // 일 (01-31)
+            return `${month}/${day}`; // mm/dd 형식 반환
+        }
+
         function displayData(values, selectedDate) {
             // 자리번호 및 이름 분리
             const userInfo = $('#userName').text();
@@ -172,8 +179,12 @@
                 // 선택한 날짜와 데이터가 일치하는지 확인 (3행 제외)
                 if (values[i][0] === userSeatNumber && values[i][1] === userName) {
                     let dateMatches = !selectedDate; // 날짜가 선택되지 않았을 경우 기본적으로 true
+                    const formattedSelectedDate = selectedDate ? formatDate(selectedDate) : ''; // 선택한 날짜 포맷
+
                     for (let j = 7; j < values[i].length && j <= 20; j++) {
-                        if (values[0][j] === selectedDate) {
+                        // I, K, M, O, Q, S, U열에서 날짜 비교
+                        const cellDate = values[0][j] ? formatDate(values[0][j]) : ''; // 셀 날짜 포맷
+                        if (cellDate === formattedSelectedDate) {
                             dateMatches = true;
                             break;
                         }
