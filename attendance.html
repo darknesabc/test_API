@@ -127,7 +127,7 @@
         function formatDate(dateString) {
             const date = new Date(dateString);
             const month = (date.getMonth() + 1).toString().padStart(2, '0'); // 월 (01-12)
-            const day = date.getDate().toString(); // 한 자리일 경우 0 제외
+            const day = date.getDate().toString().padStart(2, '0'); // 일 (01-31)
             return `${month}/${day}`; // mm/dd 형식 반환
         }
 
@@ -155,7 +155,28 @@
 
             // 데이터 행 추가
             for (let i = 2; i < values.length; i++) {
-                // 선택한 날짜와 데이터가 일치하는지 확인
+                // 3행 데이터는 무조건 표시
+                if (i === 2) {
+                    output += '<tr>';
+                    output += `<td>${values[i][0]}</td>`; // 자리번호
+                    output += `<td>${values[i][1]}</td>`; // 이름
+                    output += `<td>${values[i][6]}</td>`; // 교시 (G열)
+
+                    // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
+                    for (let j = 7; j < values[i].length && j <= 20; j++) {
+                        let cellValue = values[i][j];
+                        if (cellValue == '1') {
+                            output += `<td class="attendance">출석</td>`;
+                        } else if (cellValue == '3') {
+                            output += `<td class="absence">결석</td>`;
+                        } else {
+                            output += `<td>${cellValue}</td>`;
+                        }
+                    }
+                    output += '</tr>';
+                }
+
+                // 선택한 날짜와 데이터가 일치하는지 확인 (3행 제외)
                 if (values[i][0] === userSeatNumber && values[i][1] === userName) {
                     let dateMatches = !selectedDate; // 날짜가 선택되지 않았을 경우 기본적으로 true
                     const formattedSelectedDate = selectedDate ? formatDate(selectedDate) : ''; // 선택한 날짜 포맷
@@ -190,13 +211,7 @@
                     }
                 }
             }
-
-            if (!output.includes('<tr>')) {
-                output = '<p>선택한 날짜에 해당하는 데이터가 없습니다.</p>';
-            } else {
-                output += '</table>';
-            }
-
+            output += '</table>';
             $('#output').html(output); // 기존 박스에 데이터 삽입
         }
 
@@ -215,7 +230,7 @@
     
     <!-- 날짜 선택 입력 필드 추가 (달력 선택 가능) -->
     <label for="dateSelect">날짜 선택:</label>
-    <input type="date" id="dateSelect">
+    <input type="date" id="dateSelect" />
     
     <div id="output">데이터를 불러오는 중...</div>
 </body>
