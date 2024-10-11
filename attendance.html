@@ -1,22 +1,58 @@
-async function fetchData() {
-    const spreadsheetId = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
-    const range = '출결!A1:U43'; // 데이터 범위
-    const apiKey = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // API 키
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance</title>
+</head>
+<body>
+    <h1>출결 데이터</h1>
+    <table id="data-table" border="1">
+        <thead>
+            <tr>
+                <th>Column 1</th>
+                <th>Column 2</th>
+                <th>Column 3</th>
+                <!-- 필요한 만큼 열 추가 -->
+            </tr>
+        </thead>
+        <tbody>
+            <!-- 데이터가 이곳에 추가됩니다 -->
+        </tbody>
+    </table>
 
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?key=${apiKey}`;
+    <script>
+        async function fetchData() {
+            const spreadsheetId = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
+            const range = '출결!A1:U43'; // 데이터 범위
+            const apiKey = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // API 키
 
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?key=${apiKey}`;
 
-        if (data.values && data.values.length) {
-            console.log('데이터:', data.values);
-        } else {
-            console.log('데이터가 없습니다.');
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.values && data.values.length) {
+                    const tableBody = document.getElementById('data-table').getElementsByTagName('tbody')[0];
+
+                    // 데이터를 테이블에 추가
+                    data.values.forEach(row => {
+                        const newRow = tableBody.insertRow();
+                        row.forEach(cell => {
+                            const newCell = newRow.insertCell();
+                            newCell.textContent = cell;
+                        });
+                    });
+                } else {
+                    console.log('데이터가 없습니다.');
+                }
+            } catch (error) {
+                console.error('오류:', error);
+            }
         }
-    } catch (error) {
-        console.error('오류:', error);
-    }
-}
 
-fetchData();
+        fetchData();
+    </script>
+</body>
+</html>
