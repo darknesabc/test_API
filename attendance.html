@@ -28,6 +28,7 @@
         tr:nth-child(even) {
             background-color: #f9f9f9;
         }
+        
         /* 출석 및 결석 색상 */
         .attendance {
             background-color: #d4edda; /* 출석: 연한 초록색 */
@@ -165,14 +166,22 @@
                         output += `<td>${values[i][6]}</td>`; // 교시 (G열)
 
                         // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
+                        let attendanceCount = 0; // 출석 상태 카운트
                         for (let j = 7; j < values[i].length && j <= 20; j++) {
                             let cellValue = values[i][j];
                             if (cellValue == '1') {
                                 output += `<td class="attendance">출석</td>`;
+                                attendanceCount++;
                             } else if (cellValue == '3') {
                                 output += `<td class="absence">결석</td>`;
+                                attendanceCount++;
                             } else {
                                 output += `<td>${cellValue}</td>`;
+                            }
+
+                            // 최대 3개의 출석 상태까지만 표시
+                            if (attendanceCount >= 3) {
+                                break; // 3개 초과 시 종료
                             }
                         }
                         output += '</tr>';
