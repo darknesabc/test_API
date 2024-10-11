@@ -31,8 +31,8 @@
             padding: 10px;
             text-align: left;
             border: 1px solid #ddd;
-            word-wrap: normal; /* 줄바꿈을 방지 */
-            white-space: nowrap; /* 텍스트가 한 줄로 유지되도록 설정 */
+            word-wrap: normal;
+            white-space: nowrap;
         }
 
         th {
@@ -40,9 +40,9 @@
         }
 
         td {
-            max-width: 200px; /* 셀에 들어가는 내용이 너무 길면 자동으로 줄바꿈 */
-            overflow: hidden; /* 넘치는 내용 숨김 */
-            text-overflow: ellipsis; /* 넘치는 내용에 '...' 표시 */
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* 모바일 대응 */
@@ -78,6 +78,14 @@
                 padding: 9px;
             }
         }
+
+        /* 날짜 선택 스타일 */
+        #datePicker {
+            display: block;
+            margin: 20px auto;
+            padding: 10px;
+            font-size: 1em;
+        }
     </style>
     <script>
         const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
@@ -86,6 +94,10 @@
 
         $(document).ready(function() {
             fetchSheetData();
+            $('#datePicker').on('change', function() {
+                const selectedDate = $(this).val();
+                filterDataByDate(selectedDate);
+            });
         });
 
         function fetchSheetData() {
@@ -109,7 +121,7 @@
             output += '<th>이름</th>';
             output += '<th>교시</th>';
 
-            // 금주 시작 요일과 날짜 설정 (H1, I1)
+            // 금주 시작 요일과 날짜 설정
             const startDays = ["월", "화", "수", "목", "금", "토", "일"];
             const currentDate = new Date();
             const startDate = new Date(currentDate);
@@ -119,13 +131,13 @@
             for (let i = 0; i < 7; i++) {
                 const date = new Date(startDate);
                 date.setDate(startDate.getDate() + i);
-                const day = date.getDate().toString().padStart(2, '0'); // 두 자리로 포맷
-                const month = (date.getMonth() + 1).toString().padStart(2, '0'); // 두 자리로 포맷
+                const day = date.getDate().toString().padStart(2, '0');
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
                 startDates.push(`${month}/${day}`); // MM/DD 포맷
             }
 
             // H열부터 U열까지의 헤더 설정
-            for (let i = 0; i < 7; i++) { // 7일 동안
+            for (let i = 0; i < 7; i++) {
                 output += `<th>${startDays[i]}</th>`; // 요일
                 output += `<th>${startDates[i]}</th>`; // 날짜
             }
@@ -150,26 +162,17 @@
                 
                 // H열부터 U열까지의 데이터 가져오기
                 for (let j = 7; j <= 20; j++) {
-                    // 3행 데이터 수정
-                    if (i === 2) {
-                        if (j % 2 === 1) { // H-J-L-N-P-R-T
-                            output += `<td>의무</td>`;
-                        } else { // I-K-M-O-Q-S-U
+                    let cellValue = values[i][j] !== undefined ? values[i][j] : '';
+                    if ([8, 10, 12, 14, 16, 18].includes(j)) { // I, K, M, O, Q, S, U 열
+                        if (cellValue == '1') {
                             output += `<td>출석</td>`;
-                        }
-                    } else {
-                        let cellValue = values[i][j] !== undefined ? values[i][j] : ''; // H열부터 U열 데이터
-                        if ([8, 10, 12, 14, 16, 18].includes(j)) { // I, K, M, O, Q, S, U 열
-                            if (cellValue == '1') {
-                                output += `<td>출석</td>`;
-                            } else if (cellValue == '3') {
-                                output += `<td>결석</td>`;
-                            } else {
-                                output += `<td>${cellValue}</td>`;
-                            }
+                        } else if (cellValue == '3') {
+                            output += `<td>결석</td>`;
                         } else {
                             output += `<td>${cellValue}</td>`;
                         }
+                    } else {
+                        output += `<td>${cellValue}</td>`;
                     }
                 }
                 
@@ -178,10 +181,17 @@
             output += '</table>';
             $('#output').html(output);
         }
+
+        function filterDataByDate(date) {
+            // 이 부분에서 선택한 날짜에 맞춰 데이터를 필터링하는 로직을 추가할 수 있습니다.
+            // 현재는 전체 데이터를 보여주기 위해 displayData()를 호출합니다.
+            fetchSheetData(); // 데이터 불러오기 (필터링 로직 추가 필요)
+        }
     </script>
 </head>
 <body>
     <h1>출결 현황</h1>
+    <input type="date" id="datePicker" placeholder="날짜 선택" />
     <div id="output">데이터를 불러오는 중...</div>
 </body>
 </html>
