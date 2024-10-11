@@ -109,14 +109,6 @@
             });
         });
 
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            const month = date.getMonth() + 1; // 월은 0부터 시작하므로 1을 더합니다.
-            const day = date.getDate();
-
-            return `${month}/${day}`; // mm/dd 형식으로 반환
-        }
-
         function fetchSheetData(selectedDate = '') {
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`;
             
@@ -132,6 +124,13 @@
             });
         }
 
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const month = (date.getMonth() + 1).toString().padStart(2, '0'); // 월 (01-12)
+            const day = date.getDate().toString().padStart(2, '0'); // 일 (01-31)
+            return `${month}/${day}`; // mm/dd 형식 반환
+        }
+
         function displayData(values, selectedDate) {
             // 자리번호 및 이름 분리
             const userInfo = $('#userName').text();
@@ -139,7 +138,14 @@
 
             // 테이블 생성
             let output = '<table><tr>';
-            output += '<th>자리번호</th><th>이름</th><th>교시</th>'; 
+            output += '<th>자리번호</th><th>이름</th><th>교시</th>';
+
+            // I, K, M, O, Q, S, U열의 2행 데이터를 1행으로 옮김
+            for (let i = 8; i <= 20; i += 2) {
+                if (values[1][i]) {
+                    values[0][i] = values[1][i]; // 2행 값을 1행으로 옮김
+                }
+            }
 
             // H부터 U열까지 헤더 추가 (U열까지만 표시)
             for (let i = 7; i < values[0].length && i <= 20; i++) {
@@ -147,14 +153,39 @@
             }
             output += '</tr>';
 
-            // 선택한 날짜와 일치하는 데이터만 표시
+            // 데이터 행 추가
             for (let i = 2; i < values.length; i++) {
-                if (values[i][0] === userSeatNumber && values[i][1] === userName) {
-                    let dateMatches = false; // 기본값 false
+                // 3행 데이터는 무조건 표시
+                if (i === 2) {
+                    output += '<tr>';
+                    output += `<td>${values[i][0]}</td>`; // 자리번호
+                    output += `<td>${values[i][1]}</td>`; // 이름
+                    output += `<td>${values[i][6]}</td>`; // 교시 (G열)
+
+                    // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
                     for (let j = 7; j < values[i].length && j <= 20; j++) {
-                        const sheetDate = formatDate(values[0][j]); // 시트 날짜를 mm/dd 형식으로 변환
-                        if (sheetDate === formatDate(selectedDate)) {
-                            dateMatches = true; // 날짜가 일치하면 true
+                        let cellValue = values[i][j];
+                        if (cellValue == '1') {
+                            output += `<td class="attendance">출석</td>`;
+                        } else if (cellValue == '3') {
+                            output += `<td class="absence">결석</td>`;
+                        } else {
+                            output += `<td>${cellValue}</td>`;
+                        }
+                    }
+                    output += '</tr>';
+                }
+
+                // 선택한 날짜와 데이터가 일치하는지 확인 (3행 제외)
+                if (values[i][0] === userSeatNumber && values[i][1] === userName) {
+                    let dateMatches = !selectedDate; // 날짜가 선택되지 않았을 경우 기본적으로 true
+                    const formattedSelectedDate = selectedDate ? formatDate(selectedDate) : ''; // 선택한 날짜 포맷
+
+                    for (let j = 7; j < values[i].length && j <= 20; j++) {
+                        // I, K, M, O, Q, S, U열에서 날짜 비교
+                        const cellDate = values[0][j] ? formatDate(values[0][j]) : ''; // 셀 날짜 포맷
+                        if (cellDate === formattedSelectedDate) {
+                            dateMatches = true;
                             break;
                         }
                     }
