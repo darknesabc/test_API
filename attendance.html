@@ -150,10 +150,15 @@
                 
                 // H열부터 U열까지의 데이터 가져오기
                 for (let j = 7; j <= 20; j++) {
-                    if (j % 2 === 1) { // H, J, L, N, P, R, T 열 (3행 "의무")
-                        output += `<td>${values[i][j] !== undefined ? '의무' : ''}</td>`;
-                    } else { // I, K, M, O, Q, S, U 열 (3행 "출석")
-                        output += `<td>${values[i][j] !== undefined ? '출석' : ''}</td>`;
+                    // 3행 데이터 수정
+                    if (i === 2) {
+                        if (j % 2 === 1) { // H-J-L-N-P-R-T
+                            output += `<td>의무</td>`;
+                        } else { // I-K-M-O-Q-S-U
+                            output += `<td>출석</td>`;
+                        }
+                    } else {
+                        output += `<td>${values[i][j] !== undefined ? values[i][j] : ''}</td>`; // H열부터 U열 데이터
                     }
                 }
                 
