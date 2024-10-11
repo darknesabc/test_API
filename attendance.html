@@ -86,6 +86,12 @@
 
         $(document).ready(function() {
             fetchSheetData();
+
+            // 날짜 선택 시 데이터 필터링
+            $('#dateSelector').on('change', function() {
+                const selectedDate = $(this).val();
+                filterData(selectedDate);
+            });
         });
 
         function fetchSheetData() {
@@ -93,7 +99,8 @@
             
             $.get(url, function(data) {
                 if (data.values && data.values.length > 1) { // 데이터가 1행 이상일 때만
-                    displayData(data.values);
+                    window.allData = data.values; // 전체 데이터를 전역 변수에 저장
+                    displayData(data.values); // 전체 데이터 표시
                 } else {
                     $('#output').html('<p>데이터가 없습니다.</p>');
                 }
@@ -125,10 +132,205 @@
             output += '</table>';
             $('#output').html(output);
         }
+
+        function filterData(selectedDate) {
+            const filteredData = allData.filter((row, index) => {
+                if (index === 0) return true; // 헤더 행은 제외
+                const dateValue = row[0]; // A열에서 날짜 값 가져오기
+                const formattedDate = formatDate(dateValue); // 날짜 형식 MM/DD로 변환
+                return formattedDate === selectedDate; // 선택한 날짜와 비교
+            });
+
+            if (filteredData.length > 0) {
+                displayData(filteredData); // 필터링된 데이터 표시
+            } else {
+                $('#output').html('<p>해당 날짜의 데이터가 없습니다.</p>');
+            }
+        }
+
+        function formatDate(dateString) {
+            const dateParts = dateString.split('/'); // 날짜 문자열을 '/'로 분리
+            if (dateParts.length === 3) {
+                const month = dateParts[0].padStart(2, '0'); // 월을 두 자리로 변환
+                const day = dateParts[1].padStart(2, '0'); // 일을 두 자리로 변환
+                return `${month}/${day}`; // MM/DD 형식으로 반환
+            }
+            return ''; // 형식이 잘못된 경우 빈 문자열 반환
+        }
     </script>
 </head>
 <body>
     <h1>출결 현황</h1>
+    <label for="dateSelector">날짜 선택 (MM/DD): </label>
+    <input type="text" id="dateSelector" placeholder="MM/DD" maxlength="5" />
+    <div id="output">데이터를 불러오는 중...</div>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>출결 현황</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        /* 기본 스타일 */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2em;
+            margin: 20px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 1em;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #ddd;
+            word-wrap: normal; /* 줄바꿈을 방지 */
+            white-space: nowrap; /* 텍스트가 한 줄로 유지되도록 설정 */
+        }
+
+        th {
+            background-color: #f4f4f4;
+        }
+
+        td {
+            max-width: 200px; /* 셀에 들어가는 내용이 너무 길면 자동으로 줄바꿈 */
+            overflow: hidden; /* 넘치는 내용 숨김 */
+            text-overflow: ellipsis; /* 넘치는 내용에 '...' 표시 */
+        }
+
+        /* 모바일 대응 */
+        @media screen and (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+
+            table {
+                font-size: 0.9em;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+        }
+
+        /* 태블릿 대응 */
+        @media screen and (max-width: 900px) and (min-width: 601px) {
+            h1 {
+                font-size: 1.75em;
+            }
+
+            table {
+                font-size: 1em;
+            }
+
+            th, td {
+                padding: 9px;
+            }
+        }
+    </style>
+    <script>
+        const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
+        const SHEET_NAME = '출결'; // 시트 이름
+        const API_KEY = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // 구글 API 키
+
+        $(document).ready(function() {
+            fetchSheetData();
+
+            // 날짜 선택 시 데이터 필터링
+            $('#dateSelector').on('change', function() {
+                const selectedDate = $(this).val();
+                filterData(selectedDate);
+            });
+        });
+
+        function fetchSheetData() {
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`;
+            
+            $.get(url, function(data) {
+                if (data.values && data.values.length > 1) { // 데이터가 1행 이상일 때만
+                    window.allData = data.values; // 전체 데이터를 전역 변수에 저장
+                    displayData(data.values); // 전체 데이터 표시
+                } else {
+                    $('#output').html('<p>데이터가 없습니다.</p>');
+                }
+            }).fail(function() {
+                $('#output').html('<p>데이터를 불러오는 데 실패했습니다.</p>');
+            });
+        }
+
+        function displayData(values) {
+            let output = '<table border="1"><tr>';
+            // 테이블 헤더 생성 (A, B, G, H~U열)
+            output += `<th>${values[0][0]}</th>`; // A열
+            output += `<th>${values[0][1]}</th>`; // B열
+            for (let i = 6; i < 21; i++) { // G부터 U까지
+                output += `<th>${values[0][i]}</th>`;
+            }
+            output += '</tr>';
+
+            // 테이블 데이터 생성
+            for (let i = 1; i < values.length; i++) {
+                output += '<tr>';
+                output += `<td>${values[i][0]}</td>`; // A열
+                output += `<td>${values[i][1]}</td>`; // B열
+                for (let j = 6; j < 21; j++) { // G부터 U까지
+                    output += `<td>${values[i][j]}</td>`;
+                }
+                output += '</tr>';
+            }
+            output += '</table>';
+            $('#output').html(output);
+        }
+
+        function filterData(selectedDate) {
+            const filteredData = allData.filter((row, index) => {
+                if (index === 0) return true; // 헤더 행은 제외
+                const dateValue = row[0]; // A열에서 날짜 값 가져오기
+                const formattedDate = formatDate(dateValue); // 날짜 형식 MM/DD로 변환
+                return formattedDate === selectedDate; // 선택한 날짜와 비교
+            });
+
+            if (filteredData.length > 0) {
+                displayData(filteredData); // 필터링된 데이터 표시
+            } else {
+                $('#output').html('<p>해당 날짜의 데이터가 없습니다.</p>');
+            }
+        }
+
+        function formatDate(dateString) {
+            const dateParts = dateString.split('/'); // 날짜 문자열을 '/'로 분리
+            if (dateParts.length === 3) {
+                const month = dateParts[0].padStart(2, '0'); // 월을 두 자리로 변환
+                const day = dateParts[1].padStart(2, '0'); // 일을 두 자리로 변환
+                return `${month}/${day}`; // MM/DD 형식으로 반환
+            }
+            return ''; // 형식이 잘못된 경우 빈 문자열 반환
+        }
+    </script>
+</head>
+<body>
+    <h1>출결 현황</h1>
+    <label for="dateSelector">날짜 선택 (MM/DD): </label>
+    <input type="text" id="dateSelector" placeholder="MM/DD" maxlength="5" />
     <div id="output">데이터를 불러오는 중...</div>
 </body>
 </html>
