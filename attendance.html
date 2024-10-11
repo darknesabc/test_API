@@ -78,6 +78,20 @@
             margin-right: 20px; /* 이름과 버튼 사이의 간격 */
             white-space: nowrap; /* 줄 바꿈 방지 */
         }
+        /* 홈 버튼 스타일 */
+        .home-button {
+            cursor: pointer;
+            margin-right: auto;
+            font-size: 24px;
+            color: white;
+        }
+        .home-button:hover {
+            opacity: 0.7; /* 호버 시 투명도 조정 */
+        }
+        /* 날짜 선택 스타일 */
+        #dateSelector {
+            margin: 10px 20px;
+        }
     </style>
     <script>
         const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
@@ -86,6 +100,7 @@
 
         $(document).ready(function() {
             fetchSheetData();
+
             // 첫 로그인 페이지에서 저장된 자리번호와 사용자 이름 불러오기
             const userInfo = localStorage.getItem('username'); // 자리번호와 이름이 함께 저장됨
 
@@ -94,14 +109,25 @@
             } else {
                 $('#userName').text('사용자'); // 이름이 없을 경우 기본값
             }
+
+            // 날짜 선택 이벤트
+            $('#dateSelector').on('change', function() {
+                const selectedDate = $(this).val();
+                fetchSheetData(selectedDate);
+            });
         });
 
-        function fetchSheetData() {
+        // 홈 버튼 클릭 시 첫 페이지로 이동
+        function goHome() {
+            window.location.href = '첫페이지주소.html'; // 첫 페이지의 주소로 변경하세요.
+        }
+
+        function fetchSheetData(selectedDate) {
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`;
             
             $.get(url, function(data) {
                 if (data.values && data.values.length > 0) {
-                    displayData(data.values);
+                    displayData(data.values, selectedDate);
                 } else {
                     $('#output').html('<p>데이터가 없습니다.</p>');
                 }
@@ -111,7 +137,7 @@
             });
         }
 
-        function displayData(values) {
+        function displayData(values, selectedDate) {
             // 자리번호 및 이름 분리
             const userInfo = $('#userName').text();
             const [userSeatNumber, userName] = userInfo.split(' ');
@@ -120,18 +146,24 @@
             let output = '<table><tr>';
             output += '<th>자리번호</th><th>이름</th><th>교시</th>';
 
-            // I, K, M, O, Q, S, U열의 2행 데이터를 1행으로 옮김
-            for (let i = 8; i <= 20; i += 2) {
-                if (values[1][i]) {
-                    values[0][i] = values[1][i]; // 2행 값을 1행으로 옮김
-                }
-            }
-
             // H부터 U열까지 헤더 추가 (U열까지만 표시)
             for (let i = 7; i < values[0].length && i <= 20; i++) {
                 output += `<th>${values[0][i]}</th>`;
             }
             output += '</tr>';
+
+            // 선택한 날짜의 열 인덱스 찾기
+            const dateColumns = {
+                '10/7': 7,
+                '10/8': 8,
+                '10/9': 9,
+                '10/10': 10,
+                '10/11': 11,
+                '10/12': 12,
+                '10/13': 13
+            };
+
+            const selectedIndex = dateColumns[selectedDate];
 
             // 데이터 행 추가
             for (let i = 2; i < values.length; i++) {
@@ -141,36 +173,14 @@
                     output += `<td>${values[i][1]}</td>`; // 이름
                     output += `<td>${values[i][6]}</td>`; // 교시 (G열)
 
-                    // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
-                    for (let j = 7; j < values[i].length && j <= 20; j++) {
-                        let cellValue = values[i][j];
-                        if (cellValue == '1') {
-                            output += `<td class="attendance">출석</td>`;
-                        } else if (cellValue == '3') {
-                            output += `<td class="absence">결석</td>`;
-                        } else {
-                            output += `<td>${cellValue}</td>`;
-                        }
-                    }
-                    output += '</tr>';
-                }
-                // 2행 데이터도 표시
-                if (i === 2) {
-                    output += '<tr>';
-                    output += `<td>${values[i][0]}</td>`; // 자리번호
-                    output += `<td>${values[i][1]}</td>`; // 이름
-                    output += `<td>${values[i][6]}</td>`; // 교시 (G열)
-
-                    // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
-                    for (let j = 7; j < values[i].length && j <= 20; j++) {
-                        let cellValue = values[i][j];
-                        if (cellValue == '1') {
-                            output += `<td class="attendance">출석</td>`;
-                        } else if (cellValue == '3') {
-                            output += `<td class="absence">결석</td>`;
-                        } else {
-                            output += `<td>${cellValue}</td>`;
-                        }
+                    // 선택한 날짜에 해당하는 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
+                    let cellValue = values[i][selectedIndex];
+                    if (cellValue == '1') {
+                        output += `<td class="attendance">출석</td>`;
+                    } else if (cellValue == '3') {
+                        output += `<td class="absence">결석</td>`;
+                    } else {
+                        output += `<td>${cellValue}</td>`;
                     }
                     output += '</tr>';
                 }
@@ -182,9 +192,22 @@
 </head>
 <body>
     <header>
+        <div class="home-button" onclick="goHome()">🏠</div>
         <div id="userName"></div>
     </header>
     <h1>출결 현황</h1>
+    
+    <label for="dateSelector">날짜 선택:</label>
+    <select id="dateSelector">
+        <option value="10/7">10/7</option>
+        <option value="10/8">10/8</option>
+        <option value="10/9">10/9</option>
+        <option value="10/10">10/10</option>
+        <option value="10/11">10/11</option>
+        <option value="10/12">10/12</option>
+        <option value="10/13">10/13</option>
+    </select>
+
     <div id="output">데이터를 불러오는 중...</div>
 </body>
 </html>
