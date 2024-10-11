@@ -28,6 +28,7 @@
         tr:nth-child(even) {
             background-color: #f9f9f9;
         }
+        
         /* 출석 및 결석 색상 */
         .attendance {
             background-color: #d4edda; /* 출석: 연한 초록색 */
@@ -179,6 +180,31 @@
                     }
                 }
             }
+            
+            // 세 번째 행도 확인하여 추가
+            for (let i = 2; i < values.length; i++) {
+                if (values[i][0] === userSeatNumber && values[i][1] === userName) {
+                    // 세 번째 행 추가
+                    output += '<tr>';
+                    output += `<td>${values[i][0]}</td>`; // 자리번호
+                    output += `<td>${values[i][1]}</td>`; // 이름
+                    output += `<td>${values[i][6]}</td>`; // 교시 (G열)
+
+                    // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
+                    for (let j = 7; j < values[i].length && j <= 20; j++) {
+                        let cellValue = values[i][j];
+                        if (cellValue == '1') {
+                            output += `<td class="attendance">출석</td>`;
+                        } else if (cellValue == '3') {
+                            output += `<td class="absence">결석</td>`;
+                        } else {
+                            output += `<td>${cellValue}</td>`;
+                        }
+                    }
+                    output += '</tr>';
+                }
+            }
+
             output += '</table>';
             $('#output').html(output); // 기존 박스에 데이터 삽입
         }
