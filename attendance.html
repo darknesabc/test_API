@@ -106,7 +106,7 @@
             let output = '<table border="1"><tr>';
             // 필요한 열만 테이블 헤더에 추가
             output += '<th>자리번호</th><th>이름</th><th>교시</th>';
-            for (let col = 7; col < values[0].length; col++) { // H열부터 U열까지
+            for (let col = 7; col < 21; col++) { // H열(7)부터 U열(20)까지
                 output += `<th>${values[0][col]}</th>`;
             }
             output += '</tr>';
@@ -117,7 +117,7 @@
                 output += `<td>${values[i][0]}</td>`; // A열: 자리번호
                 output += `<td>${values[i][1]}</td>`; // B열: 이름
                 output += `<td>${values[i][6]}</td>`; // G열: 교시
-                for (let col = 7; col < values[i].length; col++) { // H열부터 U열까지
+                for (let col = 7; col < 21; col++) { // H열(7)부터 U열(20)까지
                     output += `<td>${values[i][col]}</td>`;
                 }
                 output += '</tr>';
