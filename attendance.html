@@ -92,6 +92,8 @@
         const SHEET_NAME = '출결'; // 시트 이름
         const API_KEY = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // 구글 API 키
 
+        let allData = []; // 전체 데이터를 저장할 변수
+
         $(document).ready(function() {
             fetchSheetData();
             $('#datePicker').on('change', function() {
@@ -105,7 +107,8 @@
             
             $.get(url, function(data) {
                 if (data.values && data.values.length > 0) {
-                    displayData(data.values);
+                    allData = data.values; // 전체 데이터 저장
+                    displayData(allData); // 처음 데이터 표시
                 } else {
                     $('#output').html('<p>데이터가 없습니다.</p>');
                 }
@@ -182,10 +185,22 @@
             $('#output').html(output);
         }
 
-        function filterDataByDate(date) {
-            // 이 부분에서 선택한 날짜에 맞춰 데이터를 필터링하는 로직을 추가할 수 있습니다.
-            // 현재는 전체 데이터를 보여주기 위해 displayData()를 호출합니다.
-            fetchSheetData(); // 데이터 불러오기 (필터링 로직 추가 필요)
+        function filterDataByDate(selectedDate) {
+            // 선택한 날짜를 MM/DD 형식으로 변환
+            const dateParts = selectedDate.split('-');
+            const formattedDate = `${dateParts[1].padStart(2, '0')}/${dateParts[2].padStart(2, '0')}`; // MM/DD 포맷
+
+            // 선택한 날짜와 매칭되는 데이터만 필터링
+            const filteredData = allData.filter(row => {
+                // H열부터 U열까지의 데이터와 비교 (즉, 8, 10, 12, 14, 16, 18 열)
+                return row.slice(8, 20).includes(formattedDate);
+            });
+
+            if (filteredData.length > 0) {
+                displayData(filteredData);
+            } else {
+                $('#output').html('<p>선택한 날짜에 대한 데이터가 없습니다.</p>');
+            }
         }
     </script>
 </head>
