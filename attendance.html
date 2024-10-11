@@ -27,15 +27,6 @@
         tr:nth-child(even) {
             background-color: #f9f9f9;
         }
-        /* 출석 및 결석 색상 */
-        .attendance {
-            background-color: #d4edda; /* 출석: 연한 초록색 */
-            color: #155724;
-        }
-        .absence {
-            background-color: #f8d7da; /* 결석: 연한 빨간색 */
-            color: #721c24;
-        }
 
         /* 작은 화면에서도 스크롤 가능하게 */
         .table-container {
@@ -121,17 +112,7 @@
             let output = '<div class="table-container"><table><tr>';
             output += '<th>자리번호</th><th>이름</th><th>교시</th>';
 
-            // I, K, M, O, Q, S, U열의 2행 데이터를 1행으로 옮김
-            for (let i = 8; i <= 20; i += 2) {
-                if (values[1][i]) {
-                    values[0][i] = values[1][i]; // 2행 값을 1행으로 옮김
-                }
-            }
-
-            // H부터 U열까지 헤더 추가 (U열까지만 표시)
-            for (let i = 7; i < values[0].length && i <= 20; i++) {
-                output += `<th>${values[0][i]}</th>`;
-            }
+            // G열(교시)에서 데이터만 추가
             output += '</tr>';
 
             // 데이터 행 추가
@@ -140,18 +121,6 @@
                 output += `<td>${values[i][0]}</td>`; // 자리번호
                 output += `<td>${values[i][1]}</td>`; // 이름
                 output += `<td>${values[i][6]}</td>`; // 교시 (G열)
-
-                // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
-                for (let j = 7; j < values[i].length && j <= 20; j++) {
-                    let cellValue = values[i][j];
-                    if (cellValue == '1') {
-                        output += `<td class="attendance">출석</td>`;
-                    } else if (cellValue == '3') {
-                        output += `<td class="absence">결석</td>`;
-                    } else {
-                        output += `<td>${cellValue}</td>`;
-                    }
-                }
                 output += '</tr>';
             }
             output += '</table></div>';
