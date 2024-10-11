@@ -140,7 +140,7 @@
             let output = '<table><tr>';
             output += '<th>자리번호</th><th>이름</th><th>교시</th>'; // 기본 헤더
 
-            // H부터 U열까지 헤더 추가 (U열까지만 표시)
+            // 1행에서 날짜 헤더 추가 (H부터 U열까지)
             for (let i = 7; i < values[0].length && i <= 20; i++) {
                 output += `<th>${values[0][i]}</th>`;
             }
