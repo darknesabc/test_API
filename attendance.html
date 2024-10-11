@@ -7,6 +7,12 @@
 </head>
 <body>
     <h1>출결 데이터</h1>
+
+    <label for="date-picker">날짜 선택:</label>
+    <input type="date" id="date-picker" />
+
+    <button id="load-data">데이터 불러오기</button>
+
     <table id="data-table" border="1">
         <thead>
             <tr>
@@ -22,7 +28,15 @@
     </table>
 
     <script>
+        document.getElementById('load-data').addEventListener('click', fetchData);
+
         async function fetchData() {
+            const date = document.getElementById('date-picker').value; // 선택한 날짜
+            if (!date) {
+                alert("날짜를 선택해 주세요.");
+                return;
+            }
+
             const spreadsheetId = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
             const range = '출결!A1:U43'; // 데이터 범위
             const apiKey = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // API 키
@@ -35,15 +49,23 @@
 
                 if (data.values && data.values.length) {
                     const tableBody = document.getElementById('data-table').getElementsByTagName('tbody')[0];
+                    tableBody.innerHTML = ''; // 이전 데이터 삭제
 
-                    // 데이터를 테이블에 추가
+                    // 선택한 날짜에 해당하는 데이터 필터링
                     data.values.forEach(row => {
-                        const newRow = tableBody.insertRow();
-                        row.forEach(cell => {
-                            const newCell = newRow.insertCell();
-                            newCell.textContent = cell;
-                        });
+                        // 예를 들어, 첫 번째 열이 날짜라고 가정하고 비교
+                        if (row[0] === date) { // 날짜 비교
+                            const newRow = tableBody.insertRow();
+                            row.forEach(cell => {
+                                const newCell = newRow.insertCell();
+                                newCell.textContent = cell;
+                            });
+                        }
                     });
+
+                    if (tableBody.rows.length === 0) {
+                        console.log('해당 날짜에 데이터가 없습니다.');
+                    }
                 } else {
                     console.log('데이터가 없습니다.');
                 }
@@ -51,8 +73,6 @@
                 console.error('오류:', error);
             }
         }
-
-        fetchData();
     </script>
 </body>
 </html>
