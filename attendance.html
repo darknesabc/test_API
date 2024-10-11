@@ -104,18 +104,22 @@
 
         function displayData(values) {
             let output = '<table border="1"><tr>';
-            // 테이블 헤더 생성
-            values[0].forEach(header => {
-                output += `<th>${header}</th>`;
-            });
+            // 필요한 열만 테이블 헤더에 추가
+            output += '<th>자리번호</th><th>이름</th><th>교시</th>';
+            for (let col = 7; col < values[0].length; col++) { // H열부터 U열까지
+                output += `<th>${values[0][col]}</th>`;
+            }
             output += '</tr>';
 
-            // 테이블 데이터 생성
+            // 테이블 데이터 생성 (2행부터 시작)
             for (let i = 1; i < values.length; i++) {
                 output += '<tr>';
-                values[i].forEach(cell => {
-                    output += `<td>${cell}</td>`;
-                });
+                output += `<td>${values[i][0]}</td>`; // A열: 자리번호
+                output += `<td>${values[i][1]}</td>`; // B열: 이름
+                output += `<td>${values[i][6]}</td>`; // G열: 교시
+                for (let col = 7; col < values[i].length; col++) { // H열부터 U열까지
+                    output += `<td>${values[i][col]}</td>`;
+                }
                 output += '</tr>';
             }
             output += '</table>';
