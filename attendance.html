@@ -158,7 +158,18 @@
                             output += `<td>출석</td>`;
                         }
                     } else {
-                        output += `<td>${values[i][j] !== undefined ? values[i][j] : ''}</td>`; // H열부터 U열 데이터
+                        let cellValue = values[i][j] !== undefined ? values[i][j] : ''; // H열부터 U열 데이터
+                        if ([8, 10, 12, 14, 16, 18].includes(j)) { // I, K, M, O, Q, S, U 열
+                            if (cellValue == '1') {
+                                output += `<td>출석</td>`;
+                            } else if (cellValue == '3') {
+                                output += `<td>결석</td>`;
+                            } else {
+                                output += `<td>${cellValue}</td>`;
+                            }
+                        } else {
+                            output += `<td>${cellValue}</td>`;
+                        }
                     }
                 }
                 
