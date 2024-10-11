@@ -165,30 +165,31 @@
                         // I, K, M, O, Q, S, U열에서 날짜 비교
                         const cellDate = values[0][j] ? formatDate(values[0][j]) : ''; // 셀 날짜 포맷
                         if (cellDate === formattedSelectedDate) {
-                            dateMatches = true;
-                            break;
-                        }
-                    }
+                            // 해당 열의 값이 있는 경우에만 추가
+                            output += '<tr>';
+                            output += `<td>${values[i][0]}</td>`; // 자리번호
+                            output += `<td>${values[i][1]}</td>`; // 이름
+                            output += `<td>${values[i][6]}</td>`; // 교시 (G열)
 
-                    if (dateMatches) {
-                        output += '<tr>';
-                        output += `<td>${values[i][0]}</td>`; // 자리번호
-                        output += `<td>${values[i][1]}</td>`; // 이름
-                        output += `<td>${values[i][6]}</td>`; // 교시 (G열)
-
-                        // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
-                        for (let j = 7; j < values[i].length && j <= 20; j++) {
-                            let cellValue = values[i][j];
-                            if (cellValue == '1') {
-                                output += `<td class="attendance">출석</td>`;
-                            } else if (cellValue == '3') {
-                                output += `<td class="absence">결석</td>`;
-                            } else {
-                                output += `<td>${cellValue}</td>`;
+                            // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
+                            for (let k = 7; k < values[i].length && k <= 20; k++) {
+                                const cellValue = values[i][k];
+                                if (k === j) { // 선택된 날짜의 열에 해당하는 값만 표시
+                                    if (cellValue == '1') {
+                                        output += `<td class="attendance">출석</td>`;
+                                    } else if (cellValue == '3') {
+                                        output += `<td class="absence">결석</td>`;
+                                    } else {
+                                        output += `<td>${cellValue}</td>`;
+                                    }
+                                } else {
+                                    output += '<td></td>'; // 해당하지 않는 열은 빈 셀로
+                                }
                             }
+                            output += '</tr>';
+                            dataDisplayed = true; // 데이터가 표시됨
+                            break; // 첫 번째로 일치하는 데이터만 표시 후 종료
                         }
-                        output += '</tr>';
-                        dataDisplayed = true; // 데이터가 표시됨
                     }
                 }
             }
@@ -210,12 +211,21 @@
 </head>
 <body>
     <header>
-        <i class="fas fa-home home-icon" onclick="goHome()"></i> <!-- 집 아이콘 추가 -->
+        <i class="fas fa-home home-icon" onclick="goHome()"></i>
         <div id="userName"></div>
     </header>
-    <h1>출결 현황</h1>
-    <label for="dateSelect">날짜 선택:</label>
-    <input type="date" id="dateSelect">
+    <div>
+        <label for="dateSelect">날짜 선택:</label>
+        <select id="dateSelect">
+            <option value="">전체</option>
+            <option value="10/07">10/07</option>
+            <option value="10/08">10/08</option>
+            <option value="10/09">10/09</option>
+            <option value="10/10">10/10</option>
+            <option value="10/11">10/11</option>
+            <!-- 필요한 다른 날짜 옵션 추가 -->
+        </select>
+    </div>
     <div id="output"></div>
 </body>
 </html>
