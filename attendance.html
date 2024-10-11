@@ -88,10 +88,6 @@
         .home-button:hover {
             opacity: 0.7; /* 호버 시 투명도 조정 */
         }
-        /* 날짜 선택 스타일 */
-        #dateSelector {
-            margin: 10px 20px;
-        }
     </style>
     <script>
         const SPREADSHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
@@ -109,12 +105,6 @@
             } else {
                 $('#userName').text('사용자'); // 이름이 없을 경우 기본값
             }
-
-            // 날짜 선택 이벤트
-            $('#dateSelector').on('change', function() {
-                const selectedDate = $(this).val();
-                fetchSheetData(selectedDate);
-            });
         });
 
         // 홈 버튼 클릭 시 첫 페이지로 이동
@@ -122,12 +112,12 @@
             window.location.href = 'nextpage.html'; // 첫 페이지의 주소로 변경
         }
 
-        function fetchSheetData(selectedDate) {
+        function fetchSheetData() {
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`;
             
             $.get(url, function(data) {
                 if (data.values && data.values.length > 0) {
-                    displayData(data.values, selectedDate);
+                    displayData(data.values);
                 } else {
                     $('#output').html('<p>데이터가 없습니다.</p>');
                 }
@@ -137,7 +127,7 @@
             });
         }
 
-        function displayData(values, selectedDate) {
+        function displayData(values) {
             // 자리번호 및 이름 분리
             const userInfo = $('#userName').text();
             const [userSeatNumber, userName] = userInfo.split(' ');
@@ -152,19 +142,6 @@
             }
             output += '</tr>';
 
-            // 선택한 날짜의 열 인덱스 찾기
-            const dateColumns = {
-                '10/7': 7,
-                '10/8': 8,
-                '10/9': 9,
-                '10/10': 10,
-                '10/11': 11,
-                '10/12': 12,
-                '10/13': 13
-            };
-
-            const selectedIndex = dateColumns[selectedDate];
-
             // 데이터 행 추가
             for (let i = 2; i < values.length; i++) {
                 if (values[i][0] === userSeatNumber && values[i][1] === userName) {
@@ -173,14 +150,16 @@
                     output += `<td>${values[i][1]}</td>`; // 이름
                     output += `<td>${values[i][6]}</td>`; // 교시 (G열)
 
-                    // 선택한 날짜에 해당하는 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
-                    let cellValue = values[i][selectedIndex];
-                    if (cellValue == '1') {
-                        output += `<td class="attendance">출석</td>`;
-                    } else if (cellValue == '3') {
-                        output += `<td class="absence">결석</td>`;
-                    } else {
-                        output += `<td>${cellValue}</td>`;
+                    // 모든 날짜의 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
+                    for (let j = 7; j < values[i].length; j++) {
+                        let cellValue = values[i][j];
+                        if (cellValue == '1') {
+                            output += `<td class="attendance">출석</td>`;
+                        } else if (cellValue == '3') {
+                            output += `<td class="absence">결석</td>`;
+                        } else {
+                            output += `<td>${cellValue}</td>`;
+                        }
                     }
                     output += '</tr>';
                 }
@@ -196,18 +175,6 @@
         <div id="userName"></div>
     </header>
     <h1>출결 현황</h1>
-    
-    <label for="dateSelector">날짜 선택:</label>
-    <select id="dateSelector">
-        <option value="10/7">10/7</option>
-        <option value="10/8">10/8</option>
-        <option value="10/9">10/9</option>
-        <option value="10/10">10/10</option>
-        <option value="10/11">10/11</option>
-        <option value="10/12">10/12</option>
-        <option value="10/13">10/13</option>
-        <option value="전체">전체</option> <!-- 전체 선택 추가 -->
-    </select>
 
     <div id="output">데이터를 불러오는 중...</div>
 </body>
