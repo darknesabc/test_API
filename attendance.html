@@ -56,10 +56,22 @@
             const formattedDate = formatDate(selectedDate);
             const filteredData = allData.filter((row, index) => {
                 if (index === 0) return true; // 헤더 행은 항상 포함
-                return row.includes(formattedDate);
+                return row.includes(formattedDate); // 날짜가 포함된 행만 포함
             });
-            document.body.querySelector('table').remove(); // 이전 테이블 제거
-            displayData(filteredData); // 필터링된 데이터 표시
+
+            // 이전 테이블 제거
+            const existingTable = document.body.querySelector('table');
+            if (existingTable) {
+                existingTable.remove();
+            }
+            // 필터링된 데이터 표시
+            if (filteredData.length > 1) {
+                displayData(filteredData); // 매칭되는 데이터가 있을 경우 표시
+            } else {
+                const message = document.createElement('p');
+                message.textContent = '매칭되는 데이터가 없습니다.'; // 매칭 데이터가 없을 경우 메시지 표시
+                document.body.appendChild(message);
+            }
         }
 
         function formatDate(date) {
