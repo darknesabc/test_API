@@ -136,9 +136,6 @@
             const userInfo = $('#userName').text();
             const [userSeatNumber, userName] = userInfo.split(' ');
 
-            // 선택한 날짜가 있는지 확인
-            const formattedSelectedDate = selectedDate ? formatDate(selectedDate) : '';
-
             // 테이블 생성
             let output = '<table><tr>';
             output += '<th>자리번호</th><th>이름</th><th>교시</th>';
@@ -158,21 +155,39 @@
 
             // 데이터 행 추가
             for (let i = 2; i < values.length; i++) {
-                // 사용자의 자리번호와 이름이 매칭되는지 확인
-                if (values[i][0] === userSeatNumber && values[i][1] === userName) {
-                    let dateMatches = false;
+                // 3행 데이터는 무조건 표시
+                if (i === 2) {
+                    output += '<tr>';
+                    output += `<td>${values[i][0]}</td>`; // 자리번호
+                    output += `<td>${values[i][1]}</td>`; // 이름
+                    output += `<td>${values[i][6]}</td>`; // 교시 (G열)
 
-                    // 날짜가 선택된 경우에만 매칭된 데이터를 필터링
-                    if (formattedSelectedDate) {
-                        for (let j = 7; j < values[i].length && j <= 20; j += 2) {
-                            const cellDate = values[0][j] ? formatDate(values[0][j]) : '';
-                            if (cellDate === formattedSelectedDate) {
-                                dateMatches = true;
-                                break;
-                            }
+                    // H부터 U열까지 데이터 추가 및 값 변환 (출석: 1, 결석: 3)
+                    for (let j = 7; j < values[i].length && j <= 20; j++) {
+                        let cellValue = values[i][j];
+                        if (cellValue == '1') {
+                            output += `<td class="attendance">출석</td>`;
+                        } else if (cellValue == '3') {
+                            output += `<td class="absence">결석</td>`;
+                        } else {
+                            output += `<td>${cellValue}</td>`;
                         }
-                    } else {
-                        dateMatches = true; // 날짜가 선택되지 않은 경우 모든 데이터를 표시
+                    }
+                    output += '</tr>';
+                }
+
+                // 선택한 날짜와 데이터가 일치하는지 확인 (3행 제외)
+                if (values[i][0] === userSeatNumber && values[i][1] === userName) {
+                    let dateMatches = !selectedDate; // 날짜가 선택되지 않았을 경우 기본적으로 true
+                    const formattedSelectedDate = selectedDate ? formatDate(selectedDate) : ''; // 선택한 날짜 포맷
+
+                    for (let j = 7; j < values[i].length && j <= 20; j++) {
+                        // I, K, M, O, Q, S, U열에서 날짜 비교
+                        const cellDate = values[0][j] ? formatDate(values[0][j]) : ''; // 셀 날짜 포맷
+                        if (cellDate === formattedSelectedDate) {
+                            dateMatches = true;
+                            break;
+                        }
                     }
 
                     if (dateMatches) {
@@ -196,14 +211,7 @@
                     }
                 }
             }
-
-            // 만약 매칭되는 데이터가 없을 경우 메시지 출력
-            if (output === '<table><tr><th>자리번호</th><th>이름</th><th>교시</th></tr>') {
-                output = '<p>선택한 날짜에 해당하는 데이터가 없습니다.</p>';
-            } else {
-                output += '</table>';
-            }
-
+            output += '</table>';
             $('#output').html(output); // 기존 박스에 데이터 삽입
         }
 
@@ -216,16 +224,14 @@
 <body>
     <header>
         <i class="fas fa-home home-icon" onclick="goHome()"></i> <!-- 집 아이콘 추가 -->
-        <span id="userName">사용자</span>
+        <div id="userName"></div>
     </header>
-
-    <section>
-        <label for="dateSelect">날짜 선택: </label>
-        <input type="date" id="dateSelect">
-    </section>
-
-    <section id="output">
-        <!-- 출결 데이터가 이곳에 출력됩니다 -->
-    </section>
+    <h1>출결 현황</h1>
+    
+    <!-- 날짜 선택 입력 필드 추가 (달력 선택 가능) -->
+    <label for="dateSelect">날짜 선택:</label>
+    <input type="date" id="dateSelect" />
+    
+    <div id="output">데이터를 불러오는 중...</div>
 </body>
 </html>
