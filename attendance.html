@@ -105,17 +105,58 @@
         function displayData(values) {
             let output = '<table border="1"><tr>';
             // 테이블 헤더 생성
-            values[0].forEach(header => {
-                output += `<th>${header}</th>`;
-            });
+            output += '<th>자리번호</th>';
+            output += '<th>이름</th>';
+            output += '<th>교시</th>';
+            output += '<th>요일</th>';
+            output += '<th>날짜</th>';
+            output += '<th>요일</th>';
+            output += '<th>날짜</th>';
+            output += '<th>요일</th>';
+            output += '<th>날짜</th>';
+            output += '<th>요일</th>';
+            output += '<th>날짜</th>';
+            output += '<th>요일</th>';
+            output += '<th>날짜</th>';
+            output += '<th>요일</th>';
+            output += '<th>날짜</th>';
+            output += '<th>요일</th>';
+            output += '<th>날짜</th>';
             output += '</tr>';
 
             // 테이블 데이터 생성
             for (let i = 1; i < values.length; i++) {
                 output += '<tr>';
-                values[i].forEach(cell => {
-                    output += `<td>${cell}</td>`;
-                });
+                
+                // 자리번호 (A열)
+                output += `<td>${values[i][0]}</td>`;
+                
+                // 이름 (B열)
+                output += `<td>${values[i][1]}</td>`;
+                
+                // 교시 (G열)
+                output += `<td>${values[i][6]}</td>`;
+                
+                // 요일 (H열)
+                output += `<td>${values[i][7]}</td>`;
+                
+                // 날짜 (I열)
+                output += `<td>${values[i][8]}</td>`;
+                
+                // 나머지 요일과 날짜 (K, M, O, Q, S, U 열)
+                for (let j = 10; j <= 20; j += 2) {
+                    if (values[i][j]) {
+                        output += `<td>${values[i][j]}</td>`; // 요일
+                    } else {
+                        output += '<td></td>'; // 비어있는 경우
+                    }
+                    if (values[i][j + 1]) {
+                        output += `<td>${values[i][j + 1]}</td>`; // 날짜
+                    } else {
+                        output += '<td></td>'; // 비어있는 경우
+                    }
+                }
+                
                 output += '</tr>';
             }
             output += '</table>';
