@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attendance Tracker</title>
     <script>
-        const API_KEY = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk';  // 사용자 제공 API 키
+        const API_KEY = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // 사용자 제공 API 키
         const SHEET_ID = '1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0'; // 시트 ID
         const RANGE = '출결!A1:U43'; // 가져올 데이터 범위
+
+        let allData = []; // 전체 데이터를 저장할 배열
 
         async function fetchData() {
             try {
@@ -15,7 +17,8 @@
                 const data = await response.json();
 
                 if (data.values) {
-                    displayData(data.values);
+                    allData = data.values; // 전체 데이터를 저장
+                    displayData(allData); // 초기 데이터 표시
                 } else {
                     console.error('데이터를 가져오는 데 실패했습니다.');
                 }
@@ -26,7 +29,17 @@
 
         function displayData(data) {
             const table = document.createElement('table');
-            data.forEach((row, index) => {
+            const header = data[0];
+            const headerRow = document.createElement('tr');
+
+            header.forEach(cell => {
+                const th = document.createElement('th');
+                th.textContent = cell;
+                headerRow.appendChild(th);
+            });
+            table.appendChild(headerRow);
+
+            data.slice(1).forEach(row => {
                 const tr = document.createElement('tr');
                 row.forEach(cell => {
                     const td = document.createElement('td');
@@ -38,12 +51,34 @@
             document.body.appendChild(table);
         }
 
-        window.onload = fetchData; // 페이지가 로드될 때 데이터 가져오기
+        function filterData() {
+            const selectedDate = document.getElementById('datePicker').value;
+            const formattedDate = formatDate(selectedDate);
+            const filteredData = allData.filter((row, index) => {
+                if (index === 0) return true; // 헤더 행은 항상 포함
+                return row.includes(formattedDate);
+            });
+            document.body.querySelector('table').remove(); // 이전 테이블 제거
+            displayData(filteredData); // 필터링된 데이터 표시
+        }
+
+        function formatDate(date) {
+            const [year, month, day] = date.split('-');
+            const formattedMonth = month.replace(/^0/, ''); // 한 자리 월에서 0 제거
+            const formattedDay = day.replace(/^0/, ''); // 한 자리 일에서 0 제거
+            return `${formattedMonth}/${formattedDay}`;
+        }
+
+        window.onload = () => {
+            fetchData(); // 페이지가 로드될 때 데이터 가져오기
+            document.getElementById('datePicker').addEventListener('change', filterData); // 날짜 선택 이벤트 추가
+        };
     </script>
     <style>
         table {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 20px;
         }
         table, th, td {
             border: 1px solid black;
@@ -56,5 +91,6 @@
 </head>
 <body>
     <h1>출결 데이터</h1>
+    <input type="date" id="datePicker"> <!-- 날짜 선택 입력 추가 -->
 </body>
 </html>
