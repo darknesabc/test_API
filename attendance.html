@@ -105,7 +105,9 @@
             fetchSheetData();
 
             $('#dateSelect').change(function() {
-                fetchSheetData($(this).val());
+                const selectedDate = $(this).val();
+                fetchSheetData(selectedDate);
+                updateDateInSheet(selectedDate); // 선택된 날짜를 시트에 업데이트
             });
         });
 
@@ -211,27 +213,43 @@
                     }
                 }
             }
+
             output += '</table>';
-            $('#output').html(output); // 기존 박스에 데이터 삽입
+            $('#output').html(output); // 테이블 출력
         }
 
-        // 아이콘 클릭 시 nextpage.html로 이동
-        function goHome() {
-            window.location.href = 'nextpage.html';
+        function updateDateInSheet(selectedDate) {
+            const dateValue = formatDate(selectedDate); // mm/dd 형식으로 변환
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A1?valueInputOption=RAW&key=${API_KEY}`;
+
+            const data = {
+                "range": `${SHEET_NAME}!A1`,
+                "values": [[dateValue]] // A1 셀에 업데이트할 값
+            };
+
+            $.ajax({
+                url: url,
+                type: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function(response) {
+                    console.log("날짜가 성공적으로 업데이트되었습니다:", response);
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    console.error("날짜 업데이트에 실패했습니다:", textStatus, errorThrown);
+                }
+            });
         }
     </script>
 </head>
 <body>
     <header>
-        <i class="fas fa-home home-icon" onclick="goHome()"></i> <!-- 집 아이콘 추가 -->
-        <div id="userName"></div>
+        <span id="userName"></span> <!-- 사용자 이름 및 자리번호 -->
+        <i class="fas fa-home home-icon" onclick="window.location.href='main.html';"></i> <!-- 홈 아이콘 클릭 시 main.html로 이동 -->
     </header>
-    <h1>출결 현황</h1>
-    
-    <!-- 날짜 선택 입력 필드 추가 (달력 선택 가능) -->
+
     <label for="dateSelect">날짜 선택:</label>
-    <input type="date" id="dateSelect" />
-    
-    <div id="output">데이터를 불러오는 중...</div>
+    <input type="date" id="dateSelect">
+    <div id="output"></div> <!-- 데이터 출력 영역 -->
 </body>
 </html>
