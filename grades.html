@@ -44,10 +44,6 @@
             border-radius: 5px;
         }
 
-        .menu a:first-child {
-            margin-left: 0; /* 홈 버튼을 왼쪽 끝으로 배치 */
-        }
-
         header {
             display: flex;
             justify-content: flex-end;
@@ -57,6 +53,12 @@
             background-color: #4CAF50;
             color: white;
             flex-wrap: nowrap;
+        }
+
+        #logo {
+            height: 40px; /* 이미지 높이 조정 */
+            margin-right: auto; /* 오른쪽으로 밀기 */
+            cursor: pointer; /* 이미지 클릭 가능하도록 */
         }
 
         #userInfo {
@@ -125,11 +127,11 @@
 </head>
 <body>
 
-    <!-- 상단 메뉴 (홈 버튼 포함) -->
+    <!-- 상단 메뉴 -->
     <nav class="menu">
-        <a href="index.html">홈</a> <!-- 홈 버튼 -->
+        <img id="logo" src="attendance_image.png" alt="출결현황" onclick="window.location.href='attendance.html'"> <!-- 출결현황 이미지 -->
         <a href="attendance.html">출결 현황</a>
-        <a href="grades.html">성적</a> <!-- 성적 링크 -->
+        <a href="grades.html">성적</a>
         <a href="#">교육 점수</a>
         <a href="#">기타</a>
     </nav>
