@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>성적 페이지</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> <!-- Font Awesome CSS -->
+    <script src="https://apis.google.com/js/api:client.js"></script> <!-- Google API 클라이언트 라이브러리 -->
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -151,34 +152,57 @@
     </main>
 
     <script>
-        // 로그인 정보 불러오기
-        const userName = localStorage.getItem('username');
+        const CLIENT_ID = '711432312435-81aan29i1mqvddje2aifgdu8p15im1ru.apps.googleusercontent.com'; // 클라이언트 ID
+        const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 
-        if (userName) {
-            document.getElementById('userName').innerText = userName;
+        let GoogleAuth;
 
-            // Google Sheets에 이름 저장하기
-            const sheetId = '1g_QzdPaJGq1NHzw9mqsCx4YWcWxCUe2bACQ2C7Udzo4';
-            const apiKey = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk';
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/REPORT!C8?valueInputOption=USER_ENTERED&key=${apiKey}`; // REPORT 시트의 C8으로 수정
+        function initClient() {
+            gapi.load('client:auth2', () => {
+                gapi.auth2.init({
+                    client_id: CLIENT_ID,
+                    scope: SCOPES
+                }).then(auth => {
+                    GoogleAuth = auth;
+                    if (GoogleAuth.isSignedIn.get()) {
+                        handleAuthSuccess();
+                    } else {
+                        GoogleAuth.signIn().then(handleAuthSuccess);
+                    }
+                });
+            });
+        }
 
-            // 이름을 C8 셀에 입력
-            fetch(url, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    range: 'REPORT!C8',
-                    majorDimension: 'ROWS',
-                    values: [[userName]],
-                }),
-            })
-            .then(response => response.json())
-            .then(data => console.log('이름이 성공적으로 저장되었습니다:', data))
-            .catch(error => console.error('Error:', error));
-        } else {
-            document.getElementById('userName').innerText = '사용자';
+        function handleAuthSuccess() {
+            // 로그인 정보 불러오기
+            const userName = localStorage.getItem('username');
+
+            if (userName) {
+                document.getElementById('userName').innerText = userName;
+
+                // Google Sheets에 이름 저장하기
+                const sheetId = '1g_QzdPaJGq1NHzw9mqsCx4YWcWxCUe2bACQ2C7Udzo4';
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/REPORT!C8?valueInputOption=USER_ENTERED`;
+
+                // 이름을 C8 셀에 입력
+                fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + GoogleAuth.currentUser.get().getAuthResponse().access_token // 토큰 추가
+                    },
+                    body: JSON.stringify({
+                        range: 'REPORT!C8',
+                        majorDimension: 'ROWS',
+                        values: [[userName]],
+                    }),
+                })
+                .then(response => response.json())
+                .then(data => console.log('이름이 성공적으로 저장되었습니다:', data))
+                .catch(error => console.error('Error:', error));
+            } else {
+                document.getElementById('userName').innerText = '사용자';
+            }
         }
 
         // 로그아웃 기능
@@ -187,6 +211,9 @@
             alert('로그아웃되었습니다.');
             window.location.href = 'index.html';
         });
+
+        // 페이지가 로드될 때 클라이언트 초기화
+        window.onload = initClient;
     </script>
 
 </body>
