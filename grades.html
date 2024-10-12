@@ -230,7 +230,12 @@
                 }),
             })
             .then(response => {
-                if (response.ok) {
+                console.log('응답 상태:', response.status); // 응답 상태 코드 출력
+                return response.json(); // JSON 형식으로 변환
+            })
+            .then(data => {
+                console.log('응답 데이터:', data); // 응답 데이터 출력
+                if (data && data.updatedCells > 0) { // 업데이트된 셀이 있는지 확인
                     alert('이름이 구글 시트에 업데이트되었습니다.');
                 } else {
                     alert('구글 시트 업데이트에 실패했습니다.');
