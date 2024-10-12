@@ -141,6 +141,7 @@
     <header>
         <div id="userInfo">
             <div id="userName"></div>
+            <div id="seatNumber"></div> <!-- 자리 번호 표시 -->
             <button id="logoutButton">로그아웃</button>
         </div>
     </header>
@@ -150,69 +151,43 @@
         <p>여기에서 성적 정보를 확인할 수 있습니다.</p>
     </main>
 
-    <script src="https://apis.google.com/js/api.js"></script>
     <script>
-        const CLIENT_ID = '711432312435-81aan29i1mqvddje2aifgdu8p15im1ru.apps.googleusercontent.com';
-        const API_KEY = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk';
-        const SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
-        const sheetId = '1g_QzdPaJGq1NHzw9mqsCx4YWcWxCUe2bACQ2C7Udzo4';
+        // 로그인 정보 불러오기
+        const userName = localStorage.getItem('username');
+        const seatNumber = localStorage.getItem('seatNumber'); // 자리번호 가져오기
 
-        function handleClientLoad() {
-            gapi.load('client:auth2', initClient);
-        }
+        if (userName && seatNumber) {
+            document.getElementById('userName').innerText = userName;
+            document.getElementById('seatNumber').innerText = `자리번호: ${seatNumber}`; // 자리번호 표시
 
-        function initClient() {
-            gapi.client.init({
-                apiKey: API_KEY,
-                clientId: CLIENT_ID,
-                scope: SCOPE,
-                discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
-            }).then(() => {
-                // 사용자 로그인 상태 확인
-                return gapi.auth2.getAuthInstance().isSignedIn.get();
-            }).then(isSignedIn => {
-                if (isSignedIn) {
-                    handleAuthSuccess();
-                } else {
-                    gapi.auth2.getAuthInstance().signIn();
+            // Google Sheets에 이름 저장하기
+            const sheetId = '1g_QzdPaJGq1NHzw9mqsCx4YWcWxCUe2bACQ2C7Udzo4';
+            const apiKey = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk';
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/REPORT!C8?valueInputOption=USER_ENTERED&key=${apiKey}`;
+
+            // 이름을 C8 셀에 입력
+            fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    range: 'REPORT!C8',
+                    majorDimension: 'ROWS',
+                    values: [[userName]],
+                }),
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('불일치');
                 }
-            }).catch(error => {
-                console.error('Error during Google API initialization:', error);
-            });
-        }
-
-        function handleAuthSuccess() {
-            // 로컬 스토리지에서 사용자 이름과 자리번호를 가져옵니다.
-            const userName = localStorage.getItem('username');
-            const seatNumber = localStorage.getItem('seatNumber'); // 자리번호 가져오기
-
-            if (userName) {
-                document.getElementById('userName').innerText = `${seatNumber} - ${userName}`;
-
-                // Google Sheets에 이름 저장하기
-                const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/REPORT!C8?valueInputOption=USER_ENTERED&key=${API_KEY}`;
-                fetch(url, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        range: 'REPORT!C8',
-                        majorDimension: 'ROWS',
-                        values: [[userName]],
-                    }),
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('네트워크 응답이 실패했습니다.');
-                    }
-                    return response.json();
-                })
-                .then(data => console.log('이름이 성공적으로 저장되었습니다:', data))
-                .catch(error => console.error('Error:', error));
-            } else {
-                document.getElementById('userName').innerText = '사용자';
-            }
+                return response.json();
+            })
+            .then(data => console.log('이름이 성공적으로 저장되었습니다:', data))
+            .catch(error => alert('불일치: ' + error.message)); // 불일치 메시지 표시
+        } else {
+            document.getElementById('userName').innerText = '사용자';
+            document.getElementById('seatNumber').innerText = '자리번호: 없음';
         }
 
         // 로그아웃 기능
@@ -221,9 +196,6 @@
             alert('로그아웃되었습니다.');
             window.location.href = 'index.html';
         });
-
-        // 페이지 로드 시 클라이언트 로드
-        handleClientLoad();
     </script>
 
 </body>
