@@ -103,6 +103,37 @@
             margin-bottom: 30px;
         }
 
+        /* 입력 필드 스타일 */
+        #nameInput {
+            padding: 10px;
+            font-size: 16px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 200px;
+        }
+
+        #submitButton {
+            padding: 10px 15px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        #submitButton:hover {
+            background-color: #45a049;
+        }
+
+        #message {
+            margin-top: 20px;
+            color: red;
+            font-size: 16px;
+        }
+
         @media (max-width: 768px) {
             #userName {
                 font-size: 16px;
@@ -141,6 +172,11 @@
     <main>
         <h1>성적 페이지</h1>
         <p>여기에서 성적 정보를 확인할 수 있습니다.</p>
+
+        <!-- 이름 입력 필드 및 제출 버튼 추가 -->
+        <input type="text" id="nameInput" placeholder="이름을 입력하세요">
+        <button id="submitButton">제출</button>
+        <div id="message"></div>
     </main>
 
     <script>
@@ -159,6 +195,48 @@
             alert('로그아웃되었습니다.');
             window.location.href = 'index.html';
         });
+
+        // 이름 제출 기능
+        document.getElementById('submitButton').addEventListener('click', function() {
+            const inputName = document.getElementById('nameInput').value.trim();
+            const storedUserName = document.getElementById('userName').innerText;
+
+            if (inputName === storedUserName) {
+                updateSheet(inputName); // 구글 시트 업데이트
+            } else {
+                document.getElementById('message').innerText = '불일치';
+            }
+        });
+
+        // 구글 시트 업데이트 함수
+        function updateSheet(name) {
+            const sheetId = '1g_QzdPaJGq1NHzw9mqsCx4YWcWxCUe2bACQ2C7Udzo4'; // 시트 ID
+            const apiKey = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // API 키
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/REPORT!C8?valueInputOption=USER_ENTERED&key=${apiKey}`;
+
+            fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    range: "REPORT!C8",
+                    majorDimension: "ROWS",
+                    values: [[name]], // 입력할 값
+                }),
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('이름이 구글 시트에 업데이트되었습니다.');
+                } else {
+                    alert('구글 시트 업데이트에 실패했습니다.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('오류가 발생했습니다.');
+            });
+        }
     </script>
 
 </body>
