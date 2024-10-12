@@ -160,7 +160,7 @@
             // Google Sheets에 이름 저장하기
             const sheetId = '1g_QzdPaJGq1NHzw9mqsCx4YWcWxCUe2bACQ2C7Udzo4';
             const apiKey = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk';
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/C8?valueInputOption=USER_ENTERED&key=${apiKey}`;
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/REPORT!C8?valueInputOption=USER_ENTERED&key=${apiKey}`; // REPORT 시트의 C8으로 수정
 
             // 이름을 C8 셀에 입력
             fetch(url, {
@@ -169,7 +169,7 @@
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    range: 'C8',
+                    range: 'REPORT!C8',
                     majorDimension: 'ROWS',
                     values: [[userName]],
                 }),
