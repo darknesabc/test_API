@@ -16,6 +16,38 @@
             flex-direction: column;
             justify-content: flex-start;
         }
+
+        /* 상단 메뉴 스타일 */
+        nav.menu {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            width: 100%;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            list-style: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .menu a {
+            margin: 0 10px;
+            font-size: 16px;
+            text-decoration: none;
+            color: white;
+            padding: 10px 15px;
+            transition: background-color 0.3s;
+        }
+
+        .menu a:hover {
+            background-color: #45a049;
+            border-radius: 5px;
+        }
+
+        .menu a:first-child {
+            margin-left: 0; /* 홈 버튼을 왼쪽 끝으로 배치 */
+        }
+
         header {
             display: flex;
             justify-content: flex-end;
@@ -26,10 +58,12 @@
             color: white;
             flex-wrap: nowrap;
         }
+
         #userInfo {
             display: flex;
             align-items: center;
         }
+
         #userName {
             font-size: 18px;
             margin-right: 20px;
@@ -37,6 +71,7 @@
             overflow: hidden;
             flex-shrink: 1;
         }
+
         #logoutButton {
             background-color: #f44336;
             color: white;
@@ -47,27 +82,11 @@
             border-radius: 5px;
             transition: background-color 0.3s;
         }
+
         #logoutButton:hover {
             background-color: #d32f2f;
         }
-        .menu {
-            display: flex;
-            margin: 10px 0 0 20px;
-            padding: 0;
-            list-style: none;
-        }
-        .menu a {
-            margin: 0 10px;
-            font-size: 16px;
-            text-decoration: none;
-            color: #333;
-            padding: 10px 15px;
-            transition: background-color 0.3s;
-        }
-        .menu a:hover {
-            background-color: #e0e0e0;
-            border-radius: 5px;
-        }
+
         main {
             flex-grow: 1;
             display: flex;
@@ -76,10 +95,12 @@
             align-items: center;
             text-align: center;
         }
+
         h1 {
             color: #4CAF50;
             margin-bottom: 20px;
         }
+
         p {
             font-size: 18px;
             margin-bottom: 30px;
@@ -103,19 +124,22 @@
     </style>
 </head>
 <body>
+
+    <!-- 상단 메뉴 (홈 버튼 포함) -->
+    <nav class="menu">
+        <a href="index.html">홈</a> <!-- 홈 버튼 -->
+        <a href="attendance.html">출결 현황</a>
+        <a href="grades.html">성적</a>
+        <a href="#">교육 점수</a>
+        <a href="#">기타</a>
+    </nav>
+
     <header>
         <div id="userInfo">
             <div id="userName"></div>
             <button id="logoutButton">로그아웃</button>
         </div>
     </header>
-
-    <nav class="menu">
-        <a href="attendance.html">출결 현황</a>
-        <a href="grades.html">성적</a>
-        <a href="#">교육 점수</a>
-        <a href="#">기타</a>
-    </nav>
 
     <main>
         <h1>성적 페이지</h1>
@@ -139,5 +163,6 @@
             window.location.href = 'index.html';
         });
     </script>
+
 </body>
 </html>
