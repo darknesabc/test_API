@@ -104,8 +104,13 @@
             // 날짜 선택 시 데이터 불러오기
             fetchSheetData();
 
-            $('#dateSelect').change(function() {
-                fetchSheetData($(this).val());
+            $('#dateSelect').on('input', function() {
+                const selectedDate = $(this).val();
+                if (isValidDate(selectedDate)) {
+                    fetchSheetData(selectedDate);
+                } else {
+                    alert("올바른 날짜 형식(MM/DD)으로 입력해주세요.");
+                }
             });
         });
 
@@ -211,27 +216,31 @@
                     }
                 }
             }
+
             output += '</table>';
-            $('#output').html(output); // 기존 박스에 데이터 삽입
+            $('#output').html(output);
         }
 
-        // 아이콘 클릭 시 nextpage.html로 이동
-        function goHome() {
-            window.location.href = 'nextpage.html';
+        function isValidDate(date) {
+            // MM/DD 형식인지 확인하는 정규식
+            const datePattern = /^(0?[1-9]|1[0-2])\/(0?[1-9]|[12][0-9]|3[01])$/;
+            return datePattern.test(date);
         }
     </script>
 </head>
 <body>
     <header>
-        <i class="fas fa-home home-icon" onclick="goHome()"></i> <!-- 집 아이콘 추가 -->
-        <div id="userName"></div>
+        <i class="fas fa-home home-icon" onclick="location.href='nextpage.html'"></i>
+        <div id="userName">사용자</div>
     </header>
-    <h1>출결 현황</h1>
-    
-    <!-- 날짜 선택 입력 필드 추가 (달력 선택 가능) -->
-    <label for="dateSelect">날짜 선택:</label>
-    <input type="date" id="dateSelect" />
-    
-    <div id="output">데이터를 불러오는 중...</div>
+
+    <main>
+        <!-- 날짜 입력 필드 (MM/DD 형식) -->
+        <label for="dateSelect">날짜 입력 (MM/DD):</label>
+        <input type="text" id="dateSelect" placeholder="MM/DD" />
+
+        <!-- 데이터 출력 -->
+        <div id="output"></div>
+    </main>
 </body>
 </html>
