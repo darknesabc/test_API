@@ -18,17 +18,21 @@
             justify-content: flex-start;
         }
 
-        /* 상단 메뉴 스타일 */
-        nav.menu {
+        /* 상단 메뉴 및 헤더 스타일 */
+        header {
             display: flex;
-            justify-content: flex-start;
             align-items: center;
             width: 100%;
             padding: 10px 20px;
             background-color: #4CAF50;
             color: white;
-            list-style: none;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        nav.menu {
+            display: flex;
+            align-items: center;
+            margin-right: auto; /* 메뉴를 왼쪽으로 정렬 */
         }
 
         .menu a {
@@ -45,22 +49,11 @@
             border-radius: 5px;
         }
 
-        header {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            width: 100%;
-            padding: 10px 20px;
-            background-color: #4CAF50;
-            color: white;
-            flex-wrap: nowrap;
-        }
-
         #homeIcon {
             cursor: pointer; /* 클릭 가능하도록 */
             font-size: 30px; /* 아이콘 크기 조정 */
-            margin-right: auto; /* 오른쪽으로 밀기 */
             color: white; /* 아이콘 색상 */
+            margin-right: 20px; /* 아이콘과 링크 사이 공간 */
         }
 
         #userInfo {
@@ -129,16 +122,16 @@
 </head>
 <body>
 
-    <!-- 상단 메뉴 -->
-    <nav class="menu">
-        <i id="homeIcon" class="fas fa-home" onclick="window.location.href='nextpage.html'"></i> <!-- 집 아이콘 -->
-        <a href="attendance.html">출결 현황</a>
-        <a href="grades.html">성적</a> <!-- 성적 링크 -->
-        <a href="#">교육 점수</a>
-        <a href="#">기타</a>
-    </nav>
-
     <header>
+        <!-- 상단 메뉴 -->
+        <nav class="menu">
+            <i id="homeIcon" class="fas fa-home" onclick="window.location.href='nextpage.html'"></i> <!-- 집 아이콘 -->
+            <a href="attendance.html">출결 현황</a>
+            <a href="grades.html">성적</a> <!-- 성적 링크 -->
+            <a href="#">교육 점수</a>
+            <a href="#">기타</a>
+        </nav>
+
         <div id="userInfo">
             <div id="userName"></div>
             <button id="logoutButton">로그아웃</button>
