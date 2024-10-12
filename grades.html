@@ -18,17 +18,21 @@
             justify-content: flex-start;
         }
 
-        /* 상단 메뉴 스타일 */
-        nav.menu {
+        /* 상단 메뉴 및 헤더 스타일 */
+        header {
             display: flex;
-            justify-content: flex-start;
             align-items: center;
             width: 100%;
             padding: 10px 20px;
             background-color: #4CAF50;
             color: white;
-            list-style: none;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        nav.menu {
+            display: flex;
+            align-items: center;
+            margin-right: auto; /* 메뉴를 왼쪽으로 정렬 */
         }
 
         .menu a {
@@ -45,22 +49,11 @@
             border-radius: 5px;
         }
 
-        header {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            width: 100%;
-            padding: 10px 20px;
-            background-color: #4CAF50;
-            color: white;
-            flex-wrap: nowrap;
-        }
-
         #homeIcon {
             cursor: pointer; /* 클릭 가능하도록 */
             font-size: 30px; /* 아이콘 크기 조정 */
-            margin-right: auto; /* 오른쪽으로 밀기 */
             color: white; /* 아이콘 색상 */
+            margin-right: 20px; /* 아이콘과 링크 사이 공간 */
         }
 
         #userInfo {
@@ -129,19 +122,18 @@
 </head>
 <body>
 
-    <!-- 상단 메뉴 -->
-    <nav class="menu">
-        <i id="homeIcon" class="fas fa-home" onclick="window.location.href='nextpage.html'"></i> <!-- 집 아이콘 -->
-        <a href="attendance.html">출결 현황</a>
-        <a href="grades.html">성적</a> <!-- 성적 링크 -->
-        <a href="#">교육 점수</a>
-        <a href="#">기타</a>
-    </nav>
-
     <header>
+        <!-- 상단 메뉴 -->
+        <nav class="menu">
+            <i id="homeIcon" class="fas fa-home" onclick="window.location.href='nextpage.html'"></i> <!-- 집 아이콘 -->
+            <a href="attendance.html">출결 현황</a>
+            <a href="grades.html">성적</a> <!-- 성적 링크 -->
+            <a href="#">교육 점수</a>
+            <a href="#">기타</a>
+        </nav>
+
         <div id="userInfo">
             <div id="userName"></div>
-            <div id="seatNumber"></div> <!-- 자리 번호 표시 -->
             <button id="logoutButton">로그아웃</button>
         </div>
     </header>
@@ -154,40 +146,11 @@
     <script>
         // 로그인 정보 불러오기
         const userName = localStorage.getItem('username');
-        const seatNumber = localStorage.getItem('seatNumber'); // 자리번호 가져오기
 
-        if (userName && seatNumber) {
+        if (userName) {
             document.getElementById('userName').innerText = userName;
-            document.getElementById('seatNumber').innerText = `자리번호: ${seatNumber}`; // 자리번호 표시
-
-            // Google Sheets에 이름 저장하기
-            const sheetId = '1g_QzdPaJGq1NHzw9mqsCx4YWcWxCUe2bACQ2C7Udzo4';
-            const apiKey = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk';
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/REPORT!C8?valueInputOption=USER_ENTERED&key=${apiKey}`;
-
-            // 이름을 C8 셀에 입력
-            fetch(url, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    range: 'REPORT!C8',
-                    majorDimension: 'ROWS',
-                    values: [[userName]],
-                }),
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('불일치');
-                }
-                return response.json();
-            })
-            .then(data => console.log('이름이 성공적으로 저장되었습니다:', data))
-            .catch(error => alert('불일치: ' + error.message)); // 불일치 메시지 표시
         } else {
             document.getElementById('userName').innerText = '사용자';
-            document.getElementById('seatNumber').innerText = '자리번호: 없음';
         }
 
         // 로그아웃 기능
