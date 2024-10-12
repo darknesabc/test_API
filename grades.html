@@ -199,9 +199,13 @@
         // 이름 제출 기능
         document.getElementById('submitButton').addEventListener('click', function() {
             const inputName = document.getElementById('nameInput').value.trim();
-            const storedUserName = document.getElementById('userName').innerText;
+            const storedUserName = document.getElementById('userName').innerText.trim();
 
-            if (inputName === storedUserName) {
+            console.log('입력된 이름:', inputName);
+            console.log('저장된 이름:', storedUserName);
+
+            // 대소문자 및 공백 무시
+            if (inputName.toLowerCase() === storedUserName.toLowerCase()) {
                 updateSheet(inputName); // 구글 시트 업데이트
             } else {
                 document.getElementById('message').innerText = '불일치';
