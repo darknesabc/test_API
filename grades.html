@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>성적 페이지</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> <!-- Font Awesome CSS -->
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -56,10 +57,10 @@
         }
 
         #homeIcon {
-            width: 30px; /* 아이콘 크기 조정 */
-            height: 30px; /* 아이콘 크기 조정 */
-            margin-right: auto; /* 오른쪽으로 밀기 */
             cursor: pointer; /* 클릭 가능하도록 */
+            font-size: 30px; /* 아이콘 크기 조정 */
+            margin-right: auto; /* 오른쪽으로 밀기 */
+            color: white; /* 아이콘 색상 */
         }
 
         #userInfo {
@@ -130,7 +131,7 @@
 
     <!-- 상단 메뉴 -->
     <nav class="menu">
-        <img id="homeIcon" src="house_icon.png" alt="홈" onclick="window.location.href='nextpage.html'"> <!-- 집 아이콘 -->
+        <i id="homeIcon" class="fas fa-home" onclick="window.location.href='nextpage.html'"></i> <!-- 집 아이콘 -->
         <a href="attendance.html">출결 현황</a>
         <a href="grades.html">성적</a> <!-- 성적 링크 -->
         <a href="#">교육 점수</a>
