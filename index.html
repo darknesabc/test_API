@@ -4,48 +4,75 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>학생 확인</title>
-
-  <!-- 스타일 -->
-  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .container { max-width: 420px; margin: 0 auto; }
+    label { display:block; margin-top: 12px; font-weight: 700; }
+    input { width:100%; padding:12px; box-sizing:border-box; margin-top:8px; }
+    button { width:100%; padding:12px; margin-top:16px; }
+    .error { margin-top: 10px; color: #c00; min-height: 1.2em; }
+  </style>
 </head>
 <body>
   <main class="container">
-    <h1 class="title">학생 확인</h1>
+    <h1>학생 확인</h1>
 
-    <!-- 🔑 학생 인증 폼 -->
     <form id="loginForm" novalidate>
-      
       <label for="name">이름</label>
-      <input
-        type="text"
-        id="name"
-        name="name"
-        placeholder="이름 입력"
-        autocomplete="name"
-        required
-      />
+      <input id="name" autocomplete="name" required placeholder="이름 입력" />
 
       <label for="number">핸드폰 뒤 4자리</label>
-      <input
-        type="text"
-        id="number"
-        name="number"
-        placeholder="뒤 4자리 (숫자)"
-        inputmode="numeric"
-        autocomplete="tel-local-suffix"
-        maxlength="4"
-        pattern="[0-9]{4}"
-        required
-      />
+      <input id="number" inputmode="numeric" maxlength="4" required placeholder="뒤 4자리(숫자)" />
 
-      <!-- 에러 메시지 -->
       <p id="error" class="error" role="alert" aria-live="polite"></p>
-
-      <button type="submit" id="submit" disabled>확인</button>
+      <button id="submit" type="submit" disabled>확인</button>
     </form>
   </main>
 
-  <!-- 브라우저용 JS -->
-  <script src="script.js"></script>
+  <script>
+    const form = document.getElementById("loginForm");
+    const nameInput = document.getElementById("name");
+    const numberInput = document.getElementById("number");
+    const button = document.getElementById("submit");
+    const error = document.getElementById("error");
+
+    function onlyDigits4(v) {
+      return v.replace(/\D/g, "").slice(0, 4);
+    }
+
+    function validate() {
+      numberInput.value = onlyDigits4(numberInput.value);
+      const ok = nameInput.value.trim().length > 0 && /^\d{4}$/.test(numberInput.value);
+      button.disabled = !ok;
+    }
+
+    nameInput.addEventListener("input", validate);
+    numberInput.addEventListener("input", validate);
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      error.textContent = "";
+      button.disabled = true;
+
+      google.script.run
+        .withSuccessHandler((result) => {
+          if (result.ok) {
+            localStorage.setItem("username", `${result.seatNumber} ${result.name}`.trim());
+            // 다음 페이지로 이동(일단 파일이 없으면 alert로 확인)
+            // location.href = "nextpage.html";
+            alert("인증 성공: " + localStorage.getItem("username"));
+          } else {
+            error.textContent = result.message || "인증 실패";
+            button.disabled = false;
+          }
+        })
+        .withFailureHandler((err) => {
+          console.error(err);
+          error.textContent = "서버 오류";
+          button.disabled = false;
+        })
+        .checkStudent(nameInput.value.trim(), numberInput.value.trim());
+    });
+  </script>
 </body>
 </html>
