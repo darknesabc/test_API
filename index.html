@@ -3,21 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="style.css">
-    <title>학생 관리 페이지</title>
+    <title>구글 시트 업데이트</title>
 </head>
 <body>
-    <div class="container">
-        <h1>학생 관리 페이지</h1>
-        <form id="loginForm">
-            <label for="name">이름:</label>
-            <input type="text" id="name" required>
-            <label for="number">4자리 번호:</label>
-            <input type="text" id="number" maxlength="4" required pattern="\d{4}">
-            <button type="submit">로그인</button>
-        </form>
-        <p id="error" class="error"></p>
-    </div>
-    <script src="script.js"></script>
+    <h1>이름 입력</h1>
+    <form id="nameForm">
+        <input type="text" id="name" placeholder="이름을 입력하세요" required>
+        <button type="submit">제출</button>
+    </form>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $('#nameForm').on('submit', function(event) {
+            event.preventDefault(); // 기본 제출 방지
+            const name = $('#name').val(); // 입력값 가져오기
+            updateSheet(name); // 구글 시트 업데이트 함수 호출
+        });
+
+        function updateSheet(name) {
+            const sheetId = '1g_QzdPaJGq1NHzw9mqsCx4YWcWxCUe2bACQ2C7Udzo4'; // 시트 ID
+            const range = 'REPORT!C8'; // 업데이트할 범위
+            const apiKey = 'AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk'; // API 키
+
+            // Google Sheets API 호출
+            $.ajax({
+                url: `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?valueInputOption=USER_ENTERED&key=${apiKey}`,
+                type: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    range: range,
+                    majorDimension: 'ROWS',
+                    values: [[name]] // 입력값을 배열로 감싸기
+                }),
+                success: function(response) {
+                    alert('값이 성공적으로 업데이트되었습니다.');
+                },
+                error: function(error) {
+                    console.error('에러 발생:', error);
+                    alert('값 업데이트에 실패했습니다.');
+                }
+            });
+        }
+    </script>
 </body>
 </html>
