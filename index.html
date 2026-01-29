@@ -1,92 +1,12 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>학생 확인</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    .container { max-width: 420px; margin: 0 auto; }
-    label { display:block; margin-top: 12px; font-weight: 700; }
-    input { width:100%; padding:12px; box-sizing:border-box; margin-top:8px; }
-    button { width:100%; padding:12px; margin-top:16px; }
-    .error { margin-top: 10px; color: #c00; min-height: 1.2em; }
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>학생관리</title>
 </head>
 <body>
-  <main class="container">
-    <h1>학생 확인</h1>
-
-    <form id="loginForm" novalidate>
-      <label for="name">이름</label>
-      <input id="name" autocomplete="name" required placeholder="이름 입력" />
-
-      <label for="number">핸드폰 뒤 4자리</label>
-      <input id="number" inputmode="numeric" maxlength="4" required placeholder="뒤 4자리(숫자)" />
-
-      <p id="error" class="error" role="alert" aria-live="polite"></p>
-      <button id="submit" type="submit" disabled>확인</button>
-    </form>
-  </main>
-
-  <script>
-    const form = document.getElementById("loginForm");
-    const nameInput = document.getElementById("name");
-    const numberInput = document.getElementById("number");
-    const button = document.getElementById("submit");
-    const error = document.getElementById("error");
-
-    function onlyDigits4(v) {
-      return String(v || "").replace(/\D/g, "").slice(0, 4);
-    }
-
-    function validate() {
-      numberInput.value = onlyDigits4(numberInput.value);
-      const ok =
-        nameInput.value.trim().length > 0 &&
-        /^\d{4}$/.test(numberInput.value);
-      button.disabled = !ok;
-    }
-
-    ["input", "keyup", "change", "paste"].forEach((evt) => {
-      nameInput.addEventListener(evt, validate);
-      numberInput.addEventListener(evt, validate);
-    });
-    validate();
-
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      validate();
-      if (button.disabled) return;
-
-      error.textContent = "요청 중...";
-      button.disabled = true;
-
-      google.script.run
-        .withSuccessHandler((result) => {
-          if (!result) {
-            error.textContent = "서버 응답이 비어있음";
-            button.disabled = false;
-            return;
-          }
-
-          if (result.ok) {
-            localStorage.setItem("username", `${result.seatNumber} ${result.name}`.trim());
-            alert("인증 성공: " + localStorage.getItem("username"));
-            // 다음 페이지는 다음 단계에서 붙임
-            // location.href = "nextpage";
-            return;
-          }
-
-          error.textContent = result.message || "인증 실패";
-          button.disabled = false;
-        })
-        .withFailureHandler((err) => {
-          error.textContent = "서버 오류: " + (err?.message || JSON.stringify(err));
-          button.disabled = false;
-        })
-        .checkStudent(nameInput.value.trim(), numberInput.value.trim());
-    });
-  </script>
+  <h1>학생관리 페이지</h1>
+  <p>깃허브 페이지 테스트 성공!</p>
 </body>
 </html>
