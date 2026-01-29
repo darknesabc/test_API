@@ -1,4 +1,5 @@
-const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxBqEYlBC1OHGTvbOhaRM8kNm7_45dkaIKFmi40biJz7iznXVmJfnmG8mLohznvC-ni/exec";
+const WEBAPP_URL =
+  "https://script.google.com/macros/s/AKfycbxBqEYlBC1OHGTvbOhaRM8kNm7_45dkaIKFmi40biJz7iznXVmJfnmG8mLohznvC-ni/exec";
 
 const form = document.getElementById("loginForm");
 const nameInput = document.getElementById("name");
@@ -12,7 +13,9 @@ function onlyDigits4(v) {
 
 function validate() {
   numberInput.value = onlyDigits4(numberInput.value);
-  const ok = nameInput.value.trim().length > 0 && /^\d{4}$/.test(numberInput.value);
+  const ok =
+    nameInput.value.trim().length > 0 &&
+    /^\d{4}$/.test(numberInput.value);
   button.disabled = !ok;
 }
 
@@ -37,11 +40,13 @@ form.addEventListener("submit", async (e) => {
     const result = await res.json();
 
     if (result.ok) {
-      // seatNumber를 서버에서 같이 내려주게 만들면 여기서 저장 가능
-      // 예: result.seatNumber === "5-1D30"
-      const seatNumber = result.seatNumber || "";
-      localStorage.setItem("username", `${seatNumber} ${nameInput.value.trim()}`.trim());
+      // ✅ 기존 방식 그대로: "좌석 이름" 저장
+      localStorage.setItem(
+        "username",
+        `${result.seatNumber} ${result.name}`.trim()
+      );
 
+      // 페이지 이동
       window.location.href = "nextpage.html";
     } else {
       error.textContent = result.message || "일치하는 데이터가 없습니다.";
