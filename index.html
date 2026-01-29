@@ -1,17 +1,45 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles.css">
-    <title>입력 페이지</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>입력 페이지</title>
 </head>
 <body>
-    <div class="container">
-        <input type="text" id="name" placeholder="이름 입력">
-        <input type="text" id="number" placeholder="핸드폰 뒤숫자 4자리 입력">
-        <button id="submit">확인</button>
-    </div>
-    <script src="script.js"></script>
+  <main class="container">
+    <h1 class="title">학생 확인</h1>
+
+    <form id="loginForm" novalidate>
+      <label for="name">이름</label>
+      <input
+        type="text"
+        id="name"
+        name="name"
+        placeholder="이름 입력"
+        autocomplete="name"
+        required
+      />
+
+      <label for="number">핸드폰 뒤 4자리</label>
+      <input
+        type="text"
+        id="number"
+        name="number"
+        placeholder="뒤 4자리(숫자)"
+        inputmode="numeric"
+        autocomplete="tel-local-suffix"
+        maxlength="4"
+        pattern="\\d{4}"
+        required
+      />
+
+      <p id="error" class="error" role="alert" aria-live="polite"></p>
+
+      <button id="submit" type="submit" disabled>확인</button>
+    </form>
+  </main>
+
+  <script src="script.js"></script>
 </body>
 </html>
