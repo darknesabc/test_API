@@ -1,6 +1,6 @@
 // ====== 설정 ======
-const DEMO_MODE = true;          // 지금은 데모 로그인
-const SESSION_KEY = "parent_session_v1";
+const DEMO_MODE = false;  // 데모 끄기 (실제 검증)
+const API_BASE = "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec"; 
 
 // 나중에 Apps Script 붙일 때만 사용
 const API_BASE = ""; // 예: "https://script.google.com/macros/s/XXXX/exec"
@@ -34,15 +34,24 @@ async function demoLogin(name, last4) {
 }
 
 // ====== (실전) Apps Script 로그인 ======
-async function apiLogin(name, last4) {
+async function apiLogin(name, parent4) {
   const res = await fetch(`${API_BASE}?path=login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, last4 })
+    // Apps Script CORS(프리플라이트) 피하려고 text/plain 사용
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ name, parent4 }) // ★ 키 이름 중요: parent4
   });
+
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || "로그인 실패");
-  return { ok: true, token: data.token, studentName: name.trim(), studentId: data.studentId ?? null };
+
+  // Apps Script가 내려주는 값 그대로 세션에 저장할 수 있게 리턴
+  return {
+    studentName: data.studentName,
+    seat: data.seat,
+    teacher: data.teacher,
+    token: data.token
+  };
 }
 
 // ====== 로그인 페이지 로직: loginForm이 있으면 실행 ======
@@ -69,11 +78,12 @@ async function apiLogin(name, last4) {
       const result = DEMO_MODE ? await demoLogin(name, last4) : await apiLogin(name, last4);
 
       setSession({
-        studentName: result.studentName,
-        studentId: result.studentId ?? null,
-        token: result.token,
-        createdAt: Date.now()
-      });
+  studentName: result.studentName,
+  seat: result.seat ?? null,
+  teacher: result.teacher ?? null,
+  token: result.token,
+  createdAt: Date.now()
+});
 
       location.href = "dashboard.html";
     } catch (err) {
@@ -95,7 +105,8 @@ async function apiLogin(name, last4) {
   }
 
   const userLine = $("userLine");
-  if (userLine) userLine.textContent = `${session.studentName} 학부모님`;
+  if (userLine) const extra = [session.seat, session.teacher ? `${session.teacher} 담임` : null].filter(Boolean).join(" · ");
+userLine.textContent = extra ? `${session.studentName} (${extra})` : `${session.studentName} 학부모님`;
 
   logoutBtn.addEventListener("click", () => {
     clearSession();
@@ -111,3 +122,4 @@ async function apiLogin(name, last4) {
 
   if (!getSession()) location.href = "index.html";
 })();
+
