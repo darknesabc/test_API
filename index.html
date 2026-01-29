@@ -1,45 +1,52 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="styles.css" />
-  <title>입력 페이지</title>
-</head>
-<body>
-  <main class="container">
-    <h1 class="title">학생 확인</h1>
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxBqEYlBC1OHGTvbOhaRM8kNm7_45dkaIKFmi40biJz7iznXVmJfnmG8mLohznvC-ni/exec";
 
-    <form id="loginForm" novalidate>
-      <label for="name">이름</label>
-      <input
-        type="text"
-        id="name"
-        name="name"
-        placeholder="이름 입력"
-        autocomplete="name"
-        required
-      />
+const form = document.getElementById("loginForm");
+const nameInput = document.getElementById("name");
+const numberInput = document.getElementById("number");
+const button = document.getElementById("submit");
+const error = document.getElementById("error");
 
-      <label for="number">핸드폰 뒤 4자리</label>
-      <input
-        type="text"
-        id="number"
-        name="number"
-        placeholder="뒤 4자리(숫자)"
-        inputmode="numeric"
-        autocomplete="tel-local-suffix"
-        maxlength="4"
-        pattern="\\d{4}"
-        required
-      />
+function onlyDigits4(v) {
+  return v.replace(/\D/g, "").slice(0, 4);
+}
 
-      <p id="error" class="error" role="alert" aria-live="polite"></p>
+function validate() {
+  numberInput.value = onlyDigits4(numberInput.value);
+  const ok = nameInput.value.trim().length > 0 && /^\d{4}$/.test(numberInput.value);
+  button.disabled = !ok;
+}
 
-      <button id="submit" type="submit" disabled>확인</button>
-    </form>
-  </main>
+nameInput.addEventListener("input", validate);
+numberInput.addEventListener("input", validate);
 
-  <script src="script.js"></script>
-</body>
-</html>
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  error.textContent = "";
+  button.disabled = true;
+
+  try {
+    const res = await fetch(WEBAPP_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: nameInput.value.trim(),
+        phoneLast4: numberInput.value.trim(),
+      }),
+    });
+
+    const result = await res.json();
+
+    if (result.ok) {
+      // ✅ 성공 시 다음 페이지로
+      // location.href = "dashboard.html";
+      alert("인증 성공!");
+    } else {
+      error.textContent = result.message || "인증 실패";
+      button.disabled = false;
+    }
+  } catch (err) {
+    console.error(err);
+    error.textContent = "서버 호출 실패(CORS/네트워크)";
+    button.disabled = false;
+  }
+});
