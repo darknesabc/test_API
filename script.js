@@ -8,22 +8,33 @@ const button = document.getElementById("submit");
 const error = document.getElementById("error");
 
 function onlyDigits4(v) {
-  return v.replace(/\D/g, "").slice(0, 4);
+  return String(v || "").replace(/\D/g, "").slice(0, 4);
 }
 
 function validate() {
   numberInput.value = onlyDigits4(numberInput.value);
-  const ok =
-    nameInput.value.trim().length > 0 &&
-    /^\d{4}$/.test(numberInput.value);
-  button.disabled = !ok;
+
+  const nameOk = nameInput.value.trim().length > 0;
+  const numOk = /^\d{4}$/.test(numberInput.value);
+
+  button.disabled = !(nameOk && numOk);
 }
 
-nameInput.addEventListener("input", validate);
-numberInput.addEventListener("input", validate);
+["input", "keyup", "change", "paste"].forEach((evt) => {
+  nameInput.addEventListener(evt, validate);
+  numberInput.addEventListener(evt, validate);
+});
+
+// ✅ 로딩/자동완성 대비: 처음에도 한 번 실행
+validate();
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
+
+  // 버튼이 눌린다는 건 이미 유효하단 뜻이지만, 안전하게 한 번 더
+  validate();
+  if (button.disabled) return;
+
   error.textContent = "";
   button.disabled = true;
 
@@ -40,10 +51,7 @@ form.addEventListener("submit", async (e) => {
     const result = await res.json();
 
     if (result.ok) {
-      localStorage.setItem(
-        "username",
-        `${result.seatNumber} ${result.name}`.trim()
-      );
+      localStorage.setItem("username", `${result.seatNumber} ${result.name}`.trim());
       window.location.href = "nextpage.html";
     } else {
       error.textContent = result.message || "일치하는 데이터가 없습니다.";
