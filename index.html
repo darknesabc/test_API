@@ -1,17 +1,39 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles.css">
-    <title>입력 페이지</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>학부모 로그인</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-    <div class="container">
-        <input type="text" id="name" placeholder="이름 입력">
-        <input type="text" id="number" placeholder="핸드폰 뒤숫자 4자리 입력">
-        <button id="submit">확인</button>
-    </div>
-    <script src="script.js"></script>
+  <main class="wrap">
+    <section class="card">
+      <h1 class="title">학부모 로그인</h1>
+      <p class="sub">학생 이름과 전화번호 뒤 4자리를 입력하세요.</p>
+
+      <form id="loginForm" class="form">
+        <label class="label">
+          학생 이름
+          <input id="studentName" class="input" type="text" autocomplete="name" required />
+        </label>
+
+        <label class="label">
+          번호 뒤 4자리
+          <input id="last4" class="input" type="password" inputmode="numeric" maxlength="4" required />
+        </label>
+
+        <button class="btn" type="submit">로그인</button>
+        <p id="msg" class="msg"></p>
+      </form>
+
+      <div class="hint">
+        <strong>주의:</strong> 지금은 “틀” 단계라서 임시 로그인(데모)로 동작합니다.<br/>
+        다음 단계에서 Apps Script를 붙이면 실제 검증으로 바뀝니다.
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
 </body>
 </html>
