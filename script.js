@@ -1,35 +1,57 @@
-function doGet() {
-  // index.html 파일을 웹페이지로 보여줌
-  return HtmlService.createHtmlOutputFromFile("index")
-    .setTitle("학생 확인");
+const WEBAPP_URL =
+  "https://script.google.com/macros/s/AKfycbyRokmzeWwYvbuYKp6HYfcQOQnaHD77mYk-W3OIY1Dfrfp4SQ-k_y4UJzm_-kWqXtiP/exec";
+
+const form = document.getElementById("loginForm");
+const nameInput = document.getElementById("name");
+const numberInput = document.getElementById("number");
+const button = document.getElementById("submit");
+const error = document.getElementById("error");
+
+function onlyDigits4(v) {
+  return v.replace(/\D/g, "").slice(0, 4);
 }
 
-// 학생 인증(명렬: A=이름, B=폰뒤4, C=좌석)
-function checkStudent(name, phoneLast4) {
-  name = String(name || "").trim();
-  phoneLast4 = String(phoneLast4 || "").trim();
+function validate() {
+  numberInput.value = onlyDigits4(numberInput.value);
+  const ok =
+    nameInput.value.trim().length > 0 &&
+    /^\d{4}$/.test(numberInput.value);
+  button.disabled = !ok;
+}
 
-  if (!name || !/^\d{4}$/.test(phoneLast4)) {
-    return { ok: false, message: "이름/뒤4자리 형식 확인" };
-  }
+nameInput.addEventListener("input", validate);
+numberInput.addEventListener("input", validate);
 
-  const sheet = SpreadsheetApp
-    .openById("1cTEkCLZyYN1c9qzo2YLHI06ZbCu8_qf42q2CaKyRoo0")
-    .getSheetByName("명렬");
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  error.textContent = "";
+  button.disabled = true;
 
-  if (!sheet) return { ok: false, message: "시트 없음" };
+  try {
+    const res = await fetch(WEBAPP_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: nameInput.value.trim(),
+        phoneLast4: numberInput.value.trim(),
+      }),
+    });
 
-  const rows = sheet.getDataRange().getValues();
+    const result = await res.json();
 
-  for (let i = 1; i < rows.length; i++) { // 1행 헤더 가정
-    const rowName = String(rows[i][0] || "").trim();   // A
-    const rowLast4 = String(rows[i][1] || "").trim();  // B
-    const seat = String(rows[i][2] || "").trim();      // C
-
-    if (rowName === name && rowLast4 === phoneLast4) {
-      return { ok: true, name: rowName, seatNumber: seat };
+    if (result.ok) {
+      localStorage.setItem(
+        "username",
+        `${result.seatNumber} ${result.name}`.trim()
+      );
+      window.location.href = "nextpage.html";
+    } else {
+      error.textContent = result.message || "일치하는 데이터가 없습니다.";
+      button.disabled = false;
     }
+  } catch (err) {
+    console.error(err);
+    error.textContent = "서버 호출 실패(CORS/네트워크)";
+    button.disabled = false;
   }
-
-  return { ok: false, message: "일치하는 데이터가 없습니다." };
-}
+});
