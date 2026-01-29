@@ -1,98 +1,67 @@
-const WEBAPP_URL =
-  "https://script.google.com/macros/s/AKfycbyRokmzeWwYvbuYKp6HYfcQOQnaHD77mYk-W3OIY1Dfrfp4SQ-k_y4UJzm_-kWqXtiP/exec";
+document.getElementById('loginForm').addEventListener('submit', async function(event) {
+    event.preventDefault(); // 기본 제출 동작 방지
 
-const form = document.getElementById("loginForm");
-const nameInput = document.getElementById("name");
-const numberInput = document.getElementById("number");
-const button = document.getElementById("submit");
-const error = document.getElementById("error");
+    const name = document.getElementById('name').value.trim();
+    const number = document.getElementById('number').value.trim();
+    const errorElement = document.getElementById('error');
 
-function onlyDigits4(v) {
-  return String(v || "").replace(/\D/g, "").slice(0, 4);
-}
-
-function validate() {
-  numberInput.value = onlyDigits4(numberInput.value);
-  const ok = nameInput.value.trim().length > 0 && /^\d{4}$/.test(numberInput.value);
-  button.disabled = !ok;
-}
-
-["input", "keyup", "change", "paste"].forEach((evt) => {
-  nameInput.addEventListener(evt, validate);
-  numberInput.addEventListener(evt, validate);
-});
-validate();
-
-async function fetchWithTimeout(url, options = {}, ms = 8000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
-  try {
-    const res = await fetch(url, { ...options, signal: controller.signal });
-    return res;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  validate();
-  if (button.disabled) return;
-
-  error.textContent = "요청 중...";
-  button.disabled = true;
-
-  try {
-    const res = await fetchWithTimeout(
-      WEBAPP_URL,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: nameInput.value.trim(),
-          phoneLast4: numberInput.value.trim(),
-        }),
-      },
-      8000
-    );
-
-    // 1) HTTP 상태부터 보여주기
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      error.textContent = `서버 응답 오류 (HTTP ${res.status})`;
-      console.error("HTTP error body:", text);
-      button.disabled = false;
-      return;
+    // 마스터 계정 확인
+    if (name === 'admin' && number === '1234') {
+        window.location.href = 'admin-dashboard.html'; // 관리자 대시보드로 리디렉션
+        return;
     }
 
-    // 2) JSON이 아닐 수도 있어서 text로 먼저 받고 파싱
-    const raw = await res.text();
-    let result;
     try {
-      result = JSON.parse(raw);
-    } catch (jsonErr) {
-      error.textContent = "서버가 JSON이 아닌 응답을 보냈습니다. (콘솔 확인)";
-      console.error("Non-JSON response:", raw);
-      button.disabled = false;
-      return;
-    }
+        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/199CxKW0EHGTVHMwDIEmNJ5LsOcPxyFUtQv52osl7jTY/values/명렬!A:N?key=AIzaSyDeS-WjQLmzG7yw1_GWu5Tw3HwFxG5hYbk`);
+        const data = await response.json();
 
-    if (result.ok) {
-      localStorage.setItem("username", `${result.seatNumber} ${result.name}`.trim());
-      error.textContent = "인증 성공! 이동 중...";
-      window.location.href = "nextpage.html";
-      return;
-    }
+        console.log(data); // 데이터 확인
 
-    error.textContent = result.message || "일치하는 데이터가 없습니다.";
-    button.disabled = false;
-  } catch (err) {
-    console.error(err);
-    if (err.name === "AbortError") {
-      error.textContent = "서버 응답이 너무 늦습니다(타임아웃).";
-    } else {
-      error.textContent = "서버 호출 실패(CORS/네트워크).";
+        const rows = data.values || [];
+        
+        let matched = false;
+
+        // 이름과 번호가 매칭되는지 확인
+        for (const row of rows) {
+            const sheetName = row[2]; // 이름 (C열)
+            const sheetNumber = row[13]; // 번호 (N열)
+
+            // N열의 오른쪽 4자리 확인
+            const rightmostFourDigits = sheetNumber ? sheetNumber.toString().slice(-4) : ""; // N열이 정의되지 않았을 경우 방지
+
+            console.log(`Checking: ${sheetName} (input: ${name}), ${rightmostFourDigits} (input: ${number})`); // 디버깅 메시지
+
+            // 이름과 오른쪽 4자리 번호 비교
+            if (sheetName === name && rightmostFourDigits === number) {
+                matched = true;
+
+                // 매칭된 학생 정보를 저장
+                localStorage.setItem('studentName', name);
+                localStorage.setItem('studentNumber', rightmostFourDigits);
+                
+                // 학생의 추가 정보도 저장
+                localStorage.setItem('studentSeatNumber', row[0]); // A열 자리번호
+                localStorage.setItem('teacher', row[1]); // B열 담임
+                localStorage.setItem('studentGrade', row[7]); // H열 학년
+                localStorage.setItem('studentID', row[3]); // D열 학번
+                localStorage.setItem('studentClass', row[4]); // E열 반
+                localStorage.setItem('studentGender', row[5]); // F열 성별
+                localStorage.setItem('studentSchool', row[6]); // G열 학교
+                localStorage.setItem('studentContact', row[12]); // M열 학생연락처
+                localStorage.setItem('parentContact', row[13]); // N열 학부모연락처
+
+                break;
+            }
+        }
+
+        if (matched) {
+            // 로그인 성공 후 student-dashboard.html로 리디렉션
+            window.location.href = 'student-dashboard.html';
+        } else {
+            errorElement.textContent = "이름과 번호가 일치하지 않습니다.";
+        }
+    } catch (error) {
+        console.error("Error fetching data: ", error);
+        errorElement.textContent = "데이터를 불러오는 중 오류가 발생했습니다.";
     }
-    button.disabled = false;
-  }
 });
