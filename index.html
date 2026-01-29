@@ -1,12 +1,23 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>학생관리</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>학생 관리 페이지</title>
 </head>
 <body>
-  <h1>학생관리 페이지</h1>
-  <p>깃허브 페이지 테스트 성공!</p>
+    <div class="container">
+        <h1>학생 관리 페이지</h1>
+        <form id="loginForm">
+            <label for="name">이름:</label>
+            <input type="text" id="name" required>
+            <label for="number">4자리 번호:</label>
+            <input type="text" id="number" maxlength="4" required pattern="\d{4}">
+            <button type="submit">로그인</button>
+        </form>
+        <p id="error" class="error"></p>
+    </div>
+    <script src="script.js"></script>
 </body>
 </html>
