@@ -1,5 +1,5 @@
 const WEBAPP_URL =
-  "https://script.google.com/macros/s/AKfycbxBqEYlBC1OHGTvbOhaRM8kNm7_45dkaIKFmi40biJz7iznXVmJfnmG8mLohznvC-ni/exec";
+  "https://script.google.com/macros/s/AKfycbyRokmzeWwYvbuYKp6HYfcQOQnaHD77mYk-W3OIY1Dfrfp4SQ-k_y4UJzm_-kWqXtiP/exec";
 
 const form = document.getElementById("loginForm");
 const nameInput = document.getElementById("name");
@@ -40,13 +40,10 @@ form.addEventListener("submit", async (e) => {
     const result = await res.json();
 
     if (result.ok) {
-      // ✅ 기존 방식 그대로: "좌석 이름" 저장
       localStorage.setItem(
         "username",
         `${result.seatNumber} ${result.name}`.trim()
       );
-
-      // 페이지 이동
       window.location.href = "nextpage.html";
     } else {
       error.textContent = result.message || "일치하는 데이터가 없습니다.";
