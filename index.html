@@ -37,14 +37,14 @@
     const error = document.getElementById("error");
 
     function onlyDigits4(v) {
-      return String(v || "").replace(/\\D/g, "").slice(0, 4);
+      return String(v || "").replace(/\D/g, "").slice(0, 4);
     }
 
     function validate() {
       numberInput.value = onlyDigits4(numberInput.value);
       const ok =
         nameInput.value.trim().length > 0 &&
-        /^\\d{4}$/.test(numberInput.value);
+        /^\d{4}$/.test(numberInput.value);
       button.disabled = !ok;
     }
 
@@ -52,8 +52,6 @@
       nameInput.addEventListener(evt, validate);
       numberInput.addEventListener(evt, validate);
     });
-
-    // ✅ 로딩 시 1회 실행(자동완성/붙여넣기 대비)
     validate();
 
     form.addEventListener("submit", (e) => {
@@ -74,10 +72,9 @@
 
           if (result.ok) {
             localStorage.setItem("username", `${result.seatNumber} ${result.name}`.trim());
-
-            // ✅ 여기서 원하는 동작으로 바꾸면 됨
             alert("인증 성공: " + localStorage.getItem("username"));
-            // location.href = "nextpage.html";
+            // 다음 페이지는 다음 단계에서 붙임
+            // location.href = "nextpage";
             return;
           }
 
@@ -85,7 +82,6 @@
           button.disabled = false;
         })
         .withFailureHandler((err) => {
-          console.error(err);
           error.textContent = "서버 오류: " + (err?.message || JSON.stringify(err));
           button.disabled = false;
         })
