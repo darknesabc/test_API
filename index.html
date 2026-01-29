@@ -29,50 +29,60 @@
     </form>
   </main>
 
-  <script>
-    const form = document.getElementById("loginForm");
-    const nameInput = document.getElementById("name");
-    const numberInput = document.getElementById("number");
-    const button = document.getElementById("submit");
-    const error = document.getElementById("error");
+ <script>
+  const form = document.getElementById("loginForm");
+  const nameInput = document.getElementById("name");
+  const numberInput = document.getElementById("number");
+  const button = document.getElementById("submit");
+  const error = document.getElementById("error");
 
-    function onlyDigits4(v) {
-      return v.replace(/\D/g, "").slice(0, 4);
-    }
+  function onlyDigits4(v) {
+    return String(v || "").replace(/\D/g, "").slice(0, 4);
+  }
 
-    function validate() {
-      numberInput.value = onlyDigits4(numberInput.value);
-      const ok = nameInput.value.trim().length > 0 && /^\d{4}$/.test(numberInput.value);
-      button.disabled = !ok;
-    }
+  function validate() {
+    numberInput.value = onlyDigits4(numberInput.value);
+    const ok =
+      nameInput.value.trim().length > 0 &&
+      /^\d{4}$/.test(numberInput.value);
+    button.disabled = !ok;
+  }
 
-    nameInput.addEventListener("input", validate);
-    numberInput.addEventListener("input", validate);
+  ["input", "keyup", "change", "paste"].forEach((evt) => {
+    nameInput.addEventListener(evt, validate);
+    numberInput.addEventListener(evt, validate);
+  });
 
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      error.textContent = "";
-      button.disabled = true;
+  // ✅ 로딩 시 1회 실행(자동완성 대비)
+  validate();
 
-      google.script.run
-        .withSuccessHandler((result) => {
-          if (result.ok) {
-            localStorage.setItem("username", `${result.seatNumber} ${result.name}`.trim());
-            // 다음 페이지로 이동(일단 파일이 없으면 alert로 확인)
-            // location.href = "nextpage.html";
-            alert("인증 성공: " + localStorage.getItem("username"));
-          } else {
-            error.textContent = result.message || "인증 실패";
-            button.disabled = false;
-          }
-        })
-        .withFailureHandler((err) => {
-          console.error(err);
-          error.textContent = "서버 오류";
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    validate();
+    if (button.disabled) return;
+
+    error.textContent = "요청 중...";
+    button.disabled = true;
+
+    google.script.run
+      .withSuccessHandler((result) => {
+        if (result && result.ok) {
+          localStorage.setItem("username", `${result.seatNumber} ${result.name}`.trim());
+          alert("인증 성공: " + localStorage.getItem("username"));
+          // location.href = "nextpage.html";
+        } else {
+          error.textContent = (result && result.message) || "인증 실패";
           button.disabled = false;
-        })
-        .checkStudent(nameInput.value.trim(), numberInput.value.trim());
-    });
-  </script>
+        }
+      })
+      .withFailureHandler((err) => {
+        console.error(err);
+        error.textContent = "서버 오류(콘솔 확인)";
+        button.disabled = false;
+      })
+      .checkStudent(nameInput.value.trim(), numberInput.value.trim());
+  });
+</script>
 </body>
 </html>
+
