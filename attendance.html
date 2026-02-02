@@ -66,13 +66,12 @@
       <p id="loading" class="muted">불러오는 중...</p>
       <p id="err" class="msg"></p>
 
-      <!-- ✅ 이번 주 요약 -->
       <div class="summary-box" id="weeklySummary" style="display:none;">
         <div class="summary-title">이번 주 출결 요약</div>
         <div class="summary-line" id="sumCounts"></div>
         <div class="summary-sub" id="sumRecent"></div>
         <div class="summary-sub" style="opacity:.85;">
-          * 결석은 “스케줄 공란 + 결석”만 집계됩니다.
+          * 결석은 “스케줄 공란 + 결석”만 집계됩니다. (오늘 기준, 미래 제외)
         </div>
       </div>
 
@@ -91,7 +90,6 @@
 
   <script src="script.js"></script>
   <script>
-    // 출결코드 -> 텍스트
     function attText(a) {
       const s = String(a ?? "").trim();
       if (s === "1") return "출석";
@@ -99,7 +97,6 @@
       return "";
     }
 
-    // "2/2 (Mon)" -> {date:"2/2", day:"월"}
     function splitDateLabel(label) {
       const s = String(label ?? "").trim();
       const dayMap = {
@@ -145,23 +142,24 @@
       const dateIso = data.dateIso || [];
       const datesLabel = data.dates || [];
       const rows = data.rows || [];
+      const todayIso = data.todayIso || "";
 
-      if (!dateIso.length || !rows.length) return;
+      if (!dateIso.length || !rows.length || !todayIso) return;
 
-      // 최신 날짜의 주(월~일)를 “이번 주”로
-      const lastIso = dateIso[dateIso.length - 1];
-      if (!lastIso) return;
+      const today = parseIso(todayIso);
+      today.setHours(0,0,0,0);
 
-      const lastDate = parseIso(lastIso);
-      const weekStart = mondayOf(lastDate);
+      // 이번 주: 오늘이 속한 주(월~일)
+      const weekStart = mondayOf(today);
       const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
 
+      // 이번 주 + 오늘(미래 제외) 컬럼만
       const weekIdx = [];
       dateIso.forEach((iso, i) => {
         if (!iso) return;
         const d = parseIso(iso);
         d.setHours(0,0,0,0);
-        if (d >= weekStart && d <= weekEnd) weekIdx.push(i);
+        if (d >= weekStart && d <= weekEnd && d <= today) weekIdx.push(i);
       });
 
       if (!weekIdx.length) return;
@@ -188,11 +186,12 @@
         }
       }
 
-      // 최근 결석 2개(카운트 대상만)
+      // 최근 결석(오늘 기준 과거 중 최신): 날짜 인덱스 내림차순
       absEvents.sort((a,b) => b.idx - a.idx);
       const top2 = absEvents.slice(0, 2);
 
       sumCounts.textContent = `출석 ${present}회 · 결석 ${absent}회`;
+
       if (top2.length === 0) {
         sumRecent.textContent = `최근 결석: 없음`;
       } else {
@@ -229,13 +228,12 @@
 
         loading.textContent = "";
 
-        // ✅ 요약 만들기
+        // ✅ 이번 주 요약(오늘 기준 미래 제외)
         buildWeeklySummary(data);
 
         const dates = data.dates || [];
         const rows = data.rows || [];
 
-        // ===== 헤더 (2줄) =====
         const topCells = dates.map(d => {
           const { date, day } = splitDateLabel(d);
           return `
@@ -272,9 +270,11 @@
             const sched = String(cell?.s ?? "").trim();
             const status = attText(cell?.a);
             const cls = statusClass(status);
+
             const schedHtml = sched
               ? `<div class="sched-text" title="${sched}">${sched}</div>`
               : `<div class="sched-muted"> </div>`;
+
             const statusHtml = status ? status : "-";
 
             return `
