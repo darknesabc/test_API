@@ -35,12 +35,19 @@
 
   <script src="script.js"></script>
   <script>
-    // ✅ 숫자 코드 변환: 1=출석, 3=결석
-    function attLabel(v) {
-      const s = String(v ?? "").trim();
+    function attText(a) {
+      const s = String(a ?? "").trim();
       if (s === "1") return "출석";
       if (s === "3") return "결석";
-      return s; // 나머지는 그대로
+      return s; // 혹시 다른 코드가 나오면 그대로
+    }
+
+    function cellText(cell) {
+      const sched = String(cell?.s ?? "").trim();
+      const att = attText(cell?.a ?? "");
+      if (!sched) return att;
+      if (!att) return sched;
+      return `${sched} · ${att}`;
     }
 
     (async function () {
@@ -68,7 +75,6 @@
 
         loading.textContent = "";
 
-        // 헤더
         const dateHeads = data.dates || [];
         thead.innerHTML = `
           <tr>
@@ -83,7 +89,6 @@
           </tr>
         `;
 
-        // 행
         const rows = data.rows || [];
         if (rows.length === 0) {
           tbody.innerHTML = `<tr><td style="padding:10px;">기록이 없습니다.</td></tr>`;
@@ -95,9 +100,9 @@
             <td style="position:sticky; left:0; background:rgba(10,16,30,0.85); padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
               ${r.period || ""}
             </td>
-            ${(r.cells || []).map(v => `
+            ${(r.cells || []).map(cell => `
               <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
-                ${attLabel(v)}
+                ${cellText(cell)}
               </td>
             `).join("")}
           </tr>
