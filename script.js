@@ -37,15 +37,14 @@ async function demoLogin(name, last4) {
 async function apiLogin(name, parent4) {
   const res = await fetch(`${API_BASE}?path=login`, {
     method: "POST",
-    // Apps Script CORS(프리플라이트) 피하려고 text/plain 사용
+    // Apps Script CORS 프리플라이트 회피
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ name, parent4 }) // ★ 키 이름 중요: parent4
+    body: JSON.stringify({ name, parent4 }) // ★ 키 이름: parent4
   });
 
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || "로그인 실패");
 
-  // Apps Script가 내려주는 값 그대로 세션에 저장할 수 있게 리턴
   return {
     studentName: data.studentName,
     seat: data.seat,
@@ -105,8 +104,9 @@ async function apiLogin(name, parent4) {
   }
 
   const userLine = $("userLine");
-  if (userLine) const extra = [session.seat, session.teacher ? `${session.teacher} 담임` : null].filter(Boolean).join(" · ");
-userLine.textContent = extra ? `${session.studentName} (${extra})` : `${session.studentName} 학부모님`;
+  const extra = [session.seat, session.teacher ? `${session.teacher} 담임` : null].filter(Boolean).join(" · ");
+if (userLine) userLine.textContent = extra ? `${session.studentName} (${extra})` : `${session.studentName} 학부모님`;
+
 
   logoutBtn.addEventListener("click", () => {
     clearSession();
@@ -122,4 +122,5 @@ userLine.textContent = extra ? `${session.studentName} (${extra})` : `${session.
 
   if (!getSession()) location.href = "index.html";
 })();
+
 
