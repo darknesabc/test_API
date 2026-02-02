@@ -18,27 +18,34 @@
     }
     table.att th { border-bottom: 1px solid rgba(255,255,255,0.12); }
 
-    /* sticky */
     .sticky-top { position: sticky; top: 0; z-index: 5; background: rgba(10,16,30,0.96); }
     .sticky-left { position: sticky; left: 0; z-index: 6; background: rgba(10,16,30,0.92); }
     .sticky-corner { position: sticky; top:0; left:0; z-index: 7; background: rgba(10,16,30,0.98); }
 
-    /* header styling */
     .day-head { font-weight: 900; letter-spacing: 0.2px; }
     .sub-head { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 2px; }
 
-    /* columns */
     .col-period { min-width: 56px; text-align: center; }
-    .col-sched { min-width: 160px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+    .col-sched { min-width: 160px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
     .col-status { min-width: 84px; text-align: center; font-weight: 900; }
 
-    /* status colors like your sample */
     .status-present { background: rgba(120,255,170,0.18); border-right: 1px solid rgba(120,255,170,0.12); }
     .status-absent  { background: rgba(255,120,120,0.18); border-right: 1px solid rgba(255,120,120,0.12); }
     .status-empty   { color: rgba(255,255,255,0.5); }
 
     .sched-text { color: rgba(255,255,255,0.90); }
     .sched-muted { color: rgba(255,255,255,0.65); font-size: 12px; }
+
+    .summary-box{
+      margin: 12px 0 14px;
+      padding: 12px 14px;
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.04);
+    }
+    .summary-title{ font-weight: 900; margin-bottom: 6px; }
+    .summary-line{ color: rgba(255,255,255,0.88); }
+    .summary-sub{ margin-top: 6px; color: rgba(255,255,255,0.75); font-size: 13px; }
   </style>
 </head>
 
@@ -58,6 +65,16 @@
       <h2 class="card-title">출결 기록</h2>
       <p id="loading" class="muted">불러오는 중...</p>
       <p id="err" class="msg"></p>
+
+      <!-- ✅ 이번 주 요약 -->
+      <div class="summary-box" id="weeklySummary" style="display:none;">
+        <div class="summary-title">이번 주 출결 요약</div>
+        <div class="summary-line" id="sumCounts"></div>
+        <div class="summary-sub" id="sumRecent"></div>
+        <div class="summary-sub" style="opacity:.85;">
+          * 결석은 “스케줄 공란 + 결석”만 집계됩니다.
+        </div>
+      </div>
 
       <div class="att-wrap">
         <table class="att">
@@ -82,25 +99,15 @@
       return "";
     }
 
-    // ✅ "2/2 (Mon)" 같은 라벨을 "2/2" + "월" 로 변환
+    // "2/2 (Mon)" -> {date:"2/2", day:"월"}
     function splitDateLabel(label) {
       const s = String(label ?? "").trim();
-
       const dayMap = {
-        Mon: "월", Tue: "화", Wed: "수",
-        Thu: "목", Fri: "금", Sat: "토", Sun: "일",
-        월: "월", 화: "화", 수: "수", 목: "목",
-        금: "금", 토: "토", 일: "일"
+        Mon: "월", Tue: "화", Wed: "수", Thu: "목", Fri: "금", Sat: "토", Sun: "일",
+        월: "월", 화: "화", 수: "수", 목: "목", 금: "금", 토: "토", 일: "일"
       };
-
-      // 예: "2/2 (Mon)" 또는 "2/2 (월)"
       const m = s.match(/^(.+?)\s*\((.+?)\)\s*$/);
-      if (m) {
-        const date = m[1];
-        const rawDay = m[2];
-        const day = dayMap[rawDay] || rawDay;
-        return { date, day };
-      }
+      if (m) return { date: m[1], day: (dayMap[m[2]] || m[2]) };
       return { date: s, day: "" };
     }
 
@@ -110,25 +117,91 @@
       return "status-empty";
     }
 
-    function safeCellObj(cell) {
-      // 서버가 {s,a}로 내려주는 경우
-      if (cell && typeof cell === "object") {
-        return {
-          sched: String(cell.s ?? "").trim(),
-          code: String(cell.a ?? "").trim()
-        };
+    function parseIso(iso) {
+      const [y,m,d] = String(iso).split("-").map(Number);
+      return new Date(y, m-1, d);
+    }
+
+    function mondayOf(d) {
+      const x = new Date(d);
+      const day = x.getDay(); // 0=Sun..6=Sat
+      const diff = (day === 0 ? -6 : 1 - day);
+      x.setDate(x.getDate() + diff);
+      x.setHours(0,0,0,0);
+      return x;
+    }
+
+    // ✅ 결석 카운트 조건: 스케줄 공란 + 결석만
+    function isCountedAbsence(schedule, statusText) {
+      if (statusText !== "결석") return false;
+      return String(schedule ?? "").trim() === "";
+    }
+
+    function buildWeeklySummary(data) {
+      const box = document.getElementById("weeklySummary");
+      const sumCounts = document.getElementById("sumCounts");
+      const sumRecent = document.getElementById("sumRecent");
+
+      const dateIso = data.dateIso || [];
+      const datesLabel = data.dates || [];
+      const rows = data.rows || [];
+
+      if (!dateIso.length || !rows.length) return;
+
+      // 최신 날짜의 주(월~일)를 “이번 주”로
+      const lastIso = dateIso[dateIso.length - 1];
+      if (!lastIso) return;
+
+      const lastDate = parseIso(lastIso);
+      const weekStart = mondayOf(lastDate);
+      const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
+
+      const weekIdx = [];
+      dateIso.forEach((iso, i) => {
+        if (!iso) return;
+        const d = parseIso(iso);
+        d.setHours(0,0,0,0);
+        if (d >= weekStart && d <= weekEnd) weekIdx.push(i);
+      });
+
+      if (!weekIdx.length) return;
+
+      let present = 0;
+      let absent = 0;
+      const absEvents = []; // {idx, period}
+
+      for (const r of rows) {
+        const period = r.period || "";
+        const cells = r.cells || [];
+
+        for (const i of weekIdx) {
+          const cell = cells[i] || {};
+          const sched = String(cell.s ?? "").trim();
+          const status = attText(cell.a);
+
+          if (status === "출석") present++;
+
+          if (isCountedAbsence(sched, status)) {
+            absent++;
+            absEvents.push({ idx: i, period });
+          }
+        }
       }
-      // 혹시 문자열로 내려오면(예전 대비)
-      const raw = String(cell ?? "").trim();
-      if (raw.includes("·")) {
-        const parts = raw.split("·").map(x => x.trim());
-        const status = parts[1] || "";
-        const code = (status === "출석") ? "1" : (status === "결석") ? "3" : "";
-        return { sched: parts[0] || "", code };
+
+      // 최근 결석 2개(카운트 대상만)
+      absEvents.sort((a,b) => b.idx - a.idx);
+      const top2 = absEvents.slice(0, 2);
+
+      sumCounts.textContent = `출석 ${present}회 · 결석 ${absent}회`;
+      if (top2.length === 0) {
+        sumRecent.textContent = `최근 결석: 없음`;
+      } else {
+        const fmt = (label) => String(label ?? "").replace(/\s+/g,"");
+        const parts = top2.map(x => `${fmt(datesLabel[x.idx])} ${x.period}교시`);
+        sumRecent.textContent = `최근 결석: ${parts.join(", ")}`;
       }
-      if (raw === "출석") return { sched: "", code: "1" };
-      if (raw === "결석") return { sched: "", code: "3" };
-      return { sched: raw, code: "" };
+
+      box.style.display = "";
     }
 
     (async function () {
@@ -156,12 +229,13 @@
 
         loading.textContent = "";
 
+        // ✅ 요약 만들기
+        buildWeeklySummary(data);
+
         const dates = data.dates || [];
         const rows = data.rows || [];
 
         // ===== 헤더 (2줄) =====
-        // 1줄: 교시 + 날짜(각 날짜가 2칸 colSpan=2)
-        // 2줄: (스케줄/출결)
         const topCells = dates.map(d => {
           const { date, day } = splitDateLabel(d);
           return `
@@ -188,24 +262,19 @@
           </tr>
         `;
 
-        // ===== 바디 =====
         if (rows.length === 0) {
           tbody.innerHTML = `<tr><td style="padding:10px;">기록이 없습니다.</td></tr>`;
           return;
         }
 
         tbody.innerHTML = rows.map(r => {
-          const cells = (r.cells || []).map(safeCellObj);
-
-          const tds = cells.map(c => {
-            const status = attText(c.code);
+          const tds = (r.cells || []).map(cell => {
+            const sched = String(cell?.s ?? "").trim();
+            const status = attText(cell?.a);
             const cls = statusClass(status);
-
-            const sched = c.sched;
             const schedHtml = sched
               ? `<div class="sched-text" title="${sched}">${sched}</div>`
               : `<div class="sched-muted"> </div>`;
-
             const statusHtml = status ? status : "-";
 
             return `
