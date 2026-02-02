@@ -6,6 +6,7 @@
   <title>출결 상세</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body data-needs-login="1">
   <header class="topbar">
     <div class="topbar-inner">
@@ -34,6 +35,14 @@
 
   <script src="script.js"></script>
   <script>
+    // ✅ 숫자 코드 변환: 1=출석, 3=결석
+    function attLabel(v) {
+      const s = String(v ?? "").trim();
+      if (s === "1") return "출석";
+      if (s === "3") return "결석";
+      return s; // 나머지는 그대로
+    }
+
     (async function () {
       const raw = sessionStorage.getItem("parent_session_v1");
       const session = raw ? JSON.parse(raw) : null;
@@ -88,7 +97,7 @@
             </td>
             ${(r.cells || []).map(v => `
               <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
-                ${v ?? ""}
+                ${attLabel(v)}
               </td>
             `).join("")}
           </tr>
