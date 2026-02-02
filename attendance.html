@@ -6,36 +6,40 @@
   <title>출결 상세</title>
   <link rel="stylesheet" href="styles.css" />
   <style>
-    /* 테이블 */
-    .att-table { border-collapse: collapse; width: max-content; min-width: 100%; }
-    .att-table th, .att-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-    .att-table th { border-bottom: 1px solid rgba(255,255,255,0.10); white-space: nowrap; text-align: left; }
-
-    /* 고정열/고정헤더 */
-    .sticky-col { position: sticky; left: 0; background: rgba(10,16,30,0.90); z-index: 2; white-space: nowrap; }
-    .sticky-head { position: sticky; top: 0; background: rgba(10,16,30,0.96); z-index: 3; }
-
-    /* 셀 표현 */
-    .cell { display: grid; gap: 6px; min-width: 140px; }
-    .sched { font-size: 12px; color: rgba(255,255,255,0.62); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .status { display: inline-flex; align-items: center; gap: 6px; }
-    .badge {
-      display: inline-flex; align-items: center;
-      padding: 3px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.14);
-      background: rgba(255,255,255,0.06);
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: 0.2px;
+    .att-wrap { overflow:auto; border:1px solid rgba(255,255,255,0.08); border-radius:12px; }
+    table.att { border-collapse: collapse; width: max-content; min-width: 100%; }
+    table.att th, table.att td {
+      padding: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      border-right: 1px solid rgba(255,255,255,0.06);
+      white-space: nowrap;
+      text-align: left;
+      vertical-align: middle;
     }
-    .badge.present { border-color: rgba(120,255,170,0.35); background: rgba(120,255,170,0.10); }
-    .badge.absent  { border-color: rgba(255,120,120,0.45); background: rgba(255,120,120,0.12); }
-    .badge.none    { opacity: 0.55; }
+    table.att th { border-bottom: 1px solid rgba(255,255,255,0.12); }
 
-    /* 옵션 영역 */
-    .opts { display:flex; gap:12px; align-items:center; margin-top: 10px; color: rgba(255,255,255,0.75); font-size: 13px; }
-    .opts input { transform: translateY(1px); }
+    /* sticky */
+    .sticky-top { position: sticky; top: 0; z-index: 5; background: rgba(10,16,30,0.96); }
+    .sticky-left { position: sticky; left: 0; z-index: 6; background: rgba(10,16,30,0.92); }
+    .sticky-corner { position: sticky; top:0; left:0; z-index: 7; background: rgba(10,16,30,0.98); }
+
+    /* header styling */
+    .day-head { font-weight: 900; letter-spacing: 0.2px; }
+    .sub-head { font-size: 12px; color: rgba(255,255,255,0.75); }
+
+    /* columns */
+    .col-period { min-width: 56px; text-align: center; }
+    .col-sched { min-width: 160px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+    .col-status { min-width: 84px; text-align: center; font-weight: 900; }
+
+    /* status colors like your sample */
+    .status-present { background: rgba(120,255,170,0.18); border-right: 1px solid rgba(120,255,170,0.12); }
+    .status-absent  { background: rgba(255,120,120,0.18); border-right: 1px solid rgba(255,120,120,0.12); }
+    .status-empty   { color: rgba(255,255,255,0.5); }
+
+    /* optional: make schedule column a bit muted */
+    .sched-text { color: rgba(255,255,255,0.90); }
+    .sched-muted { color: rgba(255,255,255,0.65); font-size: 12px; }
   </style>
 </head>
 
@@ -56,107 +60,62 @@
       <p id="loading" class="muted">불러오는 중...</p>
       <p id="err" class="msg"></p>
 
-      <div class="opts">
-        <label><input type="checkbox" id="hideSchool" checked> ‘학교’ 스케줄 숨기기</label>
-      </div>
-
-      <div style="overflow:auto; border:1px solid rgba(255,255,255,0.08); border-radius:12px; margin-top:10px;">
-        <table class="att-table">
+      <div class="att-wrap">
+        <table class="att">
           <thead id="thead"></thead>
           <tbody id="tbody"></tbody>
         </table>
       </div>
 
       <p class="muted" style="margin-top:10px;">
-        * 위: 스케줄 / 아래: 출석 상태
+        * 날짜별로 [스케줄 | 출/결] 두 칸으로 표시됩니다.
       </p>
     </section>
   </main>
 
   <script src="script.js"></script>
   <script>
-    // 셀 문자열 예: "학교 · 출석" / "MMI면접준비 · 출석" / "출석"
-    function parseCellText(text) {
-      const s = String(text ?? "").trim();
-      if (!s) return { sched: "", status: "" };
-
-      // " · " 또는 "·" 기준으로 분리
-      const parts = s.split("·").map(x => x.trim()).filter(Boolean);
-
-      if (parts.length >= 2) {
-        return { sched: parts[0], status: parts[1] };
-      }
-      // 스케줄 없이 상태만 있는 경우
-      if (s === "출석" || s === "결석") return { sched: "", status: s };
-      // 혹시 다른 케이스면 스케줄로 처리
-      return { sched: s, status: "" };
+    // 출결코드 -> 텍스트
+    function attText(a) {
+      const s = String(a ?? "").trim();
+      if (s === "1") return "출석";
+      if (s === "3") return "결석";
+      return "";
     }
 
-    function statusBadge(status) {
-      if (status === "출석") return `<span class="badge present">출석</span>`;
-      if (status === "결석") return `<span class="badge absent">결석</span>`;
-      if (!status) return `<span class="badge none">-</span>`;
-      return `<span class="badge">${status}</span>`;
+    // "2/2 (Mon)" 같은 라벨을 "Mon"과 "2/2"처럼 나눠서 보기 좋게 만들기(선택)
+    function splitDateLabel(label) {
+      const s = String(label ?? "").trim();
+      // 예: "2/2 (Mon)" -> {d:"2/2", w:"Mon"}
+      const m = s.match(/^(.+?)\s*\((.+?)\)\s*$/);
+      if (m) return { d: m[1], w: m[2] };
+      return { d: s, w: "" };
     }
 
-    function renderCell(text, hideSchool) {
-      const { sched, status } = parseCellText(text);
-
-      const schedText = (hideSchool && sched === "학교") ? "" : sched;
-
-      const schedLine = schedText
-        ? `<div class="sched" title="${schedText}">${schedText}</div>`
-        : `<div class="sched">&nbsp;</div>`;
-
-      return `<div class="cell">
-        ${schedLine}
-        <div class="status">${statusBadge(status)}</div>
-      </div>`;
+    function statusClass(status) {
+      if (status === "출석") return "status-present";
+      if (status === "결석") return "status-absent";
+      return "status-empty";
     }
 
-    let lastData = null;
-
-    function drawTable(data) {
-      const hideSchool = document.getElementById("hideSchool").checked;
-      const thead = document.getElementById("thead");
-      const tbody = document.getElementById("tbody");
-
-      const dateHeads = data.dates || [];
-      thead.innerHTML = `
-        <tr>
-          <th class="sticky-col sticky-head">교시</th>
-          ${dateHeads.map(d => `<th class="sticky-head">${d}</th>`).join("")}
-        </tr>
-      `;
-
-      const rows = data.rows || [];
-      if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td style="padding:10px;">기록이 없습니다.</td></tr>`;
-        return;
+    function safeCellObj(cell) {
+      // Apps Script가 {s,a}로 내려주는 경우
+      if (cell && typeof cell === "object") {
+        return {
+          sched: String(cell.s ?? "").trim(),
+          code: String(cell.a ?? "").trim()
+        };
       }
-
-      tbody.innerHTML = rows.map(r => `
-        <tr>
-          <td class="sticky-col">${r.period || ""}</td>
-          ${(r.cells || []).map(cell => `
-            <td>${renderCell(cellText(cell), hideSchool)}</td>
-          `).join("")}
-        </tr>
-      `).join("");
-
-      // cell이 {s,a} 구조일 수도, 문자열일 수도 있어서 안전 처리
-      function cellText(cell) {
-        if (cell && typeof cell === "object" && ("s" in cell || "a" in cell)) {
-          // 새로운 구조: {s:스케줄, a:코드(1/3)}
-          const sched = String(cell.s ?? "").trim();
-          const a = String(cell.a ?? "").trim();
-          const status = (a === "1") ? "출석" : (a === "3") ? "결석" : "";
-          if (!sched) return status;
-          if (!status) return sched;
-          return `${sched} · ${status}`;
-        }
-        return String(cell ?? "");
+      // 혹시 문자열로 내려오면(이전 버전 대비)
+      const raw = String(cell ?? "").trim();
+      // "스케줄 · 출석" 형태면 파싱
+      if (raw.includes("·")) {
+        const parts = raw.split("·").map(x => x.trim());
+        return { sched: parts[0] || "", code: (parts[1] === "출석" ? "1" : parts[1] === "결석" ? "3" : "") };
       }
+      if (raw === "출석") return { sched: "", code: "1" };
+      if (raw === "결석") return { sched: "", code: "3" };
+      return { sched: raw, code: "" };
     }
 
     (async function () {
@@ -169,6 +128,8 @@
 
       const loading = document.getElementById("loading");
       const err = document.getElementById("err");
+      const thead = document.getElementById("thead");
+      const tbody = document.getElementById("tbody");
 
       try {
         const res = await fetch(`${API_BASE}?path=attendance`, {
@@ -181,13 +142,77 @@
         if (!data.ok) throw new Error(data.error || "불러오기 실패");
 
         loading.textContent = "";
-        lastData = data;
-        drawTable(data);
 
-        // ‘학교’ 숨기기 토글
-        document.getElementById("hideSchool").addEventListener("change", () => {
-          if (lastData) drawTable(lastData);
-        });
+        const dates = data.dates || [];
+        const rows = data.rows || [];
+
+        // ===== 헤더 (2줄) =====
+        // 1줄: 교시 + 날짜(각 날짜가 2칸 colSpan=2)
+        // 2줄: (스케줄/출결)
+        const topCells = dates.map(d => {
+          const { d:md, w } = splitDateLabel(d);
+          // 예: "2/2 (Mon)" -> 상단에 "Mon", 옆에 "2/2" 느낌으로
+          const title = w ? `${w}` : "";
+          const sub = md ? `${md}` : "";
+          return `
+            <th class="sticky-top day-head" colspan="2">
+              ${title ? `<div>${title}</div>` : ""}
+              ${sub ? `<div class="sub-head">${sub}</div>` : ""}
+            </th>
+          `;
+        }).join("");
+
+        const subCells = dates.map(() => `
+          <th class="sticky-top sub-head">스케줄</th>
+          <th class="sticky-top sub-head">출/결</th>
+        `).join("");
+
+        thead.innerHTML = `
+          <tr>
+            <th class="sticky-corner sticky-top col-period">교시</th>
+            ${topCells}
+          </tr>
+          <tr>
+            <th class="sticky-corner sticky-top col-period"></th>
+            ${subCells}
+          </tr>
+        `;
+
+        // ===== 바디 =====
+        if (rows.length === 0) {
+          tbody.innerHTML = `<tr><td style="padding:10px;">기록이 없습니다.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = rows.map(r => {
+          const cells = (r.cells || []).map(safeCellObj);
+
+          // 날짜마다 2칸씩 출력
+          const tds = cells.map(c => {
+            const status = attText(c.code);
+            const cls = statusClass(status);
+
+            const sched = c.sched;
+            // 스케줄이 비어 있으면 빈칸(깔끔)
+            const schedHtml = sched
+              ? `<div class="sched-text" title="${sched}">${sched}</div>`
+              : `<div class="sched-muted"> </div>`;
+
+            const statusHtml = status ? status : "-";
+
+            return `
+              <td class="col-sched">${schedHtml}</td>
+              <td class="col-status ${cls}">${statusHtml}</td>
+            `;
+          }).join("");
+
+          return `
+            <tr>
+              <td class="sticky-left col-period">${r.period || ""}</td>
+              ${tds}
+            </tr>
+          `;
+        }).join("");
 
       } catch (e) {
         loading.textContent = "";
