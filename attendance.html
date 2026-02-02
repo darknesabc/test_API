@@ -5,6 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>출결 상세</title>
   <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* 테이블 */
+    .att-table { border-collapse: collapse; width: max-content; min-width: 100%; }
+    .att-table th, .att-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .att-table th { border-bottom: 1px solid rgba(255,255,255,0.10); white-space: nowrap; text-align: left; }
+
+    /* 고정열/고정헤더 */
+    .sticky-col { position: sticky; left: 0; background: rgba(10,16,30,0.90); z-index: 2; white-space: nowrap; }
+    .sticky-head { position: sticky; top: 0; background: rgba(10,16,30,0.96); z-index: 3; }
+
+    /* 셀 표현 */
+    .cell { display: grid; gap: 6px; min-width: 140px; }
+    .sched { font-size: 12px; color: rgba(255,255,255,0.62); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .status { display: inline-flex; align-items: center; gap: 6px; }
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+    .badge.present { border-color: rgba(120,255,170,0.35); background: rgba(120,255,170,0.10); }
+    .badge.absent  { border-color: rgba(255,120,120,0.45); background: rgba(255,120,120,0.12); }
+    .badge.none    { opacity: 0.55; }
+
+    /* 옵션 영역 */
+    .opts { display:flex; gap:12px; align-items:center; margin-top: 10px; color: rgba(255,255,255,0.75); font-size: 13px; }
+    .opts input { transform: translateY(1px); }
+  </style>
 </head>
 
 <body data-needs-login="1">
@@ -24,30 +56,107 @@
       <p id="loading" class="muted">불러오는 중...</p>
       <p id="err" class="msg"></p>
 
-      <div style="overflow:auto; border:1px solid rgba(255,255,255,0.08); border-radius:12px;">
-        <table style="width:max-content; min-width:100%; border-collapse:collapse;">
+      <div class="opts">
+        <label><input type="checkbox" id="hideSchool" checked> ‘학교’ 스케줄 숨기기</label>
+      </div>
+
+      <div style="overflow:auto; border:1px solid rgba(255,255,255,0.08); border-radius:12px; margin-top:10px;">
+        <table class="att-table">
           <thead id="thead"></thead>
           <tbody id="tbody"></tbody>
         </table>
       </div>
+
+      <p class="muted" style="margin-top:10px;">
+        * 위: 스케줄 / 아래: 출석 상태
+      </p>
     </section>
   </main>
 
   <script src="script.js"></script>
   <script>
-    function attText(a) {
-      const s = String(a ?? "").trim();
-      if (s === "1") return "출석";
-      if (s === "3") return "결석";
-      return s; // 혹시 다른 코드가 나오면 그대로
+    // 셀 문자열 예: "학교 · 출석" / "MMI면접준비 · 출석" / "출석"
+    function parseCellText(text) {
+      const s = String(text ?? "").trim();
+      if (!s) return { sched: "", status: "" };
+
+      // " · " 또는 "·" 기준으로 분리
+      const parts = s.split("·").map(x => x.trim()).filter(Boolean);
+
+      if (parts.length >= 2) {
+        return { sched: parts[0], status: parts[1] };
+      }
+      // 스케줄 없이 상태만 있는 경우
+      if (s === "출석" || s === "결석") return { sched: "", status: s };
+      // 혹시 다른 케이스면 스케줄로 처리
+      return { sched: s, status: "" };
     }
 
-    function cellText(cell) {
-      const sched = String(cell?.s ?? "").trim();
-      const att = attText(cell?.a ?? "");
-      if (!sched) return att;
-      if (!att) return sched;
-      return `${sched} · ${att}`;
+    function statusBadge(status) {
+      if (status === "출석") return `<span class="badge present">출석</span>`;
+      if (status === "결석") return `<span class="badge absent">결석</span>`;
+      if (!status) return `<span class="badge none">-</span>`;
+      return `<span class="badge">${status}</span>`;
+    }
+
+    function renderCell(text, hideSchool) {
+      const { sched, status } = parseCellText(text);
+
+      const schedText = (hideSchool && sched === "학교") ? "" : sched;
+
+      const schedLine = schedText
+        ? `<div class="sched" title="${schedText}">${schedText}</div>`
+        : `<div class="sched">&nbsp;</div>`;
+
+      return `<div class="cell">
+        ${schedLine}
+        <div class="status">${statusBadge(status)}</div>
+      </div>`;
+    }
+
+    let lastData = null;
+
+    function drawTable(data) {
+      const hideSchool = document.getElementById("hideSchool").checked;
+      const thead = document.getElementById("thead");
+      const tbody = document.getElementById("tbody");
+
+      const dateHeads = data.dates || [];
+      thead.innerHTML = `
+        <tr>
+          <th class="sticky-col sticky-head">교시</th>
+          ${dateHeads.map(d => `<th class="sticky-head">${d}</th>`).join("")}
+        </tr>
+      `;
+
+      const rows = data.rows || [];
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td style="padding:10px;">기록이 없습니다.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td class="sticky-col">${r.period || ""}</td>
+          ${(r.cells || []).map(cell => `
+            <td>${renderCell(cellText(cell), hideSchool)}</td>
+          `).join("")}
+        </tr>
+      `).join("");
+
+      // cell이 {s,a} 구조일 수도, 문자열일 수도 있어서 안전 처리
+      function cellText(cell) {
+        if (cell && typeof cell === "object" && ("s" in cell || "a" in cell)) {
+          // 새로운 구조: {s:스케줄, a:코드(1/3)}
+          const sched = String(cell.s ?? "").trim();
+          const a = String(cell.a ?? "").trim();
+          const status = (a === "1") ? "출석" : (a === "3") ? "결석" : "";
+          if (!sched) return status;
+          if (!status) return sched;
+          return `${sched} · ${status}`;
+        }
+        return String(cell ?? "");
+      }
     }
 
     (async function () {
@@ -55,13 +164,11 @@
       const session = raw ? JSON.parse(raw) : null;
       if (!session) return;
 
-      const titleLine = document.getElementById("titleLine");
-      titleLine.textContent = `${session.studentName} (${session.seat || ""}${session.teacher ? " · " + session.teacher + " 담임" : ""})`;
+      document.getElementById("titleLine").textContent =
+        `${session.studentName} (${session.seat || ""}${session.teacher ? " · " + session.teacher + " 담임" : ""})`;
 
       const loading = document.getElementById("loading");
       const err = document.getElementById("err");
-      const thead = document.getElementById("thead");
-      const tbody = document.getElementById("tbody");
 
       try {
         const res = await fetch(`${API_BASE}?path=attendance`, {
@@ -74,39 +181,13 @@
         if (!data.ok) throw new Error(data.error || "불러오기 실패");
 
         loading.textContent = "";
+        lastData = data;
+        drawTable(data);
 
-        const dateHeads = data.dates || [];
-        thead.innerHTML = `
-          <tr>
-            <th style="position:sticky; left:0; background:rgba(10,16,30,0.9); padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left;">
-              교시
-            </th>
-            ${dateHeads.map(d => `
-              <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left; white-space:nowrap;">
-                ${d}
-              </th>
-            `).join("")}
-          </tr>
-        `;
-
-        const rows = data.rows || [];
-        if (rows.length === 0) {
-          tbody.innerHTML = `<tr><td style="padding:10px;">기록이 없습니다.</td></tr>`;
-          return;
-        }
-
-        tbody.innerHTML = rows.map(r => `
-          <tr>
-            <td style="position:sticky; left:0; background:rgba(10,16,30,0.85); padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
-              ${r.period || ""}
-            </td>
-            ${(r.cells || []).map(cell => `
-              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
-                ${cellText(cell)}
-              </td>
-            `).join("")}
-          </tr>
-        `).join("");
+        // ‘학교’ 숨기기 토글
+        document.getElementById("hideSchool").addEventListener("change", () => {
+          if (lastData) drawTable(lastData);
+        });
 
       } catch (e) {
         loading.textContent = "";
