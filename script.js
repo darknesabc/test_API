@@ -1,9 +1,9 @@
 // ====== 설정 ======
-const DEMO_MODE = false;  // 데모 끄기 (실제 검증)
-const API_BASE = "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec"; 
+// ====== 설정 ======
+const DEMO_MODE = false;  // 실제 시트 로그인 사용
+const SESSION_KEY = "parent_session_v1";
 
-// 나중에 Apps Script 붙일 때만 사용
-const API_BASE = ""; // 예: "https://script.google.com/macros/s/XXXX/exec"
+const API_BASE = "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec";
 
 // ====== 유틸 ======
 function $(id) { return document.getElementById(id); }
@@ -122,5 +122,6 @@ if (userLine) userLine.textContent = extra ? `${session.studentName} (${extra})`
 
   if (!getSession()) location.href = "index.html";
 })();
+
 
 
