@@ -25,7 +25,7 @@
 
     /* header styling */
     .day-head { font-weight: 900; letter-spacing: 0.2px; }
-    .sub-head { font-size: 12px; color: rgba(255,255,255,0.75); }
+    .sub-head { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 2px; }
 
     /* columns */
     .col-period { min-width: 56px; text-align: center; }
@@ -37,7 +37,6 @@
     .status-absent  { background: rgba(255,120,120,0.18); border-right: 1px solid rgba(255,120,120,0.12); }
     .status-empty   { color: rgba(255,255,255,0.5); }
 
-    /* optional: make schedule column a bit muted */
     .sched-text { color: rgba(255,255,255,0.90); }
     .sched-muted { color: rgba(255,255,255,0.65); font-size: 12px; }
   </style>
@@ -83,13 +82,26 @@
       return "";
     }
 
-    // "2/2 (Mon)" 같은 라벨을 "Mon"과 "2/2"처럼 나눠서 보기 좋게 만들기(선택)
+    // ✅ "2/2 (Mon)" 같은 라벨을 "2/2" + "월" 로 변환
     function splitDateLabel(label) {
       const s = String(label ?? "").trim();
-      // 예: "2/2 (Mon)" -> {d:"2/2", w:"Mon"}
+
+      const dayMap = {
+        Mon: "월", Tue: "화", Wed: "수",
+        Thu: "목", Fri: "금", Sat: "토", Sun: "일",
+        월: "월", 화: "화", 수: "수", 목: "목",
+        금: "금", 토: "토", 일: "일"
+      };
+
+      // 예: "2/2 (Mon)" 또는 "2/2 (월)"
       const m = s.match(/^(.+?)\s*\((.+?)\)\s*$/);
-      if (m) return { d: m[1], w: m[2] };
-      return { d: s, w: "" };
+      if (m) {
+        const date = m[1];
+        const rawDay = m[2];
+        const day = dayMap[rawDay] || rawDay;
+        return { date, day };
+      }
+      return { date: s, day: "" };
     }
 
     function statusClass(status) {
@@ -99,19 +111,20 @@
     }
 
     function safeCellObj(cell) {
-      // Apps Script가 {s,a}로 내려주는 경우
+      // 서버가 {s,a}로 내려주는 경우
       if (cell && typeof cell === "object") {
         return {
           sched: String(cell.s ?? "").trim(),
           code: String(cell.a ?? "").trim()
         };
       }
-      // 혹시 문자열로 내려오면(이전 버전 대비)
+      // 혹시 문자열로 내려오면(예전 대비)
       const raw = String(cell ?? "").trim();
-      // "스케줄 · 출석" 형태면 파싱
       if (raw.includes("·")) {
         const parts = raw.split("·").map(x => x.trim());
-        return { sched: parts[0] || "", code: (parts[1] === "출석" ? "1" : parts[1] === "결석" ? "3" : "") };
+        const status = parts[1] || "";
+        const code = (status === "출석") ? "1" : (status === "결석") ? "3" : "";
+        return { sched: parts[0] || "", code };
       }
       if (raw === "출석") return { sched: "", code: "1" };
       if (raw === "결석") return { sched: "", code: "3" };
@@ -150,14 +163,11 @@
         // 1줄: 교시 + 날짜(각 날짜가 2칸 colSpan=2)
         // 2줄: (스케줄/출결)
         const topCells = dates.map(d => {
-          const { d:md, w } = splitDateLabel(d);
-          // 예: "2/2 (Mon)" -> 상단에 "Mon", 옆에 "2/2" 느낌으로
-          const title = w ? `${w}` : "";
-          const sub = md ? `${md}` : "";
+          const { date, day } = splitDateLabel(d);
           return `
             <th class="sticky-top day-head" colspan="2">
-              ${title ? `<div>${title}</div>` : ""}
-              ${sub ? `<div class="sub-head">${sub}</div>` : ""}
+              <div>${date}</div>
+              <div class="sub-head">${day}</div>
             </th>
           `;
         }).join("");
@@ -187,13 +197,11 @@
         tbody.innerHTML = rows.map(r => {
           const cells = (r.cells || []).map(safeCellObj);
 
-          // 날짜마다 2칸씩 출력
           const tds = cells.map(c => {
             const status = attText(c.code);
             const cls = statusClass(status);
 
             const sched = c.sched;
-            // 스케줄이 비어 있으면 빈칸(깔끔)
             const schedHtml = sched
               ? `<div class="sched-text" title="${sched}">${sched}</div>`
               : `<div class="sched-muted"> </div>`;
