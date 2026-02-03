@@ -97,15 +97,33 @@
       return "";
     }
 
-    function splitDateLabel(label) {
-      const s = String(label ?? "").trim();
+    // ✅ dates가 "문자열"이든 "객체({md,dow,iso})"든 통일해서 쓰기
+    function normalizeDates(datesRaw) {
       const dayMap = {
         Mon: "월", Tue: "화", Wed: "수", Thu: "목", Fri: "금", Sat: "토", Sun: "일",
         월: "월", 화: "화", 수: "수", 목: "목", 금: "금", 토: "토", 일: "일"
       };
-      const m = s.match(/^(.+?)\s*\((.+?)\)\s*$/);
-      if (m) return { date: m[1], day: (dayMap[m[2]] || m[2]) };
-      return { date: s, day: "" };
+
+      return (datesRaw || []).map(d => {
+        // 객체 형태
+        if (d && typeof d === "object") {
+          const md = String(d.md ?? "").trim();   // "2/2"
+          const dow = String(d.dow ?? "").trim(); // "월"
+          const iso = String(d.iso ?? "").trim(); // "2026-02-02"
+          return { md, dow: (dayMap[dow] || dow), iso };
+        }
+
+        // 문자열 형태: "2/2 (Mon)" 같은 기존 포맷
+        const s = String(d ?? "").trim();
+        const m = s.match(/^(.+?)\s*\((.+?)\)\s*$/);
+        if (m) {
+          const md = m[1].trim();
+          const dow = (dayMap[m[2]] || m[2]);
+          return { md, dow, iso: "" };
+        }
+        // "2/2"만 있는 경우
+        return { md: s, dow: "", iso: "" };
+      });
     }
 
     function statusClass(status) {
@@ -134,17 +152,15 @@
       return String(schedule ?? "").trim() === "";
     }
 
-    function buildWeeklySummary(data) {
+    function buildWeeklySummary(data, datesNorm) {
       const box = document.getElementById("weeklySummary");
       const sumCounts = document.getElementById("sumCounts");
       const sumRecent = document.getElementById("sumRecent");
 
-      const dateIso = data.dateIso || [];
-      const datesLabel = data.dates || [];
       const rows = data.rows || [];
       const todayIso = data.todayIso || "";
 
-      if (!dateIso.length || !rows.length || !todayIso) return;
+      if (!datesNorm.length || !rows.length || !todayIso) return;
 
       const today = parseIso(todayIso);
       today.setHours(0,0,0,0);
@@ -153,13 +169,13 @@
       const weekStart = mondayOf(today);
       const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
 
-      // 이번 주 + 오늘(미래 제외) 컬럼만
+      // 이번 주 + 오늘(미래 제외) 컬럼만 선택 (iso가 있을 때만 정확히 필터)
       const weekIdx = [];
-      dateIso.forEach((iso, i) => {
-        if (!iso) return;
-        const d = parseIso(iso);
-        d.setHours(0,0,0,0);
-        if (d >= weekStart && d <= weekEnd && d <= today) weekIdx.push(i);
+      datesNorm.forEach((d, i) => {
+        if (!d.iso) return;
+        const dd = parseIso(d.iso);
+        dd.setHours(0,0,0,0);
+        if (dd >= weekStart && dd <= weekEnd && dd <= today) weekIdx.push(i);
       });
 
       if (!weekIdx.length) return;
@@ -186,7 +202,7 @@
         }
       }
 
-      // 최근 결석(오늘 기준 과거 중 최신): 날짜 인덱스 내림차순
+      // 최근 결석: 오늘 기준 과거 중 최신(인덱스가 뒤일수록 최근이라고 가정)
       absEvents.sort((a,b) => b.idx - a.idx);
       const top2 = absEvents.slice(0, 2);
 
@@ -195,8 +211,7 @@
       if (top2.length === 0) {
         sumRecent.textContent = `최근 결석: 없음`;
       } else {
-        const fmt = (label) => String(label ?? "").replace(/\s+/g,"");
-        const parts = top2.map(x => `${fmt(datesLabel[x.idx])} ${x.period}교시`);
+        const parts = top2.map(x => `${datesNorm[x.idx].md}(${datesNorm[x.idx].dow}) ${x.period}교시`);
         sumRecent.textContent = `최근 결석: ${parts.join(", ")}`;
       }
 
@@ -228,23 +243,23 @@
 
         loading.textContent = "";
 
-        // ✅ 이번 주 요약(오늘 기준 미래 제외)
-        buildWeeklySummary(data);
-
-        const dates = data.dates || [];
+        const datesNorm = normalizeDates(data.dates);
         const rows = data.rows || [];
 
-        const topCells = dates.map(d => {
-          const { date, day } = splitDateLabel(d);
+        // ✅ 이번 주 요약(오늘 기준 미래 제외)
+        buildWeeklySummary(data, datesNorm);
+
+        // ===== 헤더(2행) =====
+        const topCells = datesNorm.map(d => {
           return `
             <th class="sticky-top day-head" colspan="2">
-              <div>${date}</div>
-              <div class="sub-head">${day}</div>
+              <div>${d.md || ""}</div>
+              <div class="sub-head">${d.dow || ""}</div>
             </th>
           `;
         }).join("");
 
-        const subCells = dates.map(() => `
+        const subCells = datesNorm.map(() => `
           <th class="sticky-top sub-head">스케줄</th>
           <th class="sticky-top sub-head">출/결</th>
         `).join("");
@@ -265,6 +280,7 @@
           return;
         }
 
+        // ===== 바디 =====
         tbody.innerHTML = rows.map(r => {
           const tds = (r.cells || []).map(cell => {
             const sched = String(cell?.s ?? "").trim();
