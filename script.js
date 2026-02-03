@@ -307,7 +307,7 @@ async function loadMoveSummary(session) {
   });
 
   // 최초 로드
-  fetchAndRender(Number(daysSel.value || 30));
+  fetchAndRender(Number(daysSel.value || 7));
 
   async function fetchAndRender(days) {
     try {
@@ -389,3 +389,4 @@ async function loadMoveSummary(session) {
     }[m]));
   }
 })();
+
