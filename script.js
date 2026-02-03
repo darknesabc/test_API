@@ -197,7 +197,6 @@ async function loadAttendanceSummary(session) {
 
 /* =========================================================
    ✅ 취침 요약 (대시보드 카드)
-   - 최근 7일 "취침 기록이 있는 날짜 수" = N회
 ========================================================= */
 async function loadSleepSummary(session) {
   const loading = $("sleepLoading");
@@ -234,7 +233,6 @@ async function loadSleepSummary(session) {
 
 /* =========================================================
    ✅ 이동 요약 (대시보드 카드)
-   - Apps Script: move_summary 사용
 ========================================================= */
 async function loadMoveSummary(session) {
   const loading = $("moveLoading");
@@ -243,7 +241,6 @@ async function loadMoveSummary(session) {
   const line = $("moveLine");
   const recent = $("moveRecent");
 
-  // 이동 카드 요소가 없는 페이지면 조용히 종료 → 기존 동작 안 깨짐
   if (!loading || !error || !box || !line || !recent) return;
 
   try {
@@ -273,18 +270,23 @@ async function loadMoveSummary(session) {
 }
 
 /* =========================================================
-   ✅ 이동 상세 페이지 (move.html) - 추가
+   ✅ 이동 상세 페이지 (move.html) - 표 + 상단 라인 + 드롭다운
    - Apps Script: move_detail 사용
    - move.html에 아래 ID들이 있어야 함:
-     moveDetailLoading, moveDetailError, moveDetailList
+     moveUserLine, moveDaysSelect,
+     moveDetailLoading, moveDetailError,
+     moveDetailTableWrap, moveDetailTbody
 ========================================================= */
 (async function initMoveDetailPage(){
-  const list = $("moveDetailList");
-  const loading = $("moveDetailLoading");
-  const error = $("moveDetailError");
+  const userLine = $("moveUserLine");
+  const daysSel  = $("moveDaysSelect");
+  const loading  = $("moveDetailLoading");
+  const error    = $("moveDetailError");
+  const wrap     = $("moveDetailTableWrap");
+  const tbody    = $("moveDetailTbody");
 
   // move.html이 아니면 조용히 종료
-  if (!list || !loading || !error) return;
+  if (!loading || !error || !wrap || !tbody || !daysSel) return;
 
   const session = getSession();
   if (!session) {
@@ -292,51 +294,84 @@ async function loadMoveSummary(session) {
     return;
   }
 
-  try {
-    loading.textContent = "불러오는 중...";
-    error.textContent = "";
-    list.style.display = "none";
+  // ✅ 상단 사용자 라인 (취침 상세 스타일)
+  if (userLine) {
+    const extra = [session.seat, session.teacher ? `${session.teacher} 담임` : null]
+      .filter(Boolean).join(" · ");
+    userLine.textContent = extra ? `${session.studentName} (${extra})` : session.studentName;
+  }
 
-    const res = await fetch(`${API_BASE}?path=move_detail`, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
-        token: session.token,
-        days: 30 // 최근 30일
-      })
-    });
+  daysSel.addEventListener("change", () => {
+    const days = Number(daysSel.value || 30);
+    fetchAndRender(days);
+  });
 
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || "이동 상세 불러오기 실패");
+  // 최초 로드
+  fetchAndRender(Number(daysSel.value || 30));
 
-    const items = Array.isArray(data.items) ? data.items : [];
-    loading.textContent = "";
+  async function fetchAndRender(days) {
+    try {
+      loading.textContent = "불러오는 중...";
+      error.textContent = "";
+      wrap.style.display = "none";
+      tbody.innerHTML = "";
 
-    if (!items.length) {
-      loading.textContent = "이동 기록이 없습니다.";
-      return;
+      const res = await fetch(`${API_BASE}?path=move_detail`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ token: session.token, days })
+      });
+
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "이동 상세 불러오기 실패");
+
+      const items = Array.isArray(data.items) ? data.items : [];
+      loading.textContent = "";
+
+      if (!items.length) {
+        loading.textContent = "이동 기록이 없습니다.";
+        return;
+      }
+
+      tbody.innerHTML = items.map(it => {
+        const date = String(it.date || "").trim(); // yyyy-MM-dd
+        const time = String(it.time || "").trim(); // HH:mm
+        const prettyDate = date ? date.slice(5).replace("-", "/") : "";
+        const dtPretty = (prettyDate && time) ? `${prettyDate} ${time}` : (it.dt || "-");
+
+        const reason = escapeHtml_(it.reason || "이동");
+        const seat   = escapeHtml_(it.seat || "-");
+        const score  = escapeHtml_(it.score || "-"); // 서버에서 '복귀교시'가 오면 이게 그 값
+
+        return `
+          <tr>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
+              ${escapeHtml_(dtPretty)}
+            </td>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); font-weight:700;">
+              ${reason}
+            </td>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
+              ${seat}
+            </td>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
+              ${score}
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      wrap.style.display = "";
+    } catch (e) {
+      loading.textContent = "";
+      error.textContent = e?.message ?? String(e);
     }
+  }
 
-    list.innerHTML = items.map(it => {
-      const dt = it.dt || `${it.date || ""} ${it.time || ""}`.trim();
-      const seat = it.seat ? String(it.seat) : "";
-      const score = it.score ? String(it.score) : "";
-
-      return `
-        <li style="padding:10px 0; border-bottom:1px solid #eee;">
-          <div style="font-weight:800;">${it.reason || "이동"}</div>
-          <div class="muted" style="font-size:13px; margin-top:4px;">
-            ${dt}
-            ${seat ? ` · ${seat}` : ""}
-            ${score ? ` · ${score}` : ""}
-          </div>
-        </li>
-      `;
-    }).join("");
-
-    list.style.display = "";
-  } catch (e) {
-    loading.textContent = "";
-    error.textContent = e?.message ?? String(e);
+  // XSS 방지
+  function escapeHtml_(s) {
+    return String(s).replace(/[&<>"']/g, (m) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[m]));
   }
 })();
