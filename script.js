@@ -1,14 +1,14 @@
 /***********************
  * Frontend (GitHub Pages)
  * - 로그인: name + parent4 -> Apps Script login -> sessionStorage 저장
- * - 대시보드: 세션 체크 + 출결 요약 카드 로드
+ * - 대시보드: 세션 체크 + 출결 요약 + 취침 요약
  ***********************/
 
 // ====== 설정 ======
-const DEMO_MODE = false; // 실전 사용
+const DEMO_MODE = false; // 실전
 const SESSION_KEY = "parent_session_v1";
 
-// ✅ Apps Script Web App URL (여기만 수정하면 됨)
+// ✅ Apps Script Web App URL
 const API_BASE = "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec";
 
 // ====== 유틸 ======
@@ -44,7 +44,6 @@ async function demoLogin(name, parent4) {
 async function apiLogin(name, parent4) {
   const res = await fetch(`${API_BASE}?path=login`, {
     method: "POST",
-    // Apps Script CORS 프리플라이트 회피
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({ name, parent4 })
   });
@@ -69,7 +68,6 @@ async function apiLogin(name, parent4) {
 
   const msg = $("msg");
 
-  // 이미 로그인 상태면 대시보드로
   if (getSession()) {
     location.href = "dashboard.html";
     return;
@@ -114,23 +112,22 @@ async function apiLogin(name, parent4) {
     return;
   }
 
-  // 상단 사용자 표시
   const userLine = $("userLine");
   const extra = [session.seat, session.teacher ? `${session.teacher} 담임` : null].filter(Boolean).join(" · ");
   if (userLine) userLine.textContent = extra ? `${session.studentName} (${extra})` : `${session.studentName} 학부모님`;
 
-  // 로그아웃
   logoutBtn.addEventListener("click", () => {
     clearSession();
     location.href = "index.html";
   });
 
-  // ✅ 출결 요약 로드 (추가)
+  // ✅ 요약들 로드
   loadAttendanceSummary(session);
+  loadSleepSummary(session);
 })();
 
 /* =========================================================
-   로그인 필요 페이지 가드 (body[data-needs-login="1"])
+   로그인 필요 페이지 가드
 ========================================================= */
 (function guardAnyPrivatePage(){
   const needsLogin = document.body?.dataset?.needsLogin === "1";
@@ -141,9 +138,6 @@ async function apiLogin(name, parent4) {
 
 /* =========================================================
    출결 요약 (대시보드 카드)
-   - 이번 주: "오늘(서버 todayIso)"가 속한 주(월~일)
-   - 미래 날짜는 제외 (d <= today)
-   - 결석 카운트: "스케줄 공란 + 결석(3)"만
 ========================================================= */
 function parseIso_(iso) {
   const [y, m, d] = String(iso).split("-").map(Number);
@@ -166,10 +160,9 @@ function attText_(a) {
   return "";
 }
 
-// ✅ 결석 카운트 조건: 스케줄 공란 + 결석만
 function isCountedAbsence_(schedule, statusText) {
   if (statusText !== "결석") return false;
-  return String(schedule ?? "").trim() === "";
+  return String(schedule ?? "").trim() === ""; // 스케줄 공란만 결석 카운트
 }
 
 async function loadAttendanceSummary(session) {
@@ -179,7 +172,6 @@ async function loadAttendanceSummary(session) {
   const counts = $("attCounts");
   const recent = $("attRecent");
 
-  // dashboard.html에 카드가 없으면 종료
   if (!loading || !error || !box || !counts || !recent) return;
 
   try {
@@ -212,12 +204,10 @@ async function loadAttendanceSummary(session) {
     const today = parseIso_(todayIso);
     today.setHours(0, 0, 0, 0);
 
-    // 이번 주(오늘이 속한 주)
     const weekStart = mondayOf_(today);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
 
-    // 이번 주 + 미래 제외 컬럼 인덱스
     const weekIdx = [];
     dateIso.forEach((iso, i) => {
       if (!iso) return;
@@ -228,7 +218,7 @@ async function loadAttendanceSummary(session) {
 
     let present = 0;
     let absent = 0;
-    const absEvents = []; // { idx, period }
+    const absEvents = []; // {idx, period}
 
     for (const r of rows) {
       const period = r.period || "";
@@ -247,11 +237,9 @@ async function loadAttendanceSummary(session) {
       }
     }
 
-    // 표시
     loading.textContent = "";
-    counts.textContent = `이번 주: 출석 ${present} · 결석 ${absent}`;
+    counts.textContent = `이번 주 출결 요약\n출석 ${present}회 · 결석 ${absent}회`;
 
-    // 최근 결석 1건 (원하면 2건으로 쉽게 변경 가능)
     absEvents.sort((a, b) => b.idx - a.idx);
     const top = absEvents[0];
 
@@ -262,6 +250,43 @@ async function loadAttendanceSummary(session) {
       recent.textContent = `최근 결석: ${label} ${top.period}교시`;
     }
 
+    box.style.display = "";
+  } catch (e) {
+    loading.textContent = "";
+    error.textContent = e?.message ?? String(e);
+  }
+}
+
+/* =========================================================
+   ✅ 취침 요약 (대시보드 카드)
+   - 최근 7일 "취침 기록이 있는 날짜 수" = N회
+========================================================= */
+async function loadSleepSummary(session) {
+  const loading = $("sleepLoading");
+  const error = $("sleepError");
+  const box = $("sleepSummary");
+  const line = $("sleepLine");
+
+  if (!loading || !error || !box || !line) return;
+
+  try {
+    loading.textContent = "불러오는 중...";
+    error.textContent = "";
+    box.style.display = "none";
+
+    const res = await fetch(`${API_BASE}?path=sleep_summary`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: session.token })
+    });
+
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "취침 요약 불러오기 실패");
+
+    const n = Number(data.sleepCount7d ?? 0);
+
+    loading.textContent = "";
+    line.textContent = `최근 7일 취침 ${n}회`;
     box.style.display = "";
   } catch (e) {
     loading.textContent = "";
