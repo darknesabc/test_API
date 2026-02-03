@@ -102,3 +102,46 @@ body {
 .link { color: #9ec5ff; text-decoration: none; font-weight: 700; }
 .link:hover { text-decoration: underline; }
 .muted { color: var(--muted); font-size: 13px; }
+
+
+/* =========================
+   ✅ Select 전용 (드롭다운 깨짐 방지)
+   ========================= */
+.select-ghost{
+  box-sizing: border-box;
+  height: 32px;
+  line-height: 32px;
+  min-width: 120px;
+
+  padding: 0 34px 0 12px;   /* 오른쪽 화살표 공간 확보 */
+  border-radius: 12px;
+
+  background: var(--btn2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-weight: 700;
+  font: inherit;
+
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+
+  /* 글자 잘림 방지 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  /* 화살표(커스텀) */
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+
+  cursor: pointer;
+}
+.select-ghost:focus{
+  outline: none;
+  border-color: rgba(255,255,255,.28);
+}
