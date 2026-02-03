@@ -1,7 +1,7 @@
 /***********************
  * Frontend (GitHub Pages)
  * - 로그인: name + parent4 -> Apps Script login -> sessionStorage 저장
- * - 대시보드: 세션 체크 + 출결 요약(attendance_summary) + 취침 요약(sleep_summary)
+ * - 대시보드: 세션 체크 + 출결 요약(attendance_summary) + 취침 요약(sleep_summary) + 이동 요약(move_summary)
  ***********************/
 
 // ====== 설정 ======
@@ -132,8 +132,9 @@ async function apiLogin(name, parent4) {
   });
 
   // ✅ 요약들 로드
-  loadAttendanceSummary(session); // ✅ attendance_summary 호출로 변경
-  loadSleepSummary(session);
+  loadAttendanceSummary(session); // ✅ attendance_summary 호출
+  loadSleepSummary(session);      // ✅ sleep_summary 호출
+  loadMoveSummary(session);       // ✅ move_summary 호출 (추가)
 })();
 
 /* =========================================================
@@ -161,7 +162,6 @@ async function loadAttendanceSummary(session) {
     error.textContent = "";
     box.style.display = "none";
 
-    // ✅ 여기서 attendance_summary 호출
     const res = await fetch(`${API_BASE}?path=attendance_summary`, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -183,7 +183,6 @@ async function loadAttendanceSummary(session) {
     if (!rec.length) {
       recent.textContent = "최근 결석: 없음";
     } else {
-      // 최대 3개를 서버가 내려주니까 그대로 표시
       const items = rec.map(x => `${fmtMdDow_(x.md, x.dow)} ${x.period}교시`);
       recent.textContent = `최근 결석: ${items.join(", ")}`;
     }
@@ -225,6 +224,46 @@ async function loadSleepSummary(session) {
 
     loading.textContent = "";
     line.textContent = `최근 7일 취침 ${n}회`;
+    box.style.display = "";
+  } catch (e) {
+    loading.textContent = "";
+    error.textContent = e?.message ?? String(e);
+  }
+}
+
+/* =========================================================
+   ✅ 이동 요약 (대시보드 카드) - 추가
+   - Apps Script: move_summary 사용
+========================================================= */
+async function loadMoveSummary(session) {
+  const loading = $("moveLoading");
+  const error = $("moveError");
+  const box = $("moveSummary");
+  const line = $("moveLine");
+  const recent = $("moveRecent");
+
+  // 이동 카드 요소가 없는 페이지면 조용히 종료 → 기존 동작 안 깨짐
+  if (!loading || !error || !box || !line || !recent) return;
+
+  try {
+    loading.textContent = "불러오는 중...";
+    error.textContent = "";
+    box.style.display = "none";
+
+    const res = await fetch(`${API_BASE}?path=move_summary`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: session.token })
+    });
+
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "이동 요약 불러오기 실패");
+
+    loading.textContent = "";
+
+    line.textContent = data.latestText || "-";
+    recent.textContent = data.latestDateTime ? `최근: ${data.latestDateTime}` : "";
+
     box.style.display = "";
   } catch (e) {
     loading.textContent = "";
