@@ -1,7 +1,7 @@
 /***********************
  * Frontend (GitHub Pages)
  * - 로그인: name + parent4 -> Apps Script login -> sessionStorage 저장
- * - 대시보드: 세션 체크 + 출결 요약 + 취침 요약
+ * - 대시보드: 세션 체크 + 출결 요약(attendance_summary) + 취침 요약(sleep_summary)
  ***********************/
 
 // ====== 설정 ======
@@ -100,6 +100,16 @@ async function apiLogin(name, parent4) {
 })();
 
 /* =========================================================
+   로그인 필요 페이지 가드
+========================================================= */
+(function guardAnyPrivatePage(){
+  const needsLogin = document.body?.dataset?.needsLogin === "1";
+  if (!needsLogin) return;
+
+  if (!getSession()) location.href = "index.html";
+})();
+
+/* =========================================================
    대시보드 로직 (dashboard.html)
 ========================================================= */
 (function initDashboard(){
@@ -122,47 +132,19 @@ async function apiLogin(name, parent4) {
   });
 
   // ✅ 요약들 로드
-  loadAttendanceSummary(session);
+  loadAttendanceSummary(session); // ✅ attendance_summary 호출로 변경
   loadSleepSummary(session);
 })();
 
 /* =========================================================
-   로그인 필요 페이지 가드
-========================================================= */
-(function guardAnyPrivatePage(){
-  const needsLogin = document.body?.dataset?.needsLogin === "1";
-  if (!needsLogin) return;
-
-  if (!getSession()) location.href = "index.html";
-})();
-
-/* =========================================================
    출결 요약 (대시보드 카드)
+   ✅ Apps Script: attendance_summary 사용
 ========================================================= */
-function parseIso_(iso) {
-  const [y, m, d] = String(iso).split("-").map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function mondayOf_(d) {
-  const x = new Date(d);
-  const day = x.getDay(); // 0=Sun..6=Sat
-  const diff = (day === 0 ? -6 : 1 - day);
-  x.setDate(x.getDate() + diff);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function attText_(a) {
-  const s = String(a ?? "").trim();
-  if (s === "1") return "출석";
-  if (s === "3") return "결석";
-  return "";
-}
-
-function isCountedAbsence_(schedule, statusText) {
-  if (statusText !== "결석") return false;
-  return String(schedule ?? "").trim() === ""; // 스케줄 공란만 결석 카운트
+function fmtMdDow_(md, dow) {
+  const m = String(md ?? "").trim();
+  const d = String(dow ?? "").trim();
+  if (!m) return "";
+  return d ? `${m}(${d})` : m;
 }
 
 async function loadAttendanceSummary(session) {
@@ -179,7 +161,8 @@ async function loadAttendanceSummary(session) {
     error.textContent = "";
     box.style.display = "none";
 
-    const res = await fetch(`${API_BASE}?path=attendance`, {
+    // ✅ 여기서 attendance_summary 호출
+    const res = await fetch(`${API_BASE}?path=attendance_summary`, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ token: session.token })
@@ -188,66 +171,21 @@ async function loadAttendanceSummary(session) {
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || "출결 요약 불러오기 실패");
 
-    const dateIso = data.dateIso || [];
-    const datesLabel = data.dates || [];
-    const rows = data.rows || [];
-    const todayIso = data.todayIso || "";
-
-    if (!todayIso || !dateIso.length || !rows.length) {
-      loading.textContent = "";
-      counts.textContent = "출결 데이터 없음";
-      recent.textContent = "";
-      box.style.display = "";
-      return;
-    }
-
-    const today = parseIso_(todayIso);
-    today.setHours(0, 0, 0, 0);
-
-    const weekStart = mondayOf_(today);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-
-    const weekIdx = [];
-    dateIso.forEach((iso, i) => {
-      if (!iso) return;
-      const d = parseIso_(iso);
-      d.setHours(0, 0, 0, 0);
-      if (d >= weekStart && d <= weekEnd && d <= today) weekIdx.push(i);
-    });
-
-    let present = 0;
-    let absent = 0;
-    const absEvents = []; // {idx, period}
-
-    for (const r of rows) {
-      const period = r.period || "";
-      const cells = r.cells || [];
-
-      for (const i of weekIdx) {
-        const cell = cells[i] || {};
-        const sched = String(cell.s ?? "").trim();
-        const status = attText_(cell.a);
-
-        if (status === "출석") present++;
-        if (isCountedAbsence_(sched, status)) {
-          absent++;
-          absEvents.push({ idx: i, period });
-        }
-      }
-    }
-
     loading.textContent = "";
-    counts.textContent = `이번 주 출결 요약\n출석 ${present}회 · 결석 ${absent}회`;
 
-    absEvents.sort((a, b) => b.idx - a.idx);
-    const top = absEvents[0];
+    const present = Number(data.present ?? 0);
+    const absent = Number(data.absent ?? 0);
+    const rec = Array.isArray(data.recentAbsences) ? data.recentAbsences : [];
 
-    if (!top) {
+    // ✅ 줄바꿈은 textContent가 아니라 innerHTML로
+    counts.innerHTML = `이번 주 출결 요약<br>출석 ${present}회 · 결석 ${absent}회`;
+
+    if (!rec.length) {
       recent.textContent = "최근 결석: 없음";
     } else {
-      const label = String(datesLabel[top.idx] ?? "").replace(/\s+/g, "");
-      recent.textContent = `최근 결석: ${label} ${top.period}교시`;
+      // 최대 3개를 서버가 내려주니까 그대로 표시
+      const items = rec.map(x => `${fmtMdDow_(x.md, x.dow)} ${x.period}교시`);
+      recent.textContent = `최근 결석: ${items.join(", ")}`;
     }
 
     box.style.display = "";
