@@ -11,7 +11,7 @@
   <header class="topbar">
     <div class="topbar-inner">
       <div>
-        <div class="top-title">대시보드</div>
+        <div class="top-title">학생 현황 대시보드</div>
         <div id="userLine" class="top-sub"></div>
       </div>
       <button id="logoutBtn" class="btn btn-ghost">로그아웃</button>
@@ -19,29 +19,59 @@
   </header>
 
   <main class="wrap">
-    <!-- ✅ 출결 요약 카드 (추가) -->
-    <section class="card" id="attCard">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-        <h2 class="card-title" style="margin:0;">출결</h2>
-        <a class="btn btn-ghost" href="attendance.html">자세히</a>
-      </div>
+    <!-- ✅ 4칸 구성 (기존처럼) -->
+    <section class="grid-4">
 
-      <p id="attLoading" class="muted">불러오는 중...</p>
-      <p id="attError" class="msg"></p>
-
-      <div id="attSummary" style="display:none; margin-top:8px;">
-        <div id="attCounts" style="font-weight:900;"></div>
-        <div id="attRecent" class="muted" style="margin-top:6px;"></div>
-        <div class="muted" style="margin-top:6px; font-size:12px;">
-          * 결석은 “스케줄 공란 + 결석(3)”만 집계 (오늘 기준, 미래 제외)
+      <!-- ① 출결 -->
+      <section class="card" id="attCard">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <h2 class="card-title" style="margin:0;">출결</h2>
+          <a class="btn btn-ghost" href="attendance.html">자세히</a>
         </div>
-      </div>
-    </section>
 
-    <!-- (추후) 다른 요약 카드들 자리 -->
-    <section class="card">
-      <h2 class="card-title">추가 예정</h2>
-      <p class="muted">여기에 성적/취침/알림 등 요약을 추가할 수 있어요.</p>
+        <p id="attLoading" class="muted">불러오는 중...</p>
+        <p id="attError" class="msg"></p>
+
+        <div id="attSummary" style="display:none; margin-top:8px;">
+          <div id="attCounts" style="font-weight:900;"></div>
+          <div id="attRecent" class="muted" style="margin-top:6px;"></div>
+          <div class="muted" style="margin-top:6px; font-size:12px;">
+            * 결석은 “스케줄 공란 + 결석(3)”만 집계 (오늘 기준, 미래 제외)
+          </div>
+        </div>
+      </section>
+
+      <!-- ② 성적(자리) -->
+      <section class="card">
+        <h2 class="card-title">성적</h2>
+        <p class="muted">추가 예정</p>
+      </section>
+
+      <!-- ③ 취침 ✅ -->
+      <section class="card" id="sleepCard">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <h2 class="card-title" style="margin:0;">취침</h2>
+          <!-- 상세 페이지는 나중에 만들면 됨 -->
+          <span class="muted" style="font-size:12px;">(요약)</span>
+        </div>
+
+        <p id="sleepLoading" class="muted">불러오는 중...</p>
+        <p id="sleepError" class="msg"></p>
+
+        <div id="sleepSummary" style="display:none; margin-top:8px;">
+          <div id="sleepLine" style="font-weight:900;"></div>
+          <div class="muted" style="margin-top:6px; font-size:12px;">
+            * 최근 7일 동안 “취침” 기록이 있는 날짜 수
+          </div>
+        </div>
+      </section>
+
+      <!-- ④ 공지(자리) -->
+      <section class="card">
+        <h2 class="card-title">공지</h2>
+        <p class="muted">추가 예정</p>
+      </section>
+
     </section>
   </main>
 
