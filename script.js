@@ -259,8 +259,24 @@ async function loadMoveSummary(session) {
 
     loading.textContent = "";
 
-    line.textContent = data.latestText || "-";
-    recent.textContent = data.latestDateTime ? `최근: ${data.latestDateTime}` : "";
+    function prettyMD_(iso) {
+  if (!iso) return "";
+  return iso.slice(5).replace("-", "/"); // yyyy-MM-dd -> MM/DD
+}
+
+const md = prettyMD_(data.latestDate);
+const time = data.latestTime || "";
+const reasonLine = data.latestText || "-";
+
+// 1줄: 제목
+line.textContent = "최근 이동";
+
+// 2줄: 값
+recent.textContent =
+  (md && time)
+    ? `${md} ${time} · ${reasonLine}`
+    : "-";
+
 
     box.style.display = "";
   } catch (e) {
@@ -389,4 +405,5 @@ async function loadMoveSummary(session) {
     }[m]));
   }
 })();
+
 
