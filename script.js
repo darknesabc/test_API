@@ -2,6 +2,7 @@
  * Frontend (GitHub Pages)
  * - 로그인: name + parent4 -> Apps Script login -> sessionStorage 저장
  * - 대시보드: 세션 체크 + 출결 요약(attendance_summary) + 취침 요약(sleep_summary) + 이동 요약(move_summary)
+ * - 이동 상세: move_detail (move.html)
  ***********************/
 
 // ====== 설정 ======
@@ -232,7 +233,7 @@ async function loadSleepSummary(session) {
 }
 
 /* =========================================================
-   ✅ 이동 요약 (대시보드 카드) - 추가
+   ✅ 이동 요약 (대시보드 카드)
    - Apps Script: move_summary 사용
 ========================================================= */
 async function loadMoveSummary(session) {
@@ -270,3 +271,72 @@ async function loadMoveSummary(session) {
     error.textContent = e?.message ?? String(e);
   }
 }
+
+/* =========================================================
+   ✅ 이동 상세 페이지 (move.html) - 추가
+   - Apps Script: move_detail 사용
+   - move.html에 아래 ID들이 있어야 함:
+     moveDetailLoading, moveDetailError, moveDetailList
+========================================================= */
+(async function initMoveDetailPage(){
+  const list = $("moveDetailList");
+  const loading = $("moveDetailLoading");
+  const error = $("moveDetailError");
+
+  // move.html이 아니면 조용히 종료
+  if (!list || !loading || !error) return;
+
+  const session = getSession();
+  if (!session) {
+    location.href = "index.html";
+    return;
+  }
+
+  try {
+    loading.textContent = "불러오는 중...";
+    error.textContent = "";
+    list.style.display = "none";
+
+    const res = await fetch(`${API_BASE}?path=move_detail`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        token: session.token,
+        days: 30 // 최근 30일
+      })
+    });
+
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "이동 상세 불러오기 실패");
+
+    const items = Array.isArray(data.items) ? data.items : [];
+    loading.textContent = "";
+
+    if (!items.length) {
+      loading.textContent = "이동 기록이 없습니다.";
+      return;
+    }
+
+    list.innerHTML = items.map(it => {
+      const dt = it.dt || `${it.date || ""} ${it.time || ""}`.trim();
+      const seat = it.seat ? String(it.seat) : "";
+      const score = it.score ? String(it.score) : "";
+
+      return `
+        <li style="padding:10px 0; border-bottom:1px solid #eee;">
+          <div style="font-weight:800;">${it.reason || "이동"}</div>
+          <div class="muted" style="font-size:13px; margin-top:4px;">
+            ${dt}
+            ${seat ? ` · ${seat}` : ""}
+            ${score ? ` · ${score}` : ""}
+          </div>
+        </li>
+      `;
+    }).join("");
+
+    list.style.display = "";
+  } catch (e) {
+    loading.textContent = "";
+    error.textContent = e?.message ?? String(e);
+  }
+})();
