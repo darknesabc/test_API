@@ -233,6 +233,8 @@ async function loadSleepSummary(session) {
 
 /* =========================================================
    ✅ 이동 요약 (대시보드 카드)
+   - 1줄: "최근 이동"
+   - 2줄: "02/02 21:51 · 약국 (복귀 6교시)"
 ========================================================= */
 async function loadMoveSummary(session) {
   const loading = $("moveLoading");
@@ -259,24 +261,25 @@ async function loadMoveSummary(session) {
 
     loading.textContent = "";
 
+    // yyyy-MM-dd -> MM/DD (이미 MM/DD면 그대로)
     function prettyMD_(iso) {
-  if (!iso) return "";
-  return iso.slice(5).replace("-", "/"); // yyyy-MM-dd -> MM/DD
-}
+      iso = String(iso || "").trim();
+      if (!iso) return "";
+      if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso.slice(5).replace("-", "/");
+      return iso;
+    }
 
-const md = prettyMD_(data.latestDate);
-const time = data.latestTime || "";
-const reasonLine = data.latestText || "-";
+    const md = prettyMD_(data.latestDate);
+    const time = String(data.latestTime || "").trim();
+    const reasonLine = String(data.latestText || "-").trim();
 
-// 1줄: 제목
-line.textContent = "최근 이동";
+    // 1줄: 제목
+    line.textContent = "최근 이동";
 
-// 2줄: 값
-recent.textContent =
-  (md && time)
-    ? `${md} ${time} · ${reasonLine}`
-    : "-";
-
+    // 2줄: 값
+    recent.textContent = (md && time)
+      ? `${md} ${time} · ${reasonLine}`
+      : "-";
 
     box.style.display = "";
   } catch (e) {
@@ -318,11 +321,11 @@ recent.textContent =
   }
 
   daysSel.addEventListener("change", () => {
-    const days = Number(daysSel.value || 30);
+    const days = Number(daysSel.value || 7);
     fetchAndRender(days);
   });
 
-  // 최초 로드
+  // ✅ 최초 로드: 기본 7일
   fetchAndRender(Number(daysSel.value || 7));
 
   async function fetchAndRender(days) {
@@ -405,5 +408,3 @@ recent.textContent =
     }[m]));
   }
 })();
-
-
