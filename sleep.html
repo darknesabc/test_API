@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>취침 상세</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body data-needs-login="1">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div>
+        <div class="top-title">취침 상세</div>
+        <div id="titleLine" class="top-sub"></div>
+      </div>
+      <a class="btn btn-ghost" href="dashboard.html">대시보드</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <div style="display:flex; gap:12px; justify-content:space-between; align-items:center;">
+        <h2 class="card-title" style="margin:0;">취침 기록</h2>
+
+        <!-- 최근 N일 옵션 (원하면) -->
+        <select id="days" class="input" style="max-width:140px;">
+          <option value="7">최근 7일</option>
+          <option value="14">최근 14일</option>
+          <option value="30">최근 30일</option>
+        </select>
+      </div>
+
+      <p id="loading" class="muted" style="margin-top:10px;">불러오는 중...</p>
+      <p id="err" class="msg"></p>
+
+      <div style="overflow:auto; border:1px solid rgba(255,255,255,0.08); border-radius:12px; margin-top:10px;">
+        <table style="width:100%; border-collapse:collapse;">
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="muted" style="margin-top:10px; font-size:12px;">
+        * “사유=취침” 기록만 표시합니다.
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+  <script>
+    function fmtKDate(iso){
+      // iso: yyyy-mm-dd → mm/dd(요일)
+      const [y,m,d] = iso.split("-").map(Number);
+      const dt = new Date(y, m-1, d);
+      const wd = ["일","월","화","수","목","금","토"][dt.getDay()];
+      return `${String(m).padStart(2,"0")}/${String(d).padStart(2,"0")} (${wd})`;
+    }
+
+    async function loadSleepDetail(days){
+      const raw = sessionStorage.getItem("parent_session_v1");
+      const session = raw ? JSON.parse(raw) : null;
+      if (!session) return;
+
+      const titleLine = document.getElementById("titleLine");
+      titleLine.textContent =
+        `${session.studentName} (${session.seat || ""}${session.teacher ? " · " + session.teacher + " 담임" : ""})`;
+
+      const loading = document.getElementById("loading");
+      const err = document.getElementById("err");
+      const thead = document.getElementById("thead");
+      const tbody = document.getElementById("tbody");
+
+      try {
+        loading.textContent = "불러오는 중...";
+        err.textContent = "";
+        thead.innerHTML = "";
+        tbody.innerHTML = "";
+
+        const res = await fetch(`${API_BASE}?path=sleep_detail`, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ token: session.token, days })
+        });
+
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "불러오기 실패");
+
+        loading.textContent = "";
+
+        thead.innerHTML = `
+          <tr>
+            <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left;">날짜</th>
+            <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left;">사유</th>
+          </tr>
+        `;
+
+        const items = data.items || [];
+        if (items.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="2" style="padding:10px;">기록이 없습니다.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = items.map(it => `
+          <tr>
+            <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
+              ${fmtKDate(it.dateIso)}
+            </td>
+            <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06);">
+              ${it.reason || "취침"}
+            </td>
+          </tr>
+        `).join("");
+
+      } catch (e) {
+        loading.textContent = "";
+        err.textContent = e.message || String(e);
+      }
+    }
+
+    // 초기 로드 + 옵션 변경
+    const sel = document.getElementById("days");
+    loadSleepDetail(Number(sel.value));
+    sel.addEventListener("change", () => loadSleepDetail(Number(sel.value)));
+  </script>
+</body>
+</html>
