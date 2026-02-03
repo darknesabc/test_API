@@ -24,7 +24,8 @@
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
         <h2 class="card-title" style="margin:0;">이동 기록</h2>
 
-        <select id="moveDaysSelect" class="btn btn-ghost btn-mini" style="height:32px;">
+        <!-- ✅ select는 버튼 클래스 대신 select 전용 클래스로 -->
+        <select id="moveDaysSelect" class="select-ghost">
           <option value="7">최근 7일</option>
           <option value="30" selected>최근 30일</option>
           <option value="60">최근 60일</option>
