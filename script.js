@@ -294,7 +294,7 @@ async function loadMoveSummary(session) {
     return;
   }
 
-  // ✅ 상단 사용자 라인 (취침 상세 스타일)
+  // ✅ 상단 사용자 라인
   if (userLine) {
     const extra = [session.seat, session.teacher ? `${session.teacher} 담임` : null]
       .filter(Boolean).join(" · ");
@@ -333,29 +333,43 @@ async function loadMoveSummary(session) {
         return;
       }
 
+      // ✅ 새 컬럼 매핑: 날짜 / 입력시간 / 사유 / 복귀교시
       tbody.innerHTML = items.map(it => {
-        const date = String(it.date || "").trim(); // yyyy-MM-dd
+        const date = String(it.date || "").trim(); // yyyy-MM-dd 또는 02/02
         const time = String(it.time || "").trim(); // HH:mm
-        const prettyDate = date ? date.slice(5).replace("-", "/") : "";
-        const dtPretty = (prettyDate && time) ? `${prettyDate} ${time}` : (it.dt || "-");
+        const reason = escapeHtml_(it.reason || "-");
 
-        const reason = escapeHtml_(it.reason || "이동");
-        const seat   = escapeHtml_(it.seat || "-");
-        const score  = escapeHtml_(it.score || "-"); // 서버에서 '복귀교시'가 오면 이게 그 값
+        // ✅ 복귀교시: 백엔드 표준(returnPeriod) 우선, 없으면 score(호환)
+        const returnPeriod = escapeHtml_(it.returnPeriod || it.score || "-");
+
+        // ✅ 화면 날짜 포맷: yyyy-MM-dd -> MM/DD
+        let prettyDate = date || "-";
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          prettyDate = date.slice(5).replace("-", "/"); // "02/02"
+        }
+
+        // ✅ 입력시간이 비어있을 때 dt에서 보정(혹시 옛 데이터 섞일 때)
+        let prettyTime = time;
+        if (!prettyTime) {
+          const dt = String(it.dt || "").trim(); // "yyyy-MM-dd HH:mm" / "02/02 19:19"
+          const m = dt.match(/(\d{2}:\d{2})/);
+          if (m) prettyTime = m[1];
+        }
+        if (!prettyTime) prettyTime = "-";
 
         return `
           <tr>
             <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
-              ${escapeHtml_(dtPretty)}
+              ${escapeHtml_(prettyDate)}
+            </td>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
+              ${escapeHtml_(prettyTime)}
             </td>
             <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); font-weight:700;">
               ${reason}
             </td>
             <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
-              ${seat}
-            </td>
-            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
-              ${score}
+              ${returnPeriod}
             </td>
           </tr>
         `;
