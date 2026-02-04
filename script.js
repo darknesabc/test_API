@@ -3,6 +3,8 @@
  * - 로그인: name + parent4 -> Apps Script login -> sessionStorage 저장
  * - 대시보드: 세션 체크 + 출결 요약(attendance_summary) + 취침 요약(sleep_summary) + 이동 요약(move_summary)
  * - 이동 상세: move_detail (move.html)
+ * - ✅ 교육점수 요약: eduscore_summary
+ * - ✅ 교육점수 상세: eduscore_detail (eduscore.html)
  ***********************/
 
 // ====== 설정 ======
@@ -133,15 +135,14 @@ async function apiLogin(name, parent4) {
   });
 
   // ✅ 요약들 로드
-  loadAttendanceSummary(session); // ✅ attendance_summary 호출
-  loadSleepSummary(session);      // ✅ sleep_summary 호출
-  loadMoveSummary(session);       // ✅ move_summary 호출 (추가)
-  loadEduScoreSummary(session);   // ✅ 교육점수 요약 (추가)
+  loadAttendanceSummary(session); // attendance_summary
+  loadSleepSummary(session);      // sleep_summary
+  loadMoveSummary(session);       // move_summary
+  loadEduScoreSummary(session);   // eduscore_summary
 })();
 
 /* =========================================================
    출결 요약 (대시보드 카드)
-   ✅ Apps Script: attendance_summary 사용
 ========================================================= */
 function fmtMdDow_(md, dow) {
   const m = String(md ?? "").trim();
@@ -179,7 +180,6 @@ async function loadAttendanceSummary(session) {
     const absent = Number(data.absent ?? 0);
     const rec = Array.isArray(data.recentAbsences) ? data.recentAbsences : [];
 
-    // ✅ 줄바꿈은 textContent가 아니라 innerHTML로
     counts.innerHTML = `이번 주 출결 요약<br>출석 ${present}회 · 결석 ${absent}회`;
 
     if (!rec.length) {
@@ -234,8 +234,6 @@ async function loadSleepSummary(session) {
 
 /* =========================================================
    ✅ 이동 요약 (대시보드 카드)
-   - 1줄: "최근 이동"
-   - 2줄: "02/02 21:51 · 약국 (복귀 6교시)"
 ========================================================= */
 async function loadMoveSummary(session) {
   const loading = $("moveLoading");
@@ -262,7 +260,6 @@ async function loadMoveSummary(session) {
 
     loading.textContent = "";
 
-    // yyyy-MM-dd -> MM/DD (이미 MM/DD면 그대로)
     function prettyMD_(iso) {
       iso = String(iso || "").trim();
       if (!iso) return "";
@@ -274,13 +271,8 @@ async function loadMoveSummary(session) {
     const time = String(data.latestTime || "").trim();
     const reasonLine = String(data.latestText || "-").trim();
 
-    // 1줄: 제목
     line.textContent = "최근 이동";
-
-    // 2줄: 값
-    recent.textContent = (md && time)
-      ? `${md} ${time} · ${reasonLine}`
-      : "-";
+    recent.textContent = (md && time) ? `${md} ${time} · ${reasonLine}` : "-";
 
     box.style.display = "";
   } catch (e) {
@@ -291,9 +283,7 @@ async function loadMoveSummary(session) {
 
 /* =========================================================
    ✅ 교육점수 요약 (대시보드 카드)
-   - Apps Script: eduscore_summary 사용 (백엔드에 이 path 추가 필요)
-   - 1줄: "이번 달 교육점수 N점"
-   - 2줄: "최근 교육점수: 02/02 21:51 · 지각 (2점)"
+   - 백엔드 latestText는 "지각 (1점)" 형태
 ========================================================= */
 async function loadEduScoreSummary(session) {
   const loading = $("eduScoreLoading");
@@ -302,7 +292,6 @@ async function loadEduScoreSummary(session) {
   const line    = $("eduScoreLine");
   const recent  = $("eduScoreRecent");
 
-  // ✅ 대시보드 HTML에 영역이 아직 없으면 조용히 종료
   if (!loading || !error || !box || !line || !recent) return;
 
   try {
@@ -333,17 +322,15 @@ async function loadEduScoreSummary(session) {
 
     const md = prettyMD_(data.latestDate);
     const time = String(data.latestTime || "").trim();
-    const latestText = String(data.latestText || "").trim();
+    const latestText = String(data.latestText || "").trim(); // 예: "지각 (1점)"
 
-    if (md && time && latestText) {
-      // "지각 / 2" -> "지각 (2점)"
-      const parts = latestText.split("/").map(s => s.trim());
-      const reason = parts[0] || "-";
-      const score  = parts[1] ? parts[1].replace(/점?$/, "") : "";
-
+    if (md && time && latestText && latestText !== "-") {
+      // "사유 (N점)"에서 점수만 추출해서 표시
+      const m = latestText.match(/\((\d+)\s*점\)/);
+      const score = m ? m[1] : "";
       recent.textContent = score
-        ? `최근 교육점수: ${md} ${time} · ${reason} (${score}점)`
-        : `최근 교육점수: ${md} ${time} · ${reason}`;
+        ? `최근 교육점수: ${md} ${time} · ${latestText.replace(/\(\d+\s*점\)/, "").trim()} (${score}점)`
+        : `최근 교육점수: ${md} ${time} · ${latestText}`;
     } else {
       recent.textContent = "최근 교육점수: 없음";
     }
@@ -356,12 +343,7 @@ async function loadEduScoreSummary(session) {
 }
 
 /* =========================================================
-   ✅ 이동 상세 페이지 (move.html) - 표 + 상단 라인 + 드롭다운
-   - Apps Script: move_detail 사용
-   - move.html에 아래 ID들이 있어야 함:
-     moveUserLine, moveDaysSelect,
-     moveDetailLoading, moveDetailError,
-     moveDetailTableWrap, moveDetailTbody
+   ✅ 이동 상세 페이지 (move.html)
 ========================================================= */
 (async function initMoveDetailPage(){
   const userLine = $("moveUserLine");
@@ -371,7 +353,6 @@ async function loadEduScoreSummary(session) {
   const wrap     = $("moveDetailTableWrap");
   const tbody    = $("moveDetailTbody");
 
-  // move.html이 아니면 조용히 종료
   if (!loading || !error || !wrap || !tbody || !daysSel) return;
 
   const session = getSession();
@@ -380,7 +361,6 @@ async function loadEduScoreSummary(session) {
     return;
   }
 
-  // ✅ 상단 사용자 라인
   if (userLine) {
     const extra = [session.seat, session.teacher ? `${session.teacher} 담임` : null]
       .filter(Boolean).join(" · ");
@@ -392,7 +372,6 @@ async function loadEduScoreSummary(session) {
     fetchAndRender(days);
   });
 
-  // ✅ 최초 로드: 기본 7일
   fetchAndRender(Number(daysSel.value || 7));
 
   async function fetchAndRender(days) {
@@ -419,25 +398,21 @@ async function loadEduScoreSummary(session) {
         return;
       }
 
-      // ✅ 새 컬럼 매핑: 날짜 / 입력시간 / 사유 / 복귀교시
       tbody.innerHTML = items.map(it => {
-        const date = String(it.date || "").trim(); // yyyy-MM-dd 또는 02/02
-        const time = String(it.time || "").trim(); // HH:mm
+        const date = String(it.date || "").trim();
+        const time = String(it.time || "").trim();
         const reason = escapeHtml_(it.reason || "-");
 
-        // ✅ 복귀교시: 백엔드 표준(returnPeriod) 우선, 없으면 score(호환)
         const returnPeriod = escapeHtml_(it.returnPeriod || it.score || "-");
 
-        // ✅ 화면 날짜 포맷: yyyy-MM-dd -> MM/DD
         let prettyDate = date || "-";
         if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-          prettyDate = date.slice(5).replace("-", "/"); // "02/02"
+          prettyDate = date.slice(5).replace("-", "/");
         }
 
-        // ✅ 입력시간이 비어있을 때 dt에서 보정(혹시 옛 데이터 섞일 때)
         let prettyTime = time;
         if (!prettyTime) {
-          const dt = String(it.dt || "").trim(); // "yyyy-MM-dd HH:mm" / "02/02 19:19"
+          const dt = String(it.dt || "").trim();
           const m = dt.match(/(\d{2}:\d{2})/);
           if (m) prettyTime = m[1];
         }
@@ -467,11 +442,145 @@ async function loadEduScoreSummary(session) {
       error.textContent = e?.message ?? String(e);
     }
   }
+})();
 
-  // XSS 방지
-  function escapeHtml_(s) {
-    return String(s).replace(/[&<>"']/g, (m) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&lt;", '"': "&quot;", "'": "&#39;"
-    }[m]));
+/* =========================================================
+   ✅ 교육점수 상세 페이지 (eduscore.html)
+   - Apps Script: eduscore_detail 사용
+   - 필요 ID:
+     eduUserLine, eduMonthLine, eduDaysSelect,
+     eduDetailLoading, eduDetailError, eduDetailEmpty,
+     eduDetailTableWrap, eduDetailTbody
+========================================================= */
+(async function initEduScoreDetailPage(){
+  const userLine = $("eduUserLine");
+  const monthLine = $("eduMonthLine");
+  const daysSel  = $("eduDaysSelect");
+
+  const loading  = $("eduDetailLoading");
+  const error    = $("eduDetailError");
+  const empty    = $("eduDetailEmpty");
+
+  const wrap     = $("eduDetailTableWrap");
+  const tbody    = $("eduDetailTbody");
+
+  // eduscore.html 아니면 종료
+  if (!loading || !error || !wrap || !tbody || !daysSel) return;
+
+  const session = getSession();
+  if (!session) {
+    location.href = "index.html";
+    return;
+  }
+
+  // ✅ 상단 사용자 라인
+  if (userLine) {
+    const extra = [session.seat, session.teacher ? `${session.teacher} 담임` : null]
+      .filter(Boolean).join(" · ");
+    userLine.textContent = extra ? `${session.studentName} (${extra})` : session.studentName;
+  }
+
+  // ✅ 상단 이번달 누적 라인: eduscore_summary로 한 번 가져옴
+  try {
+    if (monthLine) {
+      monthLine.textContent = "이번 달 누적 불러오는 중...";
+      const res = await fetch(`${API_BASE}?path=eduscore_summary`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ token: session.token })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const total = Number(data.monthTotal ?? 0);
+        monthLine.textContent = `이번 달 누적: ${total}점`;
+      } else {
+        monthLine.textContent = "";
+      }
+    }
+  } catch {
+    if (monthLine) monthLine.textContent = "";
+  }
+
+  daysSel.addEventListener("change", () => {
+    const days = Number(daysSel.value || 30);
+    fetchAndRender(days);
+  });
+
+  // 최초 로드
+  fetchAndRender(Number(daysSel.value || 30));
+
+  async function fetchAndRender(days) {
+    try {
+      loading.textContent = "불러오는 중...";
+      error.textContent = "";
+      wrap.style.display = "none";
+      tbody.innerHTML = "";
+      if (empty) empty.style.display = "none";
+
+      const res = await fetch(`${API_BASE}?path=eduscore_detail`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ token: session.token, days })
+      });
+
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "교육점수 상세 불러오기 실패");
+
+      const items = Array.isArray(data.items) ? data.items : [];
+      loading.textContent = "";
+
+      if (!items.length) {
+        if (empty) empty.style.display = "";
+        loading.textContent = "";
+        return;
+      }
+
+      tbody.innerHTML = items.map(it => {
+        const date = String(it.date || "").trim();   // yyyy-MM-dd
+        const time = String(it.time || "").trim();   // HH:mm
+        const reason = escapeHtml_(it.reason || "-");
+        const score = Number(it.score ?? 0);
+
+        // 화면 날짜: yyyy-MM-dd -> MM/DD
+        let prettyDate = date || "-";
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          prettyDate = date.slice(5).replace("-", "/");
+        }
+
+        const prettyTime = time ? time : "-";
+
+        return `
+          <tr>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
+              ${escapeHtml_(prettyDate)}
+            </td>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
+              ${escapeHtml_(prettyTime)}
+            </td>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); font-weight:700;">
+              ${reason}
+            </td>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; white-space:nowrap;">
+              ${escapeHtml_(String(score))}점
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      wrap.style.display = "";
+    } catch (e) {
+      loading.textContent = "";
+      if (empty) empty.style.display = "none";
+      error.textContent = e?.message ?? String(e);
+    }
   }
 })();
+
+/* =========================================================
+   공통: XSS 방지
+========================================================= */
+function escapeHtml_(s) {
+  return String(s).replace(/[&<>"']/g, (m) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[m]));
+}
