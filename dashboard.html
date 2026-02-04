@@ -90,23 +90,25 @@
         </div>
       </section>
 
-      <!-- ✅ ⑥ 교육점수 (추가) -->
-      <section class="card" id="eduScoreCard">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-          <h2 class="card-title" style="margin:0;">교육점수</h2>
-          <a class="btn btn-ghost btn-mini" href="eduscore.html">자세히</a>
-        </div>
+      <!-- ✅ ⑥ 교육점수 -->
+<section class="card" id="eduScoreCard">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+    <h2 class="card-title" style="margin:0;">교육점수</h2>
+    <a class="btn btn-ghost btn-mini" href="eduscore.html">자세히</a>
+  </div>
 
-        <p class="muted">추가 예정</p>
-        <!-- 나중에 연동 시 아래 같은 구조로 쉽게 확장 가능
-        <div id="eduScoreSummary" style="display:none; margin-top:8px;">
-          <div id="eduScoreLine" style="font-weight:900;"></div>
-          <div class="muted" style="margin-top:6px; font-size:12px;">
-            * 이번 달 누적 점수
-          </div>
-        </div>
-        -->
-      </section>
+  <p id="eduScoreLoading" class="muted">불러오는 중...</p>
+  <p id="eduScoreError" class="msg"></p>
+
+  <div id="eduScoreSummary" style="display:none; margin-top:8px;">
+    <div id="eduScoreLine" style="font-weight:900;"></div>
+    <div id="eduScoreRecent" class="muted" style="margin-top:6px;"></div>
+    <div class="muted" style="margin-top:6px; font-size:12px;">
+      * 이번 달 누적 점수
+    </div>
+  </div>
+</section>
+
 
     </section>
   </main>
@@ -114,3 +116,4 @@
   <script src="script.js"></script>
 </body>
 </html>
+
