@@ -136,6 +136,7 @@ async function apiLogin(name, parent4) {
   loadAttendanceSummary(session); // ✅ attendance_summary 호출
   loadSleepSummary(session);      // ✅ sleep_summary 호출
   loadMoveSummary(session);       // ✅ move_summary 호출 (추가)
+  loadEduScoreSummary(session);   // ✅ 교육점수 요약 (추가)
 })();
 
 /* =========================================================
@@ -289,6 +290,72 @@ async function loadMoveSummary(session) {
 }
 
 /* =========================================================
+   ✅ 교육점수 요약 (대시보드 카드)
+   - Apps Script: eduscore_summary 사용 (백엔드에 이 path 추가 필요)
+   - 1줄: "이번 달 교육점수 N점"
+   - 2줄: "최근 교육점수: 02/02 21:51 · 지각 (2점)"
+========================================================= */
+async function loadEduScoreSummary(session) {
+  const loading = $("eduScoreLoading");
+  const error   = $("eduScoreError");
+  const box     = $("eduScoreSummary");
+  const line    = $("eduScoreLine");
+  const recent  = $("eduScoreRecent");
+
+  // ✅ 대시보드 HTML에 영역이 아직 없으면 조용히 종료
+  if (!loading || !error || !box || !line || !recent) return;
+
+  try {
+    loading.textContent = "불러오는 중...";
+    error.textContent = "";
+    box.style.display = "none";
+
+    const res = await fetch(`${API_BASE}?path=eduscore_summary`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: session.token })
+    });
+
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "교육점수 요약 불러오기 실패");
+
+    loading.textContent = "";
+
+    const total = Number(data.monthTotal ?? 0);
+    line.textContent = `이번 달 교육점수 ${total}점`;
+
+    function prettyMD_(iso) {
+      iso = String(iso || "").trim();
+      if (!iso) return "";
+      if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso.slice(5).replace("-", "/");
+      return iso;
+    }
+
+    const md = prettyMD_(data.latestDate);
+    const time = String(data.latestTime || "").trim();
+    const latestText = String(data.latestText || "").trim();
+
+    if (md && time && latestText) {
+      // "지각 / 2" -> "지각 (2점)"
+      const parts = latestText.split("/").map(s => s.trim());
+      const reason = parts[0] || "-";
+      const score  = parts[1] ? parts[1].replace(/점?$/, "") : "";
+
+      recent.textContent = score
+        ? `최근 교육점수: ${md} ${time} · ${reason} (${score}점)`
+        : `최근 교육점수: ${md} ${time} · ${reason}`;
+    } else {
+      recent.textContent = "최근 교육점수: 없음";
+    }
+
+    box.style.display = "";
+  } catch (e) {
+    loading.textContent = "";
+    error.textContent = e?.message ?? String(e);
+  }
+}
+
+/* =========================================================
    ✅ 이동 상세 페이지 (move.html) - 표 + 상단 라인 + 드롭다운
    - Apps Script: move_detail 사용
    - move.html에 아래 ID들이 있어야 함:
@@ -404,7 +471,7 @@ async function loadMoveSummary(session) {
   // XSS 방지
   function escapeHtml_(s) {
     return String(s).replace(/[&<>"']/g, (m) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      "&": "&amp;", "<": "&lt;", ">": "&lt;", '"': "&quot;", "'": "&#39;"
     }[m]));
   }
 })();
