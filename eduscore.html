@@ -6,21 +6,47 @@
   <title>교육점수 상세</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body data-needs-login="1">
   <header class="topbar">
     <div class="topbar-inner">
       <div>
         <div class="top-title">교육점수 상세</div>
-        <div class="top-sub"><a class="btn btn-ghost btn-mini" href="dashboard.html">← 대시보드</a></div>
+        <div id="eduUserLine" class="top-sub"></div>
       </div>
-      <button id="logoutBtn" class="btn btn-ghost">로그아웃</button>
+      <a class="btn btn-ghost" href="dashboard.html">대시보드</a>
     </div>
   </header>
 
   <main class="wrap">
     <section class="card">
-      <h2 class="card-title">교육점수</h2>
-      <p class="muted">추가 예정</p>
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <h2 class="card-title" style="margin:0;">기록</h2>
+
+        <select id="eduDaysSelect" class="btn btn-ghost" style="padding:10px 12px;">
+          <option value="7">최근 7일</option>
+          <option value="14">최근 14일</option>
+          <option value="30" selected>최근 30일</option>
+          <option value="60">최근 60일</option>
+        </select>
+      </div>
+
+      <p id="eduDetailLoading" class="muted">불러오는 중...</p>
+      <p id="eduDetailError" class="msg"></p>
+
+      <div id="eduDetailTableWrap" style="display:none; margin-top:10px; overflow:auto;">
+        <table style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="text-align:left; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.08);">날짜</th>
+              <th style="text-align:left; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.08);">입력시간</th>
+              <th style="text-align:left; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.08);">사유</th>
+              <th style="text-align:right; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.08);">점수</th>
+            </tr>
+          </thead>
+          <tbody id="eduDetailTbody"></tbody>
+        </table>
+      </div>
     </section>
   </main>
 
