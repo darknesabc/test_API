@@ -112,7 +112,7 @@
           return;
         }
 
-        // 토글 렌더
+        // 렌더
         tbody.innerHTML = groups.map((g, idx) => {
           const dateLabel = fmtKDate(g.dateIso);
           const total = safeNum(g.total, 0);
@@ -155,7 +155,7 @@
                 ${total}
               </td>
             </tr>
-            <tr id="${detailId}" style="display:none;">
+            <tr id="${detailId}" class="sleep-detail-row" style="display:none;">
               <td colspan="2" style="border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02);">
                 ${detailHtml}
               </td>
@@ -163,15 +163,37 @@
           `;
         }).join("");
 
-        // ✅ 토글 이벤트
-        tbody.querySelectorAll(".sleep-date-row").forEach(row => {
-          row.addEventListener("click", () => {
-            const id = row.getAttribute("data-target");
-            const panel = document.getElementById(id);
-            if (!panel) return;
-            panel.style.display = (panel.style.display === "none" || !panel.style.display) ? "" : "none";
-          });
-        });
+        // ✅ 토글(아코디언 + 같은거 다시 클릭하면 접기)
+        // - 이벤트 위임으로 안정적으로 처리
+        let openedId = null;
+
+        tbody.onclick = (ev) => {
+          const tr = ev.target.closest(".sleep-date-row");
+          if (!tr || !tbody.contains(tr)) return;
+
+          const id = tr.getAttribute("data-target");
+          const panel = document.getElementById(id);
+          if (!panel) return;
+
+          const isOpen = panel.style.display !== "none";
+
+          // 1) 이미 열려있는 걸 다시 클릭 => 접기
+          if (isOpen) {
+            panel.style.display = "none";
+            openedId = null;
+            return;
+          }
+
+          // 2) 다른 패널이 열려있으면 닫기 (아코디언)
+          if (openedId) {
+            const prev = document.getElementById(openedId);
+            if (prev) prev.style.display = "none";
+          }
+
+          // 3) 현재 패널 열기
+          panel.style.display = "table-row";
+          openedId = id;
+        };
 
       } catch (e) {
         loading.textContent = "";
