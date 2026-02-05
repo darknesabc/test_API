@@ -23,7 +23,7 @@
       <div style="display:flex; gap:12px; justify-content:space-between; align-items:center;">
         <h2 class="card-title" style="margin:0;">취침 기록</h2>
 
-        <!-- 최근 N일 옵션 (원하면) -->
+        <!-- 최근 N일 옵션 -->
         <select id="days" class="input" style="max-width:140px;">
           <option value="7">최근 7일</option>
           <option value="14">최근 14일</option>
@@ -51,10 +51,16 @@
   <script>
     function fmtKDate(iso){
       // iso: yyyy-mm-dd → mm/dd(요일)
+      if (!iso) return "";
       const [y,m,d] = iso.split("-").map(Number);
       const dt = new Date(y, m-1, d);
       const wd = ["일","월","화","수","목","금","토"][dt.getDay()];
       return `${String(m).padStart(2,"0")}/${String(d).padStart(2,"0")} (${wd})`;
+    }
+
+    function safeNum(v, fallback=0){
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
     }
 
     async function loadSleepDetail(days){
@@ -88,29 +94,39 @@
 
         loading.textContent = "";
 
+        // ✅ 날짜 / 사유 / 횟수
         thead.innerHTML = `
           <tr>
             <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left;">날짜</th>
             <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left;">사유</th>
+            <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:right; white-space:nowrap;">횟수</th>
           </tr>
         `;
 
         const items = data.items || [];
         if (items.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="2" style="padding:10px;">기록이 없습니다.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="3" style="padding:10px;">기록이 없습니다.</td></tr>`;
           return;
         }
 
-        tbody.innerHTML = items.map(it => `
-          <tr>
-            <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
-              ${fmtKDate(it.dateIso)}
-            </td>
-            <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06);">
-              ${it.reason || "취침"}
-            </td>
-          </tr>
-        `).join("");
+        tbody.innerHTML = items.map(it => {
+          const reason = it.reason || "취침";
+          const cnt = safeNum(it.count, 0);
+
+          return `
+            <tr>
+              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
+                ${fmtKDate(it.dateIso)}
+              </td>
+              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06);">
+                ${reason}
+              </td>
+              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); text-align:right; white-space:nowrap;">
+                ${cnt}
+              </td>
+            </tr>
+          `;
+        }).join("");
 
       } catch (e) {
         loading.textContent = "";
