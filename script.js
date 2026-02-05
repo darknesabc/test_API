@@ -29,6 +29,16 @@ function clearSession() {
   sessionStorage.removeItem(SESSION_KEY);
 }
 
+// ✅ (추가) 안전 유틸 (sleep.html에서도 쓰기 좋게)
+function safeNum_(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+function safeText_(v, fallback = "-") {
+  const s = String(v ?? "").trim();
+  return s ? s : fallback;
+}
+
 // ====== (데모) 로그인 ======
 async function demoLogin(name, parent4) {
   if (!name || name.trim().length < 1) throw new Error("이름을 입력하세요.");
