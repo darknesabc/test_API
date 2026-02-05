@@ -29,6 +29,16 @@ function clearSession() {
   sessionStorage.removeItem(SESSION_KEY);
 }
 
+// ✅ (추가) 안전 유틸 (sleep.html에서도 쓰기 좋게)
+function safeNum_(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+function safeText_(v, fallback = "-") {
+  const s = String(v ?? "").trim();
+  return s ? s : fallback;
+}
+
 // ====== (데모) 로그인 ======
 async function demoLogin(name, parent4) {
   if (!name || name.trim().length < 1) throw new Error("이름을 입력하세요.");
@@ -39,7 +49,8 @@ async function demoLogin(name, parent4) {
     studentName: name.trim(),
     seat: "DEMO-SEAT",
     teacher: "DEMO",
-    token: "demo-token"
+    token: "demo-token",
+    studentId: "DEMO-ID"
   };
 }
 
@@ -54,11 +65,13 @@ async function apiLogin(name, parent4) {
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || "로그인 실패");
 
+  // ✅ studentId까지 함께 들고가면, 페이지 상단 표시/디버깅에 도움됨 (있을 때만)
   return {
     studentName: data.studentName,
     seat: data.seat,
     teacher: data.teacher,
-    token: data.token
+    token: data.token,
+    studentId: data.studentId || ""
   };
 }
 
@@ -91,6 +104,7 @@ async function apiLogin(name, parent4) {
         seat: result.seat ?? null,
         teacher: result.teacher ?? null,
         token: result.token,
+        studentId: result.studentId ?? "",
         createdAt: Date.now()
       });
 
@@ -198,6 +212,8 @@ async function loadAttendanceSummary(session) {
 
 /* =========================================================
    ✅ 취침 요약 (대시보드 카드)
+   - 기존: sleepCount7d (최근 7일 '날짜 수')
+   - 신규(권장): sleepTotal7d (최근 7일 '횟수 합계')가 오면 그걸 우선 표기
 ========================================================= */
 async function loadSleepSummary(session) {
   const loading = $("sleepLoading");
@@ -221,10 +237,13 @@ async function loadSleepSummary(session) {
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || "취침 요약 불러오기 실패");
 
-    const n = Number(data.sleepCount7d ?? 0);
+    // ✅ 백엔드가 sleepTotal7d(횟수 합계) 주면 우선 사용, 없으면 기존 sleepCount7d 사용
+    const total = (data.sleepTotal7d !== undefined && data.sleepTotal7d !== null)
+      ? Number(data.sleepTotal7d ?? 0)
+      : Number(data.sleepCount7d ?? 0);
 
     loading.textContent = "";
-    line.textContent = `최근 7일 취침 ${n}회`;
+    line.textContent = `최근 7일 취침 ${total}회`;
     box.style.display = "";
   } catch (e) {
     loading.textContent = "";
@@ -325,7 +344,6 @@ async function loadEduScoreSummary(session) {
     const latestText = String(data.latestText || "").trim(); // 예: "지각 (1점)"
 
     if (md && time && latestText && latestText !== "-") {
-      // "사유 (N점)"에서 점수만 추출해서 표시
       const m = latestText.match(/\((\d+)\s*점\)/);
       const score = m ? m[1] : "";
       recent.textContent = score
@@ -402,7 +420,6 @@ async function loadEduScoreSummary(session) {
         const date = String(it.date || "").trim();
         const time = String(it.time || "").trim();
         const reason = escapeHtml_(it.reason || "-");
-
         const returnPeriod = escapeHtml_(it.returnPeriod || it.score || "-");
 
         let prettyDate = date || "-";
@@ -446,11 +463,6 @@ async function loadEduScoreSummary(session) {
 
 /* =========================================================
    ✅ 교육점수 상세 페이지 (eduscore.html)
-   - Apps Script: eduscore_detail 사용
-   - 필요 ID:
-     eduUserLine, eduMonthLine, eduDaysSelect,
-     eduDetailLoading, eduDetailError, eduDetailEmpty,
-     eduDetailTableWrap, eduDetailTbody
 ========================================================= */
 (async function initEduScoreDetailPage(){
   const userLine = $("eduUserLine");
@@ -464,7 +476,6 @@ async function loadEduScoreSummary(session) {
   const wrap     = $("eduDetailTableWrap");
   const tbody    = $("eduDetailTbody");
 
-  // eduscore.html 아니면 종료
   if (!loading || !error || !wrap || !tbody || !daysSel) return;
 
   const session = getSession();
@@ -473,14 +484,12 @@ async function loadEduScoreSummary(session) {
     return;
   }
 
-  // ✅ 상단 사용자 라인
   if (userLine) {
     const extra = [session.seat, session.teacher ? `${session.teacher} 담임` : null]
       .filter(Boolean).join(" · ");
     userLine.textContent = extra ? `${session.studentName} (${extra})` : session.studentName;
   }
 
-  // ✅ 상단 이번달 누적 라인: eduscore_summary로 한 번 가져옴
   try {
     if (monthLine) {
       monthLine.textContent = "이번 달 누적 불러오는 중...";
@@ -506,7 +515,6 @@ async function loadEduScoreSummary(session) {
     fetchAndRender(days);
   });
 
-  // 최초 로드
   fetchAndRender(Number(daysSel.value || 30));
 
   async function fetchAndRender(days) {
@@ -536,12 +544,11 @@ async function loadEduScoreSummary(session) {
       }
 
       tbody.innerHTML = items.map(it => {
-        const date = String(it.date || "").trim();   // yyyy-MM-dd
-        const time = String(it.time || "").trim();   // HH:mm
+        const date = String(it.date || "").trim();
+        const time = String(it.time || "").trim();
         const reason = escapeHtml_(it.reason || "-");
         const score = Number(it.score ?? 0);
 
-        // 화면 날짜: yyyy-MM-dd -> MM/DD
         let prettyDate = date || "-";
         if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
           prettyDate = date.slice(5).replace("-", "/");
