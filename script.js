@@ -1,187 +1,586 @@
-<!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>취침 상세</title>
-  <link rel="stylesheet" href="styles.css" />
-</head>
+/***********************
+ * Frontend (GitHub Pages)
+ * - 로그인: name + parent4 -> Apps Script login -> sessionStorage 저장
+ * - 대시보드: 세션 체크 + 출결 요약(attendance_summary) + 취침 요약(sleep_summary) + 이동 요약(move_summary)
+ * - 이동 상세: move_detail (move.html)
+ * - ✅ 교육점수 요약: eduscore_summary
+ * - ✅ 교육점수 상세: eduscore_detail (eduscore.html)
+ ***********************/
 
-<body data-needs-login="1">
-  <header class="topbar">
-    <div class="topbar-inner">
-      <div>
-        <div class="top-title">취침 상세</div>
-        <div id="titleLine" class="top-sub"></div>
-      </div>
-      <a class="btn btn-ghost" href="dashboard.html">대시보드</a>
-    </div>
-  </header>
+// ====== 설정 ======
+const DEMO_MODE = false; // 실전
+const SESSION_KEY = "parent_session_v1";
 
-  <main class="wrap">
-    <section class="card">
-      <div style="display:flex; gap:12px; justify-content:space-between; align-items:center;">
-        <h2 class="card-title" style="margin:0;">취침 기록</h2>
+// ✅ Apps Script Web App URL
+const API_BASE = "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec";
 
-        <select id="days" class="input" style="max-width:140px;">
-          <option value="7">최근 7일</option>
-          <option value="14">최근 14일</option>
-          <option value="30">최근 30일</option>
-        </select>
-      </div>
+// ====== 유틸 ======
+function $(id) { return document.getElementById(id); }
 
-      <p id="loading" class="muted" style="margin-top:10px;">불러오는 중...</p>
-      <p id="err" class="msg"></p>
+function setSession(session) {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+function getSession() {
+  const raw = sessionStorage.getItem(SESSION_KEY);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+function clearSession() {
+  sessionStorage.removeItem(SESSION_KEY);
+}
 
-      <div style="overflow:auto; border:1px solid rgba(255,255,255,0.08); border-radius:12px; margin-top:10px;">
-        <table style="width:100%; border-collapse:collapse;">
-          <thead id="thead"></thead>
-          <tbody id="tbody"></tbody>
-        </table>
-      </div>
+// ====== (데모) 로그인 ======
+async function demoLogin(name, parent4) {
+  if (!name || name.trim().length < 1) throw new Error("이름을 입력하세요.");
+  if (!/^\d{4}$/.test(parent4)) throw new Error("부모4자리는 숫자 4자리로 입력하세요.");
 
-      <div class="muted" style="margin-top:10px; font-size:12px;">
-        * “사유=취침” 기록만 표시합니다. (날짜를 클릭하면 교시별 상세가 펼쳐집니다)
-      </div>
-    </section>
-  </main>
+  return {
+    ok: true,
+    studentName: name.trim(),
+    seat: "DEMO-SEAT",
+    teacher: "DEMO",
+    token: "demo-token"
+  };
+}
 
-  <script src="script.js"></script>
-  <script>
-    function fmtKDate(iso){
+// ====== (실전) Apps Script 로그인 ======
+async function apiLogin(name, parent4) {
+  const res = await fetch(`${API_BASE}?path=login`, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ name, parent4 })
+  });
+
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || "로그인 실패");
+
+  return {
+    studentName: data.studentName,
+    seat: data.seat,
+    teacher: data.teacher,
+    token: data.token
+  };
+}
+
+/* =========================================================
+   로그인 페이지 로직 (index.html)
+========================================================= */
+(function initLoginPage(){
+  const form = $("loginForm");
+  if (!form) return;
+
+  const msg = $("msg");
+
+  if (getSession()) {
+    location.href = "dashboard.html";
+    return;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (msg) msg.textContent = "";
+
+    const name = $("studentName")?.value ?? "";
+    const parent4 = $("last4")?.value ?? "";
+
+    try {
+      const result = DEMO_MODE ? await demoLogin(name, parent4) : await apiLogin(name, parent4);
+
+      setSession({
+        studentName: result.studentName,
+        seat: result.seat ?? null,
+        teacher: result.teacher ?? null,
+        token: result.token,
+        createdAt: Date.now()
+      });
+
+      location.href = "dashboard.html";
+    } catch (err) {
+      if (msg) msg.textContent = err?.message ?? String(err);
+      else alert(err?.message ?? String(err));
+    }
+  });
+})();
+
+/* =========================================================
+   로그인 필요 페이지 가드
+========================================================= */
+(function guardAnyPrivatePage(){
+  const needsLogin = document.body?.dataset?.needsLogin === "1";
+  if (!needsLogin) return;
+
+  if (!getSession()) location.href = "index.html";
+})();
+
+/* =========================================================
+   대시보드 로직 (dashboard.html)
+========================================================= */
+(function initDashboard(){
+  const logoutBtn = $("logoutBtn");
+  if (!logoutBtn) return;
+
+  const session = getSession();
+  if (!session) {
+    location.href = "index.html";
+    return;
+  }
+
+  const userLine = $("userLine");
+  const extra = [session.seat, session.teacher ? `${session.teacher} 담임` : null].filter(Boolean).join(" · ");
+  if (userLine) userLine.textContent = extra ? `${session.studentName} (${extra})` : `${session.studentName} 학부모님`;
+
+  logoutBtn.addEventListener("click", () => {
+    clearSession();
+    location.href = "index.html";
+  });
+
+  // ✅ 요약들 로드
+  loadAttendanceSummary(session); // attendance_summary
+  loadSleepSummary(session);      // sleep_summary
+  loadMoveSummary(session);       // move_summary
+  loadEduScoreSummary(session);   // eduscore_summary
+})();
+
+/* =========================================================
+   출결 요약 (대시보드 카드)
+========================================================= */
+function fmtMdDow_(md, dow) {
+  const m = String(md ?? "").trim();
+  const d = String(dow ?? "").trim();
+  if (!m) return "";
+  return d ? `${m}(${d})` : m;
+}
+
+async function loadAttendanceSummary(session) {
+  const loading = $("attLoading");
+  const error = $("attError");
+  const box = $("attSummary");
+  const counts = $("attCounts");
+  const recent = $("attRecent");
+
+  if (!loading || !error || !box || !counts || !recent) return;
+
+  try {
+    loading.textContent = "불러오는 중...";
+    error.textContent = "";
+    box.style.display = "none";
+
+    const res = await fetch(`${API_BASE}?path=attendance_summary`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: session.token })
+    });
+
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "출결 요약 불러오기 실패");
+
+    loading.textContent = "";
+
+    const present = Number(data.present ?? 0);
+    const absent = Number(data.absent ?? 0);
+    const rec = Array.isArray(data.recentAbsences) ? data.recentAbsences : [];
+
+    counts.innerHTML = `이번 주 출결 요약<br>출석 ${present}회 · 결석 ${absent}회`;
+
+    if (!rec.length) {
+      recent.textContent = "최근 결석: 없음";
+    } else {
+      const items = rec.map(x => `${fmtMdDow_(x.md, x.dow)} ${x.period}교시`);
+      recent.textContent = `최근 결석: ${items.join(", ")}`;
+    }
+
+    box.style.display = "";
+  } catch (e) {
+    loading.textContent = "";
+    error.textContent = e?.message ?? String(e);
+  }
+}
+
+/* =========================================================
+   ✅ 취침 요약 (대시보드 카드)
+========================================================= */
+async function loadSleepSummary(session) {
+  const loading = $("sleepLoading");
+  const error = $("sleepError");
+  const box = $("sleepSummary");
+  const line = $("sleepLine");
+
+  if (!loading || !error || !box || !line) return;
+
+  try {
+    loading.textContent = "불러오는 중...";
+    error.textContent = "";
+    box.style.display = "none";
+
+    const res = await fetch(`${API_BASE}?path=sleep_summary`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: session.token })
+    });
+
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "취침 요약 불러오기 실패");
+
+    const n = Number(data.sleepCount7d ?? 0);
+
+    loading.textContent = "";
+    line.textContent = `최근 7일 취침 ${n}회`;
+    box.style.display = "";
+  } catch (e) {
+    loading.textContent = "";
+    error.textContent = e?.message ?? String(e);
+  }
+}
+
+/* =========================================================
+   ✅ 이동 요약 (대시보드 카드)
+========================================================= */
+async function loadMoveSummary(session) {
+  const loading = $("moveLoading");
+  const error = $("moveError");
+  const box = $("moveSummary");
+  const line = $("moveLine");
+  const recent = $("moveRecent");
+
+  if (!loading || !error || !box || !line || !recent) return;
+
+  try {
+    loading.textContent = "불러오는 중...";
+    error.textContent = "";
+    box.style.display = "none";
+
+    const res = await fetch(`${API_BASE}?path=move_summary`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: session.token })
+    });
+
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "이동 요약 불러오기 실패");
+
+    loading.textContent = "";
+
+    function prettyMD_(iso) {
+      iso = String(iso || "").trim();
       if (!iso) return "";
-      const [y,m,d] = iso.split("-").map(Number);
-      const dt = new Date(y, m-1, d);
-      const wd = ["일","월","화","수","목","금","토"][dt.getDay()];
-      return `${String(m).padStart(2,"0")}/${String(d).padStart(2,"0")} (${wd})`;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso.slice(5).replace("-", "/");
+      return iso;
     }
 
-    function safeNum(v, fallback=0){
-      const n = Number(v);
-      return Number.isFinite(n) ? n : fallback;
+    const md = prettyMD_(data.latestDate);
+    const time = String(data.latestTime || "").trim();
+    const reasonLine = String(data.latestText || "-").trim();
+
+    line.textContent = "최근 이동";
+    recent.textContent = (md && time) ? `${md} ${time} · ${reasonLine}` : "-";
+
+    box.style.display = "";
+  } catch (e) {
+    loading.textContent = "";
+    error.textContent = e?.message ?? String(e);
+  }
+}
+
+/* =========================================================
+   ✅ 교육점수 요약 (대시보드 카드)
+   - 백엔드 latestText는 "지각 (1점)" 형태
+========================================================= */
+async function loadEduScoreSummary(session) {
+  const loading = $("eduScoreLoading");
+  const error   = $("eduScoreError");
+  const box     = $("eduScoreSummary");
+  const line    = $("eduScoreLine");
+  const recent  = $("eduScoreRecent");
+
+  if (!loading || !error || !box || !line || !recent) return;
+
+  try {
+    loading.textContent = "불러오는 중...";
+    error.textContent = "";
+    box.style.display = "none";
+
+    const res = await fetch(`${API_BASE}?path=eduscore_summary`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: session.token })
+    });
+
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "교육점수 요약 불러오기 실패");
+
+    loading.textContent = "";
+
+    const total = Number(data.monthTotal ?? 0);
+    line.textContent = `이번 달 교육점수 ${total}점`;
+
+    function prettyMD_(iso) {
+      iso = String(iso || "").trim();
+      if (!iso) return "";
+      if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso.slice(5).replace("-", "/");
+      return iso;
     }
 
-    function escapeHtml(s){
-      return String(s).replace(/[&<>"']/g, (m) => ({
-        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-      }[m]));
+    const md = prettyMD_(data.latestDate);
+    const time = String(data.latestTime || "").trim();
+    const latestText = String(data.latestText || "").trim(); // 예: "지각 (1점)"
+
+    if (md && time && latestText && latestText !== "-") {
+      // "사유 (N점)"에서 점수만 추출해서 표시
+      const m = latestText.match(/\((\d+)\s*점\)/);
+      const score = m ? m[1] : "";
+      recent.textContent = score
+        ? `최근 교육점수: ${md} ${time} · ${latestText.replace(/\(\d+\s*점\)/, "").trim()} (${score}점)`
+        : `최근 교육점수: ${md} ${time} · ${latestText}`;
+    } else {
+      recent.textContent = "최근 교육점수: 없음";
     }
 
-    async function loadSleepDetail(days){
-      const raw = sessionStorage.getItem("parent_session_v1");
-      const session = raw ? JSON.parse(raw) : null;
-      if (!session) return;
+    box.style.display = "";
+  } catch (e) {
+    loading.textContent = "";
+    error.textContent = e?.message ?? String(e);
+  }
+}
 
-      const titleLine = document.getElementById("titleLine");
-      titleLine.textContent =
-        `${session.studentName} (${session.seat || ""}${session.teacher ? " · " + session.teacher + " 담임" : ""})`;
+/* =========================================================
+   ✅ 이동 상세 페이지 (move.html)
+========================================================= */
+(async function initMoveDetailPage(){
+  const userLine = $("moveUserLine");
+  const daysSel  = $("moveDaysSelect");
+  const loading  = $("moveDetailLoading");
+  const error    = $("moveDetailError");
+  const wrap     = $("moveDetailTableWrap");
+  const tbody    = $("moveDetailTbody");
 
-      const loading = document.getElementById("loading");
-      const err = document.getElementById("err");
-      const thead = document.getElementById("thead");
-      const tbody = document.getElementById("tbody");
+  if (!loading || !error || !wrap || !tbody || !daysSel) return;
 
-      try {
-        loading.textContent = "불러오는 중...";
-        err.textContent = "";
-        thead.innerHTML = "";
-        tbody.innerHTML = "";
+  const session = getSession();
+  if (!session) {
+    location.href = "index.html";
+    return;
+  }
 
-        const res = await fetch(`${API_BASE}?path=sleep_detail`, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ token: session.token, days })
-        });
+  if (userLine) {
+    const extra = [session.seat, session.teacher ? `${session.teacher} 담임` : null]
+      .filter(Boolean).join(" · ");
+    userLine.textContent = extra ? `${session.studentName} (${extra})` : session.studentName;
+  }
 
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.error || "불러오기 실패");
+  daysSel.addEventListener("change", () => {
+    const days = Number(daysSel.value || 7);
+    fetchAndRender(days);
+  });
 
-        loading.textContent = "";
+  fetchAndRender(Number(daysSel.value || 7));
 
-        // ✅ 옵션 B: 날짜별 합계 + 펼침 상세
-        thead.innerHTML = `
-          <tr>
-            <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left;">날짜</th>
-            <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:right; white-space:nowrap;">총 횟수</th>
-          </tr>
-        `;
+  async function fetchAndRender(days) {
+    try {
+      loading.textContent = "불러오는 중...";
+      error.textContent = "";
+      wrap.style.display = "none";
+      tbody.innerHTML = "";
 
-        const groups = Array.isArray(data.groups) ? data.groups : [];
-        if (groups.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="2" style="padding:10px;">기록이 없습니다.</td></tr>`;
-          return;
+      const res = await fetch(`${API_BASE}?path=move_detail`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ token: session.token, days })
+      });
+
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "이동 상세 불러오기 실패");
+
+      const items = Array.isArray(data.items) ? data.items : [];
+      loading.textContent = "";
+
+      if (!items.length) {
+        loading.textContent = "이동 기록이 없습니다.";
+        return;
+      }
+
+      tbody.innerHTML = items.map(it => {
+        const date = String(it.date || "").trim();
+        const time = String(it.time || "").trim();
+        const reason = escapeHtml_(it.reason || "-");
+
+        const returnPeriod = escapeHtml_(it.returnPeriod || it.score || "-");
+
+        let prettyDate = date || "-";
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          prettyDate = date.slice(5).replace("-", "/");
         }
 
-        // 토글 렌더
-        tbody.innerHTML = groups.map((g, idx) => {
-          const dateLabel = fmtKDate(g.dateIso);
-          const total = safeNum(g.total, 0);
-          const details = Array.isArray(g.details) ? g.details : [];
-          const detailId = `sleep-detail-${idx}`;
+        let prettyTime = time;
+        if (!prettyTime) {
+          const dt = String(it.dt || "").trim();
+          const m = dt.match(/(\d{2}:\d{2})/);
+          if (m) prettyTime = m[1];
+        }
+        if (!prettyTime) prettyTime = "-";
 
-          const detailHtml = details.length ? `
-            <div style="padding:10px 12px;">
-              <div class="muted" style="font-size:12px; margin-bottom:8px;">교시별 상세</div>
-              <div style="overflow:auto; border:1px solid rgba(255,255,255,0.08); border-radius:10px;">
-                <table style="width:100%; border-collapse:collapse;">
-                  <thead>
-                    <tr>
-                      <th style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left;">교시</th>
-                      <th style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left;">사유</th>
-                      <th style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:right;">횟수</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${details.map(d => `
-                      <tr>
-                        <td style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">${escapeHtml(d.period ?? "-")}</td>
-                        <td style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.06);">${escapeHtml(d.reason ?? "취침")}</td>
-                        <td style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.06); text-align:right; white-space:nowrap;">${safeNum(d.count,0)}</td>
-                      </tr>
-                    `).join("")}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ` : `<div style="padding:10px 12px;" class="muted">상세 없음</div>`;
+        return `
+          <tr>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
+              ${escapeHtml_(prettyDate)}
+            </td>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
+              ${escapeHtml_(prettyTime)}
+            </td>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); font-weight:700;">
+              ${reason}
+            </td>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
+              ${returnPeriod}
+            </td>
+          </tr>
+        `;
+      }).join("");
 
-          return `
-            <tr class="sleep-date-row" data-target="${detailId}" style="cursor:pointer;">
-              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
-                ${dateLabel}
-                <span class="muted" style="font-size:12px; margin-left:6px;">(클릭)</span>
-              </td>
-              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); text-align:right; white-space:nowrap;">
-                ${total}
-              </td>
-            </tr>
-            <tr id="${detailId}" style="display:none;">
-              <td colspan="2" style="border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02);">
-                ${detailHtml}
-              </td>
-            </tr>
-          `;
-        }).join("");
+      wrap.style.display = "";
+    } catch (e) {
+      loading.textContent = "";
+      error.textContent = e?.message ?? String(e);
+    }
+  }
+})();
 
-        // ✅ 토글 이벤트
-        tbody.querySelectorAll(".sleep-date-row").forEach(row => {
-          row.addEventListener("click", () => {
-            const id = row.getAttribute("data-target");
-            const panel = document.getElementById(id);
-            if (!panel) return;
-            panel.style.display = (panel.style.display === "none" || !panel.style.display) ? "" : "none";
-          });
-        });
+/* =========================================================
+   ✅ 교육점수 상세 페이지 (eduscore.html)
+   - Apps Script: eduscore_detail 사용
+   - 필요 ID:
+     eduUserLine, eduMonthLine, eduDaysSelect,
+     eduDetailLoading, eduDetailError, eduDetailEmpty,
+     eduDetailTableWrap, eduDetailTbody
+========================================================= */
+(async function initEduScoreDetailPage(){
+  const userLine = $("eduUserLine");
+  const monthLine = $("eduMonthLine");
+  const daysSel  = $("eduDaysSelect");
 
-      } catch (e) {
-        loading.textContent = "";
-        err.textContent = e.message || String(e);
+  const loading  = $("eduDetailLoading");
+  const error    = $("eduDetailError");
+  const empty    = $("eduDetailEmpty");
+
+  const wrap     = $("eduDetailTableWrap");
+  const tbody    = $("eduDetailTbody");
+
+  // eduscore.html 아니면 종료
+  if (!loading || !error || !wrap || !tbody || !daysSel) return;
+
+  const session = getSession();
+  if (!session) {
+    location.href = "index.html";
+    return;
+  }
+
+  // ✅ 상단 사용자 라인
+  if (userLine) {
+    const extra = [session.seat, session.teacher ? `${session.teacher} 담임` : null]
+      .filter(Boolean).join(" · ");
+    userLine.textContent = extra ? `${session.studentName} (${extra})` : session.studentName;
+  }
+
+  // ✅ 상단 이번달 누적 라인: eduscore_summary로 한 번 가져옴
+  try {
+    if (monthLine) {
+      monthLine.textContent = "이번 달 누적 불러오는 중...";
+      const res = await fetch(`${API_BASE}?path=eduscore_summary`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ token: session.token })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const total = Number(data.monthTotal ?? 0);
+        monthLine.textContent = `이번 달 누적: ${total}점`;
+      } else {
+        monthLine.textContent = "";
       }
     }
+  } catch {
+    if (monthLine) monthLine.textContent = "";
+  }
 
-    const sel = document.getElementById("days");
-    loadSleepDetail(Number(sel.value));
-    sel.addEventListener("change", () => loadSleepDetail(Number(sel.value)));
-  </script>
-</body>
-</html>
+  daysSel.addEventListener("change", () => {
+    const days = Number(daysSel.value || 30);
+    fetchAndRender(days);
+  });
+
+  // 최초 로드
+  fetchAndRender(Number(daysSel.value || 30));
+
+  async function fetchAndRender(days) {
+    try {
+      loading.textContent = "불러오는 중...";
+      error.textContent = "";
+      wrap.style.display = "none";
+      tbody.innerHTML = "";
+      if (empty) empty.style.display = "none";
+
+      const res = await fetch(`${API_BASE}?path=eduscore_detail`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ token: session.token, days })
+      });
+
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "교육점수 상세 불러오기 실패");
+
+      const items = Array.isArray(data.items) ? data.items : [];
+      loading.textContent = "";
+
+      if (!items.length) {
+        if (empty) empty.style.display = "";
+        loading.textContent = "";
+        return;
+      }
+
+      tbody.innerHTML = items.map(it => {
+        const date = String(it.date || "").trim();   // yyyy-MM-dd
+        const time = String(it.time || "").trim();   // HH:mm
+        const reason = escapeHtml_(it.reason || "-");
+        const score = Number(it.score ?? 0);
+
+        // 화면 날짜: yyyy-MM-dd -> MM/DD
+        let prettyDate = date || "-";
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          prettyDate = date.slice(5).replace("-", "/");
+        }
+
+        const prettyTime = time ? time : "-";
+
+        return `
+          <tr>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
+              ${escapeHtml_(prettyDate)}
+            </td>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
+              ${escapeHtml_(prettyTime)}
+            </td>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); font-weight:700;">
+              ${reason}
+            </td>
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; white-space:nowrap;">
+              ${escapeHtml_(String(score))}점
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      wrap.style.display = "";
+    } catch (e) {
+      loading.textContent = "";
+      if (empty) empty.style.display = "none";
+      error.textContent = e?.message ?? String(e);
+    }
+  }
+})();
+
+/* =========================================================
+   공통: XSS 방지
+========================================================= */
+function escapeHtml_(s) {
+  return String(s).replace(/[&<>"']/g, (m) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[m]));
+}
