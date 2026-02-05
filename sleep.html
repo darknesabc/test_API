@@ -63,6 +63,11 @@
       return Number.isFinite(n) ? n : fallback;
     }
 
+    function safeText(v, fallback="-"){
+      const s = String(v ?? "").trim();
+      return s ? s : fallback;
+    }
+
     async function loadSleepDetail(days){
       const raw = sessionStorage.getItem("parent_session_v1");
       const session = raw ? JSON.parse(raw) : null;
@@ -94,10 +99,11 @@
 
         loading.textContent = "";
 
-        // ✅ 날짜 / 사유 / 횟수
+        // ✅ 날짜 / 교시 / 사유 / 횟수
         thead.innerHTML = `
           <tr>
             <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left;">날짜</th>
+            <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left; white-space:nowrap;">교시</th>
             <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left;">사유</th>
             <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:right; white-space:nowrap;">횟수</th>
           </tr>
@@ -105,18 +111,22 @@
 
         const items = data.items || [];
         if (items.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="3" style="padding:10px;">기록이 없습니다.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="4" style="padding:10px;">기록이 없습니다.</td></tr>`;
           return;
         }
 
         tbody.innerHTML = items.map(it => {
-          const reason = it.reason || "취침";
-          const cnt = safeNum(it.count, 0);
+          const reason = safeText(it.reason, "취침");
+          const period = safeText(it.period, "-"); // ✅ 백엔드: period
+          const cnt = safeNum(it.count, 0);        // ✅ 백엔드: count
 
           return `
             <tr>
               <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
                 ${fmtKDate(it.dateIso)}
+              </td>
+              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
+                ${period}
               </td>
               <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06);">
                 ${reason}
