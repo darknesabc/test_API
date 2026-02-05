@@ -23,7 +23,6 @@
       <div style="display:flex; gap:12px; justify-content:space-between; align-items:center;">
         <h2 class="card-title" style="margin:0;">취침 기록</h2>
 
-        <!-- 최근 N일 옵션 -->
         <select id="days" class="input" style="max-width:140px;">
           <option value="7">최근 7일</option>
           <option value="14">최근 14일</option>
@@ -42,7 +41,7 @@
       </div>
 
       <div class="muted" style="margin-top:10px; font-size:12px;">
-        * “사유=취침” 기록만 표시합니다.
+        * “사유=취침” 기록만 표시합니다. (날짜를 클릭하면 교시별 상세가 펼쳐집니다)
       </div>
     </section>
   </main>
@@ -50,7 +49,6 @@
   <script src="script.js"></script>
   <script>
     function fmtKDate(iso){
-      // iso: yyyy-mm-dd → mm/dd(요일)
       if (!iso) return "";
       const [y,m,d] = iso.split("-").map(Number);
       const dt = new Date(y, m-1, d);
@@ -63,9 +61,10 @@
       return Number.isFinite(n) ? n : fallback;
     }
 
-    function safeText(v, fallback="-"){
-      const s = String(v ?? "").trim();
-      return s ? s : fallback;
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, (m) => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+      }[m]));
     }
 
     async function loadSleepDetail(days){
@@ -99,44 +98,80 @@
 
         loading.textContent = "";
 
-        // ✅ 날짜 / 교시 / 사유 / 횟수
+        // ✅ 옵션 B: 날짜별 합계 + 펼침 상세
         thead.innerHTML = `
           <tr>
             <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left;">날짜</th>
-            <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left; white-space:nowrap;">교시</th>
-            <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left;">사유</th>
-            <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:right; white-space:nowrap;">횟수</th>
+            <th style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:right; white-space:nowrap;">총 횟수</th>
           </tr>
         `;
 
-        const items = data.items || [];
-        if (items.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="4" style="padding:10px;">기록이 없습니다.</td></tr>`;
+        const groups = Array.isArray(data.groups) ? data.groups : [];
+        if (groups.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="2" style="padding:10px;">기록이 없습니다.</td></tr>`;
           return;
         }
 
-        tbody.innerHTML = items.map(it => {
-          const reason = safeText(it.reason, "취침");
-          const period = safeText(it.period, "-"); // ✅ 백엔드: period
-          const cnt = safeNum(it.count, 0);        // ✅ 백엔드: count
+        // 토글 렌더
+        tbody.innerHTML = groups.map((g, idx) => {
+          const dateLabel = fmtKDate(g.dateIso);
+          const total = safeNum(g.total, 0);
+          const details = Array.isArray(g.details) ? g.details : [];
+          const detailId = `sleep-detail-${idx}`;
+
+          const detailHtml = details.length ? `
+            <div style="padding:10px 12px;">
+              <div class="muted" style="font-size:12px; margin-bottom:8px;">교시별 상세</div>
+              <div style="overflow:auto; border:1px solid rgba(255,255,255,0.08); border-radius:10px;">
+                <table style="width:100%; border-collapse:collapse;">
+                  <thead>
+                    <tr>
+                      <th style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left;">교시</th>
+                      <th style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:left;">사유</th>
+                      <th style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.08); text-align:right;">횟수</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${details.map(d => `
+                      <tr>
+                        <td style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">${escapeHtml(d.period ?? "-")}</td>
+                        <td style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.06);">${escapeHtml(d.reason ?? "취침")}</td>
+                        <td style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.06); text-align:right; white-space:nowrap;">${safeNum(d.count,0)}</td>
+                      </tr>
+                    `).join("")}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ` : `<div style="padding:10px 12px;" class="muted">상세 없음</div>`;
 
           return `
-            <tr>
+            <tr class="sleep-date-row" data-target="${detailId}" style="cursor:pointer;">
               <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
-                ${fmtKDate(it.dateIso)}
-              </td>
-              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
-                ${period}
-              </td>
-              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06);">
-                ${reason}
+                ${dateLabel}
+                <span class="muted" style="font-size:12px; margin-left:6px;">(클릭)</span>
               </td>
               <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); text-align:right; white-space:nowrap;">
-                ${cnt}
+                ${total}
+              </td>
+            </tr>
+            <tr id="${detailId}" style="display:none;">
+              <td colspan="2" style="border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02);">
+                ${detailHtml}
               </td>
             </tr>
           `;
         }).join("");
+
+        // ✅ 토글 이벤트
+        tbody.querySelectorAll(".sleep-date-row").forEach(row => {
+          row.addEventListener("click", () => {
+            const id = row.getAttribute("data-target");
+            const panel = document.getElementById(id);
+            if (!panel) return;
+            panel.style.display = (panel.style.display === "none" || !panel.style.display) ? "" : "none";
+          });
+        });
 
       } catch (e) {
         loading.textContent = "";
@@ -144,7 +179,6 @@
       }
     }
 
-    // 초기 로드 + 옵션 변경
     const sel = document.getElementById("days");
     loadSleepDetail(Number(sel.value));
     sel.addEventListener("change", () => loadSleepDetail(Number(sel.value)));
