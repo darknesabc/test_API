@@ -15,7 +15,7 @@
         <div class="top-title">학생 현황 대시보드</div>
         <div id="userLine" class="top-sub"></div>
       </div>
-      <button id="logoutBtn" class="btn btn-ghost">로그아웃</button>
+      <button id="logoutBtn" class="btn btn-ghost" type="button">로그아웃</button>
     </div>
   </header>
 
@@ -69,7 +69,7 @@
       </section>
 
       <!-- ④ 공지 (슬라이드 + 스와이프 + 자동전환) -->
-      <!-- ✅ 스와이프 대상: #noticeCard -->
+      <!-- ✅ 스와이프 대상: #noticeSwipeArea (카드 전체 X) -->
       <section class="card" id="noticeCard">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
           <h2 class="card-title" style="margin:0;">공지</h2>
@@ -86,23 +86,26 @@
         <p id="noticeLoading" class="muted">불러오는 중...</p>
         <p id="noticeError" class="msg"></p>
 
-        <!-- 슬라이드 영역 -->
-        <!-- ✅ 이 영역이 자동 전환 + 스와이프로 내용 교체됨 -->
-        <div id="noticeSlider" style="display:none; margin-top:8px;">
-          <div id="noticeTitle" style="font-weight:900;"></div>
-          <div id="noticeMeta" class="muted" style="margin-top:6px; font-size:12px;"></div>
+        <!-- ✅ 스와이프 전용 영역(텍스트 갈아끼우는 방식에 최적) -->
+        <!-- script.js에서 이 영역에 touch/mouse 이벤트를 붙이면 됨 -->
+        <div id="noticeSwipeArea" style="display:none; margin-top:8px;">
+          <!-- 슬라이드 영역 -->
+          <div id="noticeSlider">
+            <div id="noticeTitle" style="font-weight:900;"></div>
+            <div id="noticeMeta" class="muted" style="margin-top:6px; font-size:12px;"></div>
 
-          <!-- ✅ 프리뷰는 텍스트 전용 -->
-          <div
-            id="noticePreview"
-            class="muted"
-            style="margin-top:8px; line-height:1.5;"
-          ></div>
+            <!-- ✅ 프리뷰는 텍스트 전용 -->
+            <div
+              id="noticePreview"
+              class="muted"
+              style="margin-top:8px; line-height:1.5;"
+            ></div>
 
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
-            <button id="noticePrevBtn" class="btn btn-ghost btn-mini" type="button">◀</button>
-            <div id="noticeDots" class="muted" style="font-size:12px;"></div>
-            <button id="noticeNextBtn" class="btn btn-ghost btn-mini" type="button">▶</button>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
+              <button id="noticePrevBtn" class="btn btn-ghost btn-mini" type="button">◀</button>
+              <div id="noticeDots" class="muted" style="font-size:12px;"></div>
+              <button id="noticeNextBtn" class="btn btn-ghost btn-mini" type="button">▶</button>
+            </div>
           </div>
         </div>
       </section>
@@ -172,7 +175,7 @@
   </div>
 
   <!-- ================= SCRIPT ================= -->
-  <!-- ✅ 스와이프 + 6초 자동전환 로직은 script.js에서 처리 -->
+  <!-- ✅ 스와이프 + N초 자동전환 로직은 script.js에서 처리 -->
   <script src="script.js"></script>
 </body>
 </html>
