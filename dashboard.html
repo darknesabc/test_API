@@ -68,14 +68,17 @@
         </div>
       </section>
 
-      <!-- ④ 공지 (슬라이드 + 모달) -->
+      <!-- ④ 공지 (슬라이드 + 스와이프 + 자동전환) -->
+      <!-- ✅ 스와이프 대상: #noticeCard -->
       <section class="card" id="noticeCard">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
           <h2 class="card-title" style="margin:0;">공지</h2>
-          <button id="noticeOpenBtn"
-                  class="btn btn-ghost btn-mini"
-                  type="button"
-                  style="display:none;">
+          <button
+            id="noticeOpenBtn"
+            class="btn btn-ghost btn-mini"
+            type="button"
+            style="display:none;"
+          >
             전체보기
           </button>
         </div>
@@ -84,14 +87,17 @@
         <p id="noticeError" class="msg"></p>
 
         <!-- 슬라이드 영역 -->
+        <!-- ✅ 이 영역이 자동 전환 + 스와이프로 내용 교체됨 -->
         <div id="noticeSlider" style="display:none; margin-top:8px;">
           <div id="noticeTitle" style="font-weight:900;"></div>
           <div id="noticeMeta" class="muted" style="margin-top:6px; font-size:12px;"></div>
 
-          <!-- ✅ 프리뷰는 "텍스트"로만 보여주는게 안전/깔끔 -->
-          <div id="noticePreview"
-               class="muted"
-               style="margin-top:8px; line-height:1.5;"></div>
+          <!-- ✅ 프리뷰는 텍스트 전용 -->
+          <div
+            id="noticePreview"
+            class="muted"
+            style="margin-top:8px; line-height:1.5;"
+          ></div>
 
           <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
             <button id="noticePrevBtn" class="btn btn-ghost btn-mini" type="button">◀</button>
@@ -153,7 +159,7 @@
       </div>
 
       <div class="modal-body">
-        <!-- ✅ body_html(링크 + <br>)를 렌더링할거라 pre-wrap 제거 -->
+        <!-- ✅ body_html을 그대로 렌더 -->
         <div id="noticeModalBody" style="line-height:1.6;"></div>
 
         <div id="noticeModalLinkWrap" style="margin-top:12px; display:none;">
@@ -166,6 +172,7 @@
   </div>
 
   <!-- ================= SCRIPT ================= -->
+  <!-- ✅ 스와이프 + 6초 자동전환 로직은 script.js에서 처리 -->
   <script src="script.js"></script>
 </body>
 </html>
