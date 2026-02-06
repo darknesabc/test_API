@@ -40,6 +40,19 @@ function safeText_(v, fallback = "-") {
   return s ? s : fallback;
 }
 
+/* =========================================================
+   ✅ 공지 상태 (TDZ 방지: var로 최상단 선선언)
+========================================================= */
+var __noticeItems = [];
+var __noticeIndex = 0;
+
+var __noticeTimer = null;
+var __NOTICE_AUTOPLAY_MS = 6000;
+
+var __noticeBound = false;        // 이벤트 중복 바인딩 방지
+var __noticeGlobalBound = false;  // 전역 이벤트(keydown/visibility) 중복 방지
+var __noticeModalOpen = false;    // 모달 열려있으면 자동전환 중지
+
 // ====== (데모) 로그인 ======
 async function demoLogin(name, parent4) {
   if (!name || name.trim().length < 1) throw new Error("이름을 입력하세요.");
@@ -66,7 +79,6 @@ async function apiLogin(name, parent4) {
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || "로그인 실패");
 
-  // ✅ studentId까지 함께 들고가면, 페이지 상단 표시/디버깅에 도움됨 (있을 때만)
   return {
     studentName: data.studentName,
     seat: data.seat,
@@ -150,10 +162,10 @@ async function apiLogin(name, parent4) {
   });
 
   // ✅ 요약들 로드
-  loadAttendanceSummary(session); // attendance_summary
-  loadSleepSummary(session);      // sleep_summary
-  loadMoveSummary(session);       // move_summary
-  loadEduScoreSummary(session);   // eduscore_summary
+  loadAttendanceSummary(session);
+  loadSleepSummary(session);
+  loadMoveSummary(session);
+  loadEduScoreSummary(session);
 
   // ✅ 공지 로드 (슬라이드 + 모달 + 스와이프 + 자동전환)
   loadNoticeList(session);
@@ -364,22 +376,13 @@ async function loadEduScoreSummary(session) {
    ✅ 공지 (dashboard 슬라이드 + 모달 + ✅스와이프 + ✅자동전환)
 ========================================================= */
 
-let __noticeItems = [];
-let __noticeIndex = 0;
-
-// ✅ 자동전환/스와이프 상태
-let __noticeTimer = null;
-const __NOTICE_AUTOPLAY_MS = 6000;
-let __noticeBound = false;      // 이벤트 중복 바인딩 방지
-let __noticeModalOpen = false;  // 모달 열려있으면 자동전환 중지
-
 async function loadNoticeList(session) {
   const loading = $("noticeLoading");
   const error   = $("noticeError");
 
-  // ✅ 대시보드 HTML이 기존/수정버전( noticeSwipeArea 유무 ) 어떤 형태여도 동작하도록
-  const sliderWrap = $("noticeSwipeArea") || $("noticeSlider"); // 표시 토글 대상
-  const slider  = $("noticeSlider"); // 실제 컨텐츠 박스(없으면 리턴)
+  // 대시보드 HTML이 noticeSwipeArea가 있든 없든 대응
+  const sliderWrap = $("noticeSwipeArea") || $("noticeSlider");
+  const slider  = $("noticeSlider");
 
   const titleEl = $("noticeTitle");
   const metaEl  = $("noticeMeta");
@@ -390,10 +393,6 @@ async function loadNoticeList(session) {
   const btnNext = $("noticeNextBtn");
   const dotsEl  = $("noticeDots");
 
-  // 모달
-  const modal = $("noticeModal");
-  const modalClose = $("noticeModalClose");
-
   if (!loading || !error || !sliderWrap || !slider || !titleEl || !metaEl || !prevEl || !btnOpen || !btnPrev || !btnNext || !dotsEl) return;
 
   try {
@@ -402,7 +401,6 @@ async function loadNoticeList(session) {
     sliderWrap.style.display = "none";
     btnOpen.style.display = "none";
 
-    // 혹시 이전 타이머가 남아있으면 정리
     stopNoticeAutoplay_();
 
     const res = await fetch(`${API_BASE}?path=notice_list`, {
@@ -426,7 +424,7 @@ async function loadNoticeList(session) {
 
     __noticeIndex = 0;
 
-    // ✅ 컨트롤/스와이프/자동전환 초기화 (1회만 바인딩)
+    // ✅ 버튼/스와이프/전역 이벤트 바인딩(최초 1회)
     initNoticeInteractions_();
 
     // 첫 렌더
@@ -435,102 +433,94 @@ async function loadNoticeList(session) {
     sliderWrap.style.display = "";
     btnOpen.style.display = "";
 
-    // ✅ 자동전환 시작 (공지 2개 이상일 때만)
     if (__noticeItems.length >= 2) startNoticeAutoplay_();
   } catch (e) {
     loading.textContent = "";
     error.textContent = e?.message ?? String(e);
   }
+}
 
-  function initNoticeInteractions_() {
-    if (__noticeBound) return;
-    __noticeBound = true
-;
+function initNoticeInteractions_() {
+  if (__noticeBound) return;
+  __noticeBound = true;
 
-    // 버튼 바인딩
-    btnPrev.onclick = () => {
-      setNoticeIndex_(__noticeIndex - 1);
-      restartNoticeAutoplay_();
+  const btnOpen = $("noticeOpenBtn");
+  const btnPrev = $("noticePrevBtn");
+  const btnNext = $("noticeNextBtn");
+
+  const modal = $("noticeModal");
+  const modalClose = $("noticeModalClose");
+
+  // 버튼 바인딩
+  if (btnPrev) btnPrev.onclick = () => { setNoticeIndex_(__noticeIndex - 1); restartNoticeAutoplay_(); };
+  if (btnNext) btnNext.onclick = () => { setNoticeIndex_(__noticeIndex + 1); restartNoticeAutoplay_(); };
+  if (btnOpen) btnOpen.onclick = () => { openNoticeModal_(__noticeItems[__noticeIndex]); };
+
+  // 모달 닫기
+  if (modalClose) modalClose.onclick = () => closeNoticeModal_();
+  if (modal) {
+    modal.onclick = (e) => {
+      const t = e.target;
+      if (t && t.dataset && t.dataset.close === "1") closeNoticeModal_();
     };
-    btnNext.onclick = () => {
-      setNoticeIndex_(__noticeIndex + 1);
-      restartNoticeAutoplay_();
-    };
-    btnOpen.onclick = () => {
-      openNoticeModal_(__noticeItems[__noticeIndex]);
-    };
+  }
 
-    // 모달 닫기
-    if (modalClose) modalClose.onclick = () => closeNoticeModal_();
-    if (modal) {
-      modal.onclick = (e) => {
-        const t = e.target;
-        if (t && t.dataset && t.dataset.close === "1") closeNoticeModal_();
-      };
-    }
+  // ✅ 전역 이벤트(ESC/visibility)는 한 번만
+  if (!__noticeGlobalBound) {
+    __noticeGlobalBound = true;
 
-    // ESC 닫기 (한 번만)
     window.addEventListener("keydown", (ev) => {
       if (ev.key === "Escape") closeNoticeModal_();
     }, { passive: true });
 
-    // ✅ 탭 비활성/복귀 시 타이머 꼬임 방지
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) stopNoticeAutoplay_();
       else restartNoticeAutoplay_();
     });
-
-    // ✅ 스와이프 대상: noticeSwipeArea 있으면 거기에, 없으면 noticeCard에
-    const swipeTarget = $("noticeSwipeArea") || $("noticeCard") || $("noticeSlider");
-    if (!swipeTarget) return;
-
-    // 터치 + 마우스 드래그 스와이프
-    let startX = 0;
-    let lastX = 0;
-    let dragging = false;
-
-    const thresholdRatio = 0.18; // 18% 이동하면 넘김
-
-    function onDown(x) {
-      if (__noticeItems.length < 2) return;
-      if (__noticeModalOpen) return;
-      dragging = true;
-      startX = x;
-      lastX = x;
-      stopNoticeAutoplay_();
-    }
-
-    function onMove(x) {
-      if (!dragging) return;
-      lastX = x;
-    }
-
-    function onUp() {
-      if (!dragging) return;
-      dragging = false;
-
-      const dx = lastX - startX;
-      const w = swipeTarget.clientWidth || 1;
-      const threshold = w * thresholdRatio;
-
-      if (dx > threshold) {
-        setNoticeIndex_(__noticeIndex - 1);
-      } else if (dx < -threshold) {
-        setNoticeIndex_(__noticeIndex + 1);
-      }
-      restartNoticeAutoplay_();
-    }
-
-    // ✅ 모바일 터치
-    swipeTarget.addEventListener("touchstart", (e) => onDown(e.touches[0].clientX), { passive: true });
-    swipeTarget.addEventListener("touchmove",  (e) => onMove(e.touches[0].clientX),  { passive: true });
-    swipeTarget.addEventListener("touchend",   ()  => onUp());
-
-    // ✅ 데스크탑 드래그
-    swipeTarget.addEventListener("mousedown", (e) => { e.preventDefault(); onDown(e.clientX); });
-    window.addEventListener("mousemove", (e) => onMove(e.clientX), { passive: true });
-    window.addEventListener("mouseup",   ()  => onUp(), { passive: true });
   }
+
+  // ✅ 스와이프 대상
+  const swipeTarget = $("noticeSwipeArea") || $("noticeCard") || $("noticeSlider");
+  if (!swipeTarget) return;
+
+  let startX = 0;
+  let lastX = 0;
+  let dragging = false;
+  const thresholdRatio = 0.18;
+
+  function onDown(x) {
+    if (__noticeItems.length < 2) return;
+    if (__noticeModalOpen) return;
+    dragging = true;
+    startX = x;
+    lastX = x;
+    stopNoticeAutoplay_();
+  }
+  function onMove(x) {
+    if (!dragging) return;
+    lastX = x;
+  }
+  function onUp() {
+    if (!dragging) return;
+    dragging = false;
+
+    const dx = lastX - startX;
+    const w = swipeTarget.clientWidth || 1;
+    const threshold = w * thresholdRatio;
+
+    if (dx > threshold) setNoticeIndex_(__noticeIndex - 1);
+    else if (dx < -threshold) setNoticeIndex_(__noticeIndex + 1);
+
+    restartNoticeAutoplay_();
+  }
+
+  swipeTarget.addEventListener("touchstart", (e) => onDown(e.touches[0].clientX), { passive: true });
+  swipeTarget.addEventListener("touchmove",  (e) => onMove(e.touches[0].clientX),  { passive: true });
+  swipeTarget.addEventListener("touchend",   ()  => onUp());
+
+  swipeTarget.addEventListener("mousedown", (e) => { e.preventDefault(); onDown(e.clientX); });
+  window.addEventListener("mousemove", (e) => onMove(e.clientX), { passive: true });
+  window.addEventListener("mouseup",   ()  => onUp(), { passive: true });
 }
 
 function normalizeNoticeItems_(items) {
@@ -611,8 +601,7 @@ function renderNoticeCard_() {
   const orderText = (it.order !== null && !Number.isNaN(it.order)) ? `노출순번 ${it.order}` : "";
   const idxText = `${__noticeIndex + 1}/${__noticeItems.length}`;
 
-  const metaParts = [createdPretty, orderText, idxText].filter(Boolean);
-  metaEl.textContent = metaParts.join(" · ");
+  metaEl.textContent = [createdPretty, orderText, idxText].filter(Boolean).join(" · ");
 
   const preview = makeNoticePreview_(it.bodyText, 180);
   prevEl.textContent = preview || "(내용 없음)";
@@ -662,14 +651,12 @@ function startNoticeAutoplay_() {
     setNoticeIndex_(__noticeIndex + 1);
   }, __NOTICE_AUTOPLAY_MS);
 }
-
 function stopNoticeAutoplay_() {
   if (__noticeTimer) {
     clearInterval(__noticeTimer);
     __noticeTimer = null;
   }
 }
-
 function restartNoticeAutoplay_() {
   stopNoticeAutoplay_();
   startNoticeAutoplay_();
@@ -943,7 +930,7 @@ function closeNoticeModal_() {
             <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
               ${escapeHtml_(prettyDate)}
             </td>
-            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,html,.06); white-space:nowrap;">
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
               ${escapeHtml_(prettyTime)}
             </td>
             <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); font-weight:700;">
