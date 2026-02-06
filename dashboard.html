@@ -8,6 +8,7 @@
 </head>
 
 <body data-needs-login="1">
+  <!-- ================= HEADER ================= -->
   <header class="topbar">
     <div class="topbar-inner">
       <div>
@@ -18,15 +19,16 @@
     </div>
   </header>
 
+  <!-- ================= MAIN ================= -->
   <main class="wrap">
-    <!-- ✅ 4칸 구성 (기존처럼) -->
+
+    <!-- ✅ 4칸 그리드 -->
     <section class="grid-4">
 
       <!-- ① 출결 -->
       <section class="card" id="attCard">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
           <h2 class="card-title" style="margin:0;">출결</h2>
-          <!-- ✅ 버튼 크기 통일 -->
           <a class="btn btn-ghost btn-mini" href="attendance.html">자세히</a>
         </div>
 
@@ -37,12 +39,12 @@
           <div id="attCounts" style="font-weight:900;"></div>
           <div id="attRecent" class="muted" style="margin-top:6px;"></div>
           <div class="muted" style="margin-top:6px; font-size:12px;">
-            * 결석은 “스케줄 공란 + 결석(3)”만 집계 (오늘 기준, 미래 제외)
+            * 결석은 “스케줄 공란 + 결석(3)”만 집계
           </div>
         </div>
       </section>
 
-      <!-- ② 성적(자리) -->
+      <!-- ② 성적 -->
       <section class="card">
         <h2 class="card-title">성적</h2>
         <p class="muted">추가 예정</p>
@@ -52,7 +54,6 @@
       <section class="card" id="sleepCard">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
           <h2 class="card-title" style="margin:0;">취침</h2>
-          <!-- ✅ 버튼 크기 통일 -->
           <a class="btn btn-ghost btn-mini" href="sleep.html">자세히</a>
         </div>
 
@@ -67,20 +68,44 @@
         </div>
       </section>
 
-      <!-- ④ 공지(자리) -->
-      <section class="card">
-        <h2 class="card-title">공지</h2>
-        <p class="muted">추가 예정</p>
+      <!-- ④ 공지 (슬라이드 + 모달) -->
+      <section class="card" id="noticeCard">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <h2 class="card-title" style="margin:0;">공지</h2>
+          <button id="noticeOpenBtn"
+                  class="btn btn-ghost btn-mini"
+                  type="button"
+                  style="display:none;">
+            전체보기
+          </button>
+        </div>
+
+        <p id="noticeLoading" class="muted">불러오는 중...</p>
+        <p id="noticeError" class="msg"></p>
+
+        <!-- 슬라이드 영역 -->
+        <div id="noticeSlider" style="display:none; margin-top:8px;">
+          <div id="noticeTitle" style="font-weight:900;"></div>
+          <div id="noticeMeta" class="muted" style="margin-top:6px; font-size:12px;"></div>
+          <div id="noticePreview"
+               class="muted"
+               style="margin-top:8px; line-height:1.5;"></div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
+            <button id="noticePrevBtn" class="btn btn-ghost btn-mini" type="button">◀</button>
+            <div id="noticeDots" class="muted" style="font-size:12px;"></div>
+            <button id="noticeNextBtn" class="btn btn-ghost btn-mini" type="button">▶</button>
+          </div>
+        </div>
       </section>
 
-      <!-- ✅ ⑤ 이동 (연동 완료 버전) -->
+      <!-- ⑤ 이동 -->
       <section class="card" id="moveCard">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
           <h2 class="card-title" style="margin:0;">이동</h2>
           <a class="btn btn-ghost btn-mini" href="move.html">자세히</a>
         </div>
 
-        <!-- ✅ script.js가 찾는 ID들 (출결/취침과 동일 패턴) -->
         <p id="moveLoading" class="muted">불러오는 중...</p>
         <p id="moveError" class="msg"></p>
 
@@ -90,30 +115,55 @@
         </div>
       </section>
 
-      <!-- ✅ ⑥ 교육점수 -->
-<section class="card" id="eduScoreCard">
-  <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-    <h2 class="card-title" style="margin:0;">교육점수</h2>
-    <a class="btn btn-ghost btn-mini" href="eduscore.html">자세히</a>
-  </div>
+      <!-- ⑥ 교육점수 -->
+      <section class="card" id="eduScoreCard">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <h2 class="card-title" style="margin:0;">교육점수</h2>
+          <a class="btn btn-ghost btn-mini" href="eduscore.html">자세히</a>
+        </div>
 
-  <p id="eduScoreLoading" class="muted">불러오는 중...</p>
-  <p id="eduScoreError" class="msg"></p>
+        <p id="eduScoreLoading" class="muted">불러오는 중...</p>
+        <p id="eduScoreError" class="msg"></p>
 
-  <div id="eduScoreSummary" style="display:none; margin-top:8px;">
-    <div id="eduScoreLine" style="font-weight:900;"></div>
-    <div id="eduScoreRecent" class="muted" style="margin-top:6px;"></div>
-    <div class="muted" style="margin-top:6px; font-size:12px;">
-      * 이번 달 누적 점수
-    </div>
-  </div>
-</section>
-
+        <div id="eduScoreSummary" style="display:none; margin-top:8px;">
+          <div id="eduScoreLine" style="font-weight:900;"></div>
+          <div id="eduScoreRecent" class="muted" style="margin-top:6px;"></div>
+          <div class="muted" style="margin-top:6px; font-size:12px;">
+            * 이번 달 누적 점수
+          </div>
+        </div>
+      </section>
 
     </section>
   </main>
 
+  <!-- ================= 공지 모달 ================= -->
+  <div id="noticeModal" class="modal" style="display:none;">
+    <div class="modal-backdrop" data-close="1"></div>
+
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div>
+          <div id="noticeModalTitle" style="font-weight:900; font-size:16px;"></div>
+          <div id="noticeModalMeta" class="muted" style="margin-top:4px; font-size:12px;"></div>
+        </div>
+        <button id="noticeModalClose" class="btn btn-ghost btn-mini" type="button">닫기</button>
+      </div>
+
+      <div class="modal-body">
+        <div id="noticeModalBody"
+             style="white-space:pre-wrap; line-height:1.6;"></div>
+
+        <div id="noticeModalLinkWrap" style="margin-top:12px; display:none;">
+          <a id="noticeModalLink" target="_blank" rel="noopener"></a>
+        </div>
+
+        <div id="noticeModalImages" style="margin-top:12px; display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= SCRIPT ================= -->
   <script src="script.js"></script>
 </body>
 </html>
-
