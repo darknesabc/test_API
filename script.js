@@ -370,6 +370,7 @@ async function loadEduScoreSummary(session) {
    - items 정렬:
       1) order(숫자) 오름차순 우선
       2) 작성일(createdAt/at/date) 내림차순
+   - ✅ 모달 본문은 body_html(링크+<br>)를 innerHTML로 렌더
 ========================================================= */
 
 let __noticeItems = [];
@@ -416,7 +417,6 @@ async function loadNoticeList(session) {
     loading.textContent = "";
 
     if (!__noticeItems.length) {
-      // 공지가 없으면 이 영역은 간단히 표시
       loading.textContent = "공지사항이 없습니다.";
       return;
     }
@@ -453,10 +453,17 @@ async function loadNoticeList(session) {
 }
 
 function normalizeNoticeItems_(items) {
-  // 허용 필드: title, body, createdAt/at/date, order, link, images
+  // 허용 필드: title, body, body_html, createdAt/at/date, order, link, images
   const out = items.map((it, idx) => {
     const title = safeText_(it?.title, "공지");
-    const body  = safeText_(it?.body ?? it?.content ?? it?.text, "");
+
+    // ✅ 텍스트 원문(프리뷰/정렬/대체용)
+    const bodyText = safeText_(it?.body ?? it?.content ?? it?.text, "");
+
+    // ✅ HTML 본문(링크/줄바꿈 렌더용)
+    // 백엔드가 body_html를 주면 그대로 사용, 없으면 텍스트를 안전하게 HTML로 변환
+    const bodyHtml = String(it?.body_html ?? it?.html ?? "").trim() || textToSafeHtml_(bodyText);
+
     const order = (it?.order !== undefined && it?.order !== null && it?.order !== "")
       ? Number(it.order)
       : null;
@@ -469,7 +476,16 @@ function normalizeNoticeItems_(items) {
 
     const id = String(it?.id ?? it?.key ?? idx);
 
-    return { id, title, body, order, created, link, images };
+    return {
+      id,
+      title,
+      bodyText,
+      bodyHtml,
+      order,
+      created,
+      link,
+      images
+    };
   });
 
   // 정렬: order 있으면 우선, order 없으면 뒤로. 그 다음 created(내림차순)
@@ -536,12 +552,11 @@ function renderNoticeCard_() {
   const metaParts = [createdPretty, orderText, idxText].filter(Boolean);
   metaEl.textContent = metaParts.join(" · ");
 
-  // 미리보기: 본문 160자 정도 + 줄바꿈 정리
-  const preview = makeNoticePreview_(it.body, 180);
+  // ✅ 미리보기: 텍스트 기반(HTML 제거) 180자
+  const preview = makeNoticePreview_(it.bodyText, 180);
   prevEl.textContent = preview || "(내용 없음)";
 
-  // dots (간단 표시)
-  // 너무 많으면 "●○○" 대신 "1/10" 같은 걸 쓰는 게 깔끔 → 이미 idxText가 있으니 dots는 점만 간단히
+  // dots
   if (__noticeItems.length <= 8) {
     dotsEl.textContent = __noticeItems.map((_, i) => (i === __noticeIndex ? "●" : "○")).join(" ");
   } else {
@@ -558,7 +573,6 @@ function prettyNoticeDate_(created) {
     const dd = String(Number(m[3])).padStart(2, "0");
     return `${mm}/${dd}`;
   }
-  // 혹시 ISO가 들어오면
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(5).replace("-", "/");
   return s;
 }
@@ -566,10 +580,16 @@ function prettyNoticeDate_(created) {
 function makeNoticePreview_(body, maxLen = 180) {
   const s = String(body ?? "").replace(/\r/g, "").trim();
   if (!s) return "";
-  // 연속 공백 정리
   const normalized = s.replace(/[ \t]+/g, " ");
   if (normalized.length <= maxLen) return normalized;
   return normalized.slice(0, maxLen) + "…";
+}
+
+// ✅ 텍스트 -> 안전한 HTML (줄바꿈만 <br>, 링크 자동 변환은 백엔드 body_html에서 처리)
+function textToSafeHtml_(text) {
+  const raw = String(text ?? "").replace(/\r/g, "");
+  const escaped = escapeHtml_(raw);
+  return escaped.replace(/\n/g, "<br>");
 }
 
 function openNoticeModal_(it) {
@@ -584,12 +604,16 @@ function openNoticeModal_(it) {
   if (!modal || !titleEl || !metaEl || !bodyEl || !linkWrap || !linkEl || !imgWrap) return;
 
   titleEl.textContent = it?.title || "공지";
-  metaEl.textContent = [prettyNoticeDate_(it?.created), (it?.order !== null ? `노출순번 ${it.order}` : "")].filter(Boolean).join(" · ");
+  metaEl.textContent = [
+    prettyNoticeDate_(it?.created),
+    (it?.order !== null && it?.order !== undefined ? `노출순번 ${it.order}` : "")
+  ].filter(Boolean).join(" · ");
 
-  // 본문: 줄바꿈 그대로 (XSS 방지 위해 textContent)
-  bodyEl.textContent = String(it?.body ?? "").trim();
+  // ✅ 본문: body_html 우선(링크 클릭 가능). 없으면 텍스트를 안전 HTML로 변환한 값.
+  const html = String(it?.bodyHtml ?? "").trim() || textToSafeHtml_(String(it?.bodyText ?? "").trim());
+  bodyEl.innerHTML = html;
 
-  // 링크
+  // 링크(별도 링크 컬럼)
   const link = String(it?.link ?? "").trim();
   if (link) {
     linkWrap.style.display = "";
