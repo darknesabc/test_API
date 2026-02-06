@@ -5,6 +5,7 @@
  * - 이동 상세: move_detail (move.html)
  * - ✅ 교육점수 요약: eduscore_summary
  * - ✅ 교육점수 상세: eduscore_detail (eduscore.html)
+ * - ✅ 공지: notice_list (dashboard에서 슬라이드 + 모달)
  ***********************/
 
 // ====== 설정 ======
@@ -153,6 +154,9 @@ async function apiLogin(name, parent4) {
   loadSleepSummary(session);      // sleep_summary
   loadMoveSummary(session);       // move_summary
   loadEduScoreSummary(session);   // eduscore_summary
+
+  // ✅ 공지 로드 (슬라이드 + 모달)
+  loadNoticeList(session);
 })();
 
 /* =========================================================
@@ -358,6 +362,275 @@ async function loadEduScoreSummary(session) {
     loading.textContent = "";
     error.textContent = e?.message ?? String(e);
   }
+}
+
+/* =========================================================
+   ✅ 공지 (dashboard 슬라이드 + 모달)
+   - 백엔드: path=notice_list (token 기준)
+   - items 정렬:
+      1) order(숫자) 오름차순 우선
+      2) 작성일(createdAt/at/date) 내림차순
+========================================================= */
+
+let __noticeItems = [];
+let __noticeIndex = 0;
+
+async function loadNoticeList(session) {
+  const loading = $("noticeLoading");
+  const error   = $("noticeError");
+  const slider  = $("noticeSlider");
+
+  const titleEl = $("noticeTitle");
+  const metaEl  = $("noticeMeta");
+  const prevEl  = $("noticePreview");
+
+  const btnOpen = $("noticeOpenBtn");
+  const btnPrev = $("noticePrevBtn");
+  const btnNext = $("noticeNextBtn");
+  const dotsEl  = $("noticeDots");
+
+  // 모달
+  const modal = $("noticeModal");
+  const modalClose = $("noticeModalClose");
+
+  if (!loading || !error || !slider || !titleEl || !metaEl || !prevEl || !btnOpen || !btnPrev || !btnNext || !dotsEl) return;
+
+  try {
+    loading.textContent = "불러오는 중...";
+    error.textContent = "";
+    slider.style.display = "none";
+    btnOpen.style.display = "none";
+
+    const res = await fetch(`${API_BASE}?path=notice_list`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: session.token })
+    });
+
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "공지 불러오기 실패");
+
+    const items = Array.isArray(data.items) ? data.items : [];
+    __noticeItems = normalizeNoticeItems_(items);
+
+    loading.textContent = "";
+
+    if (!__noticeItems.length) {
+      // 공지가 없으면 이 영역은 간단히 표시
+      loading.textContent = "공지사항이 없습니다.";
+      return;
+    }
+
+    __noticeIndex = 0;
+
+    // 버튼 바인딩 (중복 바인딩 방지)
+    btnPrev.onclick = () => setNoticeIndex_(__noticeIndex - 1);
+    btnNext.onclick = () => setNoticeIndex_(__noticeIndex + 1);
+    btnOpen.onclick = () => openNoticeModal_(__noticeItems[__noticeIndex]);
+
+    // 모달 닫기
+    if (modalClose) modalClose.onclick = () => closeNoticeModal_();
+    if (modal) {
+      modal.onclick = (e) => {
+        const t = e.target;
+        if (t && t.dataset && t.dataset.close === "1") closeNoticeModal_();
+      };
+      // ESC 닫기
+      window.addEventListener("keydown", (ev) => {
+        if (ev.key === "Escape") closeNoticeModal_();
+      }, { passive: true });
+    }
+
+    // 첫 렌더
+    renderNoticeCard_();
+
+    slider.style.display = "";
+    btnOpen.style.display = "";
+  } catch (e) {
+    loading.textContent = "";
+    error.textContent = e?.message ?? String(e);
+  }
+}
+
+function normalizeNoticeItems_(items) {
+  // 허용 필드: title, body, createdAt/at/date, order, link, images
+  const out = items.map((it, idx) => {
+    const title = safeText_(it?.title, "공지");
+    const body  = safeText_(it?.body ?? it?.content ?? it?.text, "");
+    const order = (it?.order !== undefined && it?.order !== null && it?.order !== "")
+      ? Number(it.order)
+      : null;
+
+    const createdRaw = it?.createdAt ?? it?.at ?? it?.date ?? it?.created ?? "";
+    const created = String(createdRaw ?? "").trim();
+
+    const link = String(it?.link ?? it?.url ?? "").trim();
+    const images = Array.isArray(it?.images) ? it.images.filter(Boolean).map(String) : [];
+
+    const id = String(it?.id ?? it?.key ?? idx);
+
+    return { id, title, body, order, created, link, images };
+  });
+
+  // 정렬: order 있으면 우선, order 없으면 뒤로. 그 다음 created(내림차순)
+  out.sort((a, b) => {
+    const ao = (a.order === null || Number.isNaN(a.order)) ? null : a.order;
+    const bo = (b.order === null || Number.isNaN(b.order)) ? null : b.order;
+
+    if (ao !== null && bo !== null && ao !== bo) return ao - bo;
+    if (ao !== null && bo === null) return -1;
+    if (ao === null && bo !== null) return 1;
+
+    // created 내림차순
+    const ak = noticeSortKey_(a.created);
+    const bk = noticeSortKey_(b.created);
+    if (ak !== bk) return bk.localeCompare(ak);
+
+    return String(a.id).localeCompare(String(b.id));
+  });
+
+  return out;
+}
+
+function noticeSortKey_(created) {
+  // "2026-02-05", "2026/02/05", Date string 등 → 정렬 가능한 키로 변환
+  const s = String(created || "").trim();
+  if (!s) return "0000-00-00 00:00";
+  // yyyy-mm-dd or yyyy/mm/dd
+  const m = s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})(?:\D+(\d{1,2})\D+(\d{1,2}))?/);
+  if (m) {
+    const y = m[1];
+    const mo = String(Number(m[2])).padStart(2, "0");
+    const d = String(Number(m[3])).padStart(2, "0");
+    const hh = String(Number(m[4] || 0)).padStart(2, "0");
+    const mm = String(Number(m[5] || 0)).padStart(2, "0");
+    return `${y}-${mo}-${d} ${hh}:${mm}`;
+  }
+  return s;
+}
+
+function setNoticeIndex_(next) {
+  if (!__noticeItems.length) return;
+  const n = __noticeItems.length;
+  __noticeIndex = (next % n + n) % n;
+  renderNoticeCard_();
+}
+
+function renderNoticeCard_() {
+  const it = __noticeItems[__noticeIndex];
+  if (!it) return;
+
+  const titleEl = $("noticeTitle");
+  const metaEl  = $("noticeMeta");
+  const prevEl  = $("noticePreview");
+  const dotsEl  = $("noticeDots");
+
+  if (!titleEl || !metaEl || !prevEl || !dotsEl) return;
+
+  titleEl.textContent = it.title;
+
+  const createdPretty = prettyNoticeDate_(it.created);
+  const orderText = (it.order !== null && !Number.isNaN(it.order)) ? `노출순번 ${it.order}` : "";
+  const idxText = `${__noticeIndex + 1}/${__noticeItems.length}`;
+
+  const metaParts = [createdPretty, orderText, idxText].filter(Boolean);
+  metaEl.textContent = metaParts.join(" · ");
+
+  // 미리보기: 본문 160자 정도 + 줄바꿈 정리
+  const preview = makeNoticePreview_(it.body, 180);
+  prevEl.textContent = preview || "(내용 없음)";
+
+  // dots (간단 표시)
+  // 너무 많으면 "●○○" 대신 "1/10" 같은 걸 쓰는 게 깔끔 → 이미 idxText가 있으니 dots는 점만 간단히
+  if (__noticeItems.length <= 8) {
+    dotsEl.textContent = __noticeItems.map((_, i) => (i === __noticeIndex ? "●" : "○")).join(" ");
+  } else {
+    dotsEl.textContent = idxText;
+  }
+}
+
+function prettyNoticeDate_(created) {
+  const s = String(created || "").trim();
+  if (!s) return "";
+  const m = s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+  if (m) {
+    const mm = String(Number(m[2])).padStart(2, "0");
+    const dd = String(Number(m[3])).padStart(2, "0");
+    return `${mm}/${dd}`;
+  }
+  // 혹시 ISO가 들어오면
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(5).replace("-", "/");
+  return s;
+}
+
+function makeNoticePreview_(body, maxLen = 180) {
+  const s = String(body ?? "").replace(/\r/g, "").trim();
+  if (!s) return "";
+  // 연속 공백 정리
+  const normalized = s.replace(/[ \t]+/g, " ");
+  if (normalized.length <= maxLen) return normalized;
+  return normalized.slice(0, maxLen) + "…";
+}
+
+function openNoticeModal_(it) {
+  const modal = $("noticeModal");
+  const titleEl = $("noticeModalTitle");
+  const metaEl  = $("noticeModalMeta");
+  const bodyEl  = $("noticeModalBody");
+  const linkWrap = $("noticeModalLinkWrap");
+  const linkEl   = $("noticeModalLink");
+  const imgWrap  = $("noticeModalImages");
+
+  if (!modal || !titleEl || !metaEl || !bodyEl || !linkWrap || !linkEl || !imgWrap) return;
+
+  titleEl.textContent = it?.title || "공지";
+  metaEl.textContent = [prettyNoticeDate_(it?.created), (it?.order !== null ? `노출순번 ${it.order}` : "")].filter(Boolean).join(" · ");
+
+  // 본문: 줄바꿈 그대로 (XSS 방지 위해 textContent)
+  bodyEl.textContent = String(it?.body ?? "").trim();
+
+  // 링크
+  const link = String(it?.link ?? "").trim();
+  if (link) {
+    linkWrap.style.display = "";
+    linkEl.textContent = link;
+    linkEl.href = link;
+  } else {
+    linkWrap.style.display = "none";
+    linkEl.textContent = "";
+    linkEl.removeAttribute("href");
+  }
+
+  // 이미지 여러장 세로 나열
+  const images = Array.isArray(it?.images) ? it.images : [];
+  imgWrap.innerHTML = "";
+
+  if (images.length) {
+    imgWrap.style.display = "";
+    const frag = document.createDocumentFragment();
+    images.forEach((url) => {
+      const u = String(url || "").trim();
+      if (!u) return;
+      const img = document.createElement("img");
+      img.src = u;
+      img.alt = "공지 이미지";
+      img.loading = "lazy";
+      frag.appendChild(img);
+    });
+    imgWrap.appendChild(frag);
+  } else {
+    imgWrap.style.display = "none";
+  }
+
+  modal.style.display = "";
+  document.body.style.overflow = "hidden";
+}
+
+function closeNoticeModal_() {
+  const modal = $("noticeModal");
+  if (!modal) return;
+  modal.style.display = "none";
+  document.body.style.overflow = "";
 }
 
 /* =========================================================
