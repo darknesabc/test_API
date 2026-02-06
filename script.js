@@ -155,7 +155,7 @@ async function apiLogin(name, parent4) {
   loadMoveSummary(session);       // move_summary
   loadEduScoreSummary(session);   // eduscore_summary
 
-  // ✅ 공지 로드 (슬라이드 + 모달)
+  // ✅ 공지 로드 (슬라이드 + 모달 + 스와이프 + 자동전환)
   loadNoticeList(session);
 })();
 
@@ -216,8 +216,6 @@ async function loadAttendanceSummary(session) {
 
 /* =========================================================
    ✅ 취침 요약 (대시보드 카드)
-   - 기존: sleepCount7d (최근 7일 '날짜 수')
-   - 신규(권장): sleepTotal7d (최근 7일 '횟수 합계')가 오면 그걸 우선 표기
 ========================================================= */
 async function loadSleepSummary(session) {
   const loading = $("sleepLoading");
@@ -241,7 +239,6 @@ async function loadSleepSummary(session) {
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || "취침 요약 불러오기 실패");
 
-    // ✅ 백엔드가 sleepTotal7d(횟수 합계) 주면 우선 사용, 없으면 기존 sleepCount7d 사용
     const total = (data.sleepTotal7d !== undefined && data.sleepTotal7d !== null)
       ? Number(data.sleepTotal7d ?? 0)
       : Number(data.sleepCount7d ?? 0);
@@ -306,7 +303,6 @@ async function loadMoveSummary(session) {
 
 /* =========================================================
    ✅ 교육점수 요약 (대시보드 카드)
-   - 백엔드 latestText는 "지각 (1점)" 형태
 ========================================================= */
 async function loadEduScoreSummary(session) {
   const loading = $("eduScoreLoading");
@@ -345,7 +341,7 @@ async function loadEduScoreSummary(session) {
 
     const md = prettyMD_(data.latestDate);
     const time = String(data.latestTime || "").trim();
-    const latestText = String(data.latestText || "").trim(); // 예: "지각 (1점)"
+    const latestText = String(data.latestText || "").trim();
 
     if (md && time && latestText && latestText !== "-") {
       const m = latestText.match(/\((\d+)\s*점\)/);
@@ -365,21 +361,25 @@ async function loadEduScoreSummary(session) {
 }
 
 /* =========================================================
-   ✅ 공지 (dashboard 슬라이드 + 모달)
-   - 백엔드: path=notice_list (token 기준)
-   - items 정렬:
-      1) order(숫자) 오름차순 우선
-      2) 작성일(createdAt/at/date) 내림차순
-   - ✅ 모달 본문은 body_html(링크+<br>)를 innerHTML로 렌더
+   ✅ 공지 (dashboard 슬라이드 + 모달 + ✅스와이프 + ✅자동전환)
 ========================================================= */
 
 let __noticeItems = [];
 let __noticeIndex = 0;
 
+// ✅ 자동전환/스와이프 상태
+let __noticeTimer = null;
+const __NOTICE_AUTOPLAY_MS = 6000;
+let __noticeBound = false;      // 이벤트 중복 바인딩 방지
+let __noticeModalOpen = false;  // 모달 열려있으면 자동전환 중지
+
 async function loadNoticeList(session) {
   const loading = $("noticeLoading");
   const error   = $("noticeError");
-  const slider  = $("noticeSlider");
+
+  // ✅ 대시보드 HTML이 기존/수정버전( noticeSwipeArea 유무 ) 어떤 형태여도 동작하도록
+  const sliderWrap = $("noticeSwipeArea") || $("noticeSlider"); // 표시 토글 대상
+  const slider  = $("noticeSlider"); // 실제 컨텐츠 박스(없으면 리턴)
 
   const titleEl = $("noticeTitle");
   const metaEl  = $("noticeMeta");
@@ -394,13 +394,16 @@ async function loadNoticeList(session) {
   const modal = $("noticeModal");
   const modalClose = $("noticeModalClose");
 
-  if (!loading || !error || !slider || !titleEl || !metaEl || !prevEl || !btnOpen || !btnPrev || !btnNext || !dotsEl) return;
+  if (!loading || !error || !sliderWrap || !slider || !titleEl || !metaEl || !prevEl || !btnOpen || !btnPrev || !btnNext || !dotsEl) return;
 
   try {
     loading.textContent = "불러오는 중...";
     error.textContent = "";
-    slider.style.display = "none";
+    sliderWrap.style.display = "none";
     btnOpen.style.display = "none";
+
+    // 혹시 이전 타이머가 남아있으면 정리
+    stopNoticeAutoplay_();
 
     const res = await fetch(`${API_BASE}?path=notice_list`, {
       method: "POST",
@@ -423,10 +426,39 @@ async function loadNoticeList(session) {
 
     __noticeIndex = 0;
 
-    // 버튼 바인딩 (중복 바인딩 방지)
-    btnPrev.onclick = () => setNoticeIndex_(__noticeIndex - 1);
-    btnNext.onclick = () => setNoticeIndex_(__noticeIndex + 1);
-    btnOpen.onclick = () => openNoticeModal_(__noticeItems[__noticeIndex]);
+    // ✅ 컨트롤/스와이프/자동전환 초기화 (1회만 바인딩)
+    initNoticeInteractions_();
+
+    // 첫 렌더
+    renderNoticeCard_();
+
+    sliderWrap.style.display = "";
+    btnOpen.style.display = "";
+
+    // ✅ 자동전환 시작 (공지 2개 이상일 때만)
+    if (__noticeItems.length >= 2) startNoticeAutoplay_();
+  } catch (e) {
+    loading.textContent = "";
+    error.textContent = e?.message ?? String(e);
+  }
+
+  function initNoticeInteractions_() {
+    if (__noticeBound) return;
+    __noticeBound = true
+;
+
+    // 버튼 바인딩
+    btnPrev.onclick = () => {
+      setNoticeIndex_(__noticeIndex - 1);
+      restartNoticeAutoplay_();
+    };
+    btnNext.onclick = () => {
+      setNoticeIndex_(__noticeIndex + 1);
+      restartNoticeAutoplay_();
+    };
+    btnOpen.onclick = () => {
+      openNoticeModal_(__noticeItems[__noticeIndex]);
+    };
 
     // 모달 닫기
     if (modalClose) modalClose.onclick = () => closeNoticeModal_();
@@ -435,33 +467,76 @@ async function loadNoticeList(session) {
         const t = e.target;
         if (t && t.dataset && t.dataset.close === "1") closeNoticeModal_();
       };
-      // ESC 닫기
-      window.addEventListener("keydown", (ev) => {
-        if (ev.key === "Escape") closeNoticeModal_();
-      }, { passive: true });
     }
 
-    // 첫 렌더
-    renderNoticeCard_();
+    // ESC 닫기 (한 번만)
+    window.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape") closeNoticeModal_();
+    }, { passive: true });
 
-    slider.style.display = "";
-    btnOpen.style.display = "";
-  } catch (e) {
-    loading.textContent = "";
-    error.textContent = e?.message ?? String(e);
+    // ✅ 탭 비활성/복귀 시 타이머 꼬임 방지
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) stopNoticeAutoplay_();
+      else restartNoticeAutoplay_();
+    });
+
+    // ✅ 스와이프 대상: noticeSwipeArea 있으면 거기에, 없으면 noticeCard에
+    const swipeTarget = $("noticeSwipeArea") || $("noticeCard") || $("noticeSlider");
+    if (!swipeTarget) return;
+
+    // 터치 + 마우스 드래그 스와이프
+    let startX = 0;
+    let lastX = 0;
+    let dragging = false;
+
+    const thresholdRatio = 0.18; // 18% 이동하면 넘김
+
+    function onDown(x) {
+      if (__noticeItems.length < 2) return;
+      if (__noticeModalOpen) return;
+      dragging = true;
+      startX = x;
+      lastX = x;
+      stopNoticeAutoplay_();
+    }
+
+    function onMove(x) {
+      if (!dragging) return;
+      lastX = x;
+    }
+
+    function onUp() {
+      if (!dragging) return;
+      dragging = false;
+
+      const dx = lastX - startX;
+      const w = swipeTarget.clientWidth || 1;
+      const threshold = w * thresholdRatio;
+
+      if (dx > threshold) {
+        setNoticeIndex_(__noticeIndex - 1);
+      } else if (dx < -threshold) {
+        setNoticeIndex_(__noticeIndex + 1);
+      }
+      restartNoticeAutoplay_();
+    }
+
+    // ✅ 모바일 터치
+    swipeTarget.addEventListener("touchstart", (e) => onDown(e.touches[0].clientX), { passive: true });
+    swipeTarget.addEventListener("touchmove",  (e) => onMove(e.touches[0].clientX),  { passive: true });
+    swipeTarget.addEventListener("touchend",   ()  => onUp());
+
+    // ✅ 데스크탑 드래그
+    swipeTarget.addEventListener("mousedown", (e) => { e.preventDefault(); onDown(e.clientX); });
+    window.addEventListener("mousemove", (e) => onMove(e.clientX), { passive: true });
+    window.addEventListener("mouseup",   ()  => onUp(), { passive: true });
   }
 }
 
 function normalizeNoticeItems_(items) {
-  // 허용 필드: title, body, body_html, createdAt/at/date, order, link, images
   const out = items.map((it, idx) => {
     const title = safeText_(it?.title, "공지");
-
-    // ✅ 텍스트 원문(프리뷰/정렬/대체용)
     const bodyText = safeText_(it?.body ?? it?.content ?? it?.text, "");
-
-    // ✅ HTML 본문(링크/줄바꿈 렌더용)
-    // 백엔드가 body_html를 주면 그대로 사용, 없으면 텍스트를 안전하게 HTML로 변환
     const bodyHtml = String(it?.body_html ?? it?.html ?? "").trim() || textToSafeHtml_(bodyText);
 
     const order = (it?.order !== undefined && it?.order !== null && it?.order !== "")
@@ -476,19 +551,9 @@ function normalizeNoticeItems_(items) {
 
     const id = String(it?.id ?? it?.key ?? idx);
 
-    return {
-      id,
-      title,
-      bodyText,
-      bodyHtml,
-      order,
-      created,
-      link,
-      images
-    };
+    return { id, title, bodyText, bodyHtml, order, created, link, images };
   });
 
-  // 정렬: order 있으면 우선, order 없으면 뒤로. 그 다음 created(내림차순)
   out.sort((a, b) => {
     const ao = (a.order === null || Number.isNaN(a.order)) ? null : a.order;
     const bo = (b.order === null || Number.isNaN(b.order)) ? null : b.order;
@@ -497,7 +562,6 @@ function normalizeNoticeItems_(items) {
     if (ao !== null && bo === null) return -1;
     if (ao === null && bo !== null) return 1;
 
-    // created 내림차순
     const ak = noticeSortKey_(a.created);
     const bk = noticeSortKey_(b.created);
     if (ak !== bk) return bk.localeCompare(ak);
@@ -509,10 +573,8 @@ function normalizeNoticeItems_(items) {
 }
 
 function noticeSortKey_(created) {
-  // "2026-02-05", "2026/02/05", Date string 등 → 정렬 가능한 키로 변환
   const s = String(created || "").trim();
   if (!s) return "0000-00-00 00:00";
-  // yyyy-mm-dd or yyyy/mm/dd
   const m = s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})(?:\D+(\d{1,2})\D+(\d{1,2}))?/);
   if (m) {
     const y = m[1];
@@ -552,11 +614,9 @@ function renderNoticeCard_() {
   const metaParts = [createdPretty, orderText, idxText].filter(Boolean);
   metaEl.textContent = metaParts.join(" · ");
 
-  // ✅ 미리보기: 텍스트 기반(HTML 제거) 180자
   const preview = makeNoticePreview_(it.bodyText, 180);
   prevEl.textContent = preview || "(내용 없음)";
 
-  // dots
   if (__noticeItems.length <= 8) {
     dotsEl.textContent = __noticeItems.map((_, i) => (i === __noticeIndex ? "●" : "○")).join(" ");
   } else {
@@ -585,11 +645,34 @@ function makeNoticePreview_(body, maxLen = 180) {
   return normalized.slice(0, maxLen) + "…";
 }
 
-// ✅ 텍스트 -> 안전한 HTML (줄바꿈만 <br>, 링크 자동 변환은 백엔드 body_html에서 처리)
 function textToSafeHtml_(text) {
   const raw = String(text ?? "").replace(/\r/g, "");
   const escaped = escapeHtml_(raw);
   return escaped.replace(/\n/g, "<br>");
+}
+
+// ✅ 자동전환 타이머
+function startNoticeAutoplay_() {
+  if (__noticeTimer) return;
+  if (__noticeItems.length < 2) return;
+  if (__noticeModalOpen) return;
+
+  __noticeTimer = setInterval(() => {
+    if (__noticeModalOpen) return;
+    setNoticeIndex_(__noticeIndex + 1);
+  }, __NOTICE_AUTOPLAY_MS);
+}
+
+function stopNoticeAutoplay_() {
+  if (__noticeTimer) {
+    clearInterval(__noticeTimer);
+    __noticeTimer = null;
+  }
+}
+
+function restartNoticeAutoplay_() {
+  stopNoticeAutoplay_();
+  startNoticeAutoplay_();
 }
 
 function openNoticeModal_(it) {
@@ -603,17 +686,18 @@ function openNoticeModal_(it) {
 
   if (!modal || !titleEl || !metaEl || !bodyEl || !linkWrap || !linkEl || !imgWrap) return;
 
+  __noticeModalOpen = true;
+  stopNoticeAutoplay_();
+
   titleEl.textContent = it?.title || "공지";
   metaEl.textContent = [
     prettyNoticeDate_(it?.created),
     (it?.order !== null && it?.order !== undefined ? `노출순번 ${it.order}` : "")
   ].filter(Boolean).join(" · ");
 
-  // ✅ 본문: body_html 우선(링크 클릭 가능). 없으면 텍스트를 안전 HTML로 변환한 값.
   const html = String(it?.bodyHtml ?? "").trim() || textToSafeHtml_(String(it?.bodyText ?? "").trim());
   bodyEl.innerHTML = html;
 
-  // 링크(별도 링크 컬럼)
   const link = String(it?.link ?? "").trim();
   if (link) {
     linkWrap.style.display = "";
@@ -625,7 +709,6 @@ function openNoticeModal_(it) {
     linkEl.removeAttribute("href");
   }
 
-  // 이미지 여러장 세로 나열
   const images = Array.isArray(it?.images) ? it.images : [];
   imgWrap.innerHTML = "";
 
@@ -655,6 +738,8 @@ function closeNoticeModal_() {
   if (!modal) return;
   modal.style.display = "none";
   document.body.style.overflow = "";
+  __noticeModalOpen = false;
+  restartNoticeAutoplay_();
 }
 
 /* =========================================================
@@ -858,7 +943,7 @@ function closeNoticeModal_() {
             <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
               ${escapeHtml_(prettyDate)}
             </td>
-            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
+            <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,html,.06); white-space:nowrap;">
               ${escapeHtml_(prettyTime)}
             </td>
             <td style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); font-weight:700;">
