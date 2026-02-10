@@ -162,12 +162,34 @@ body {
   line-height: 1;
 }
 
-/* 공지 미리보기 2~3줄처럼 보이게(스크립트에서 잘라도 되지만 CSS도 보조) */
+/* ✅ 베스트 조합: 공지 카드 높이 안정화 + 내부 정렬 안정화 */
+#noticeCard{
+  min-height: 220px; /* 필요하면 200~260px 미세조정 */
+  display: flex;
+  flex-direction: column;
+}
+
+/* noticeSwipeArea가 남는 공간을 먹어 버튼/도트 위치 흔들림 최소화 */
+#noticeSwipeArea{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 공지 미리보기 3줄 고정 */
 #noticePreview{
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* (선택) 공지 내용 클릭 영역 커서/포커스 느낌 */
+#noticeTapArea{
+  cursor: pointer;
+}
+#noticeTapArea:focus{
+  outline: none;
 }
 
 /* ===== 모달 ===== */
@@ -246,5 +268,10 @@ body {
   }
   .modal-body{
     max-height: calc(100vh - 130px);
+  }
+
+  /* 모바일은 카드 높이 살짝 줄여도 보기 좋아서(원치 않으면 삭제 가능) */
+  #noticeCard{
+    min-height: 200px;
   }
 }
