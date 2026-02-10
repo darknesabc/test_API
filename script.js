@@ -53,8 +53,11 @@ var __noticeBound = false;        // 이벤트 중복 바인딩 방지
 var __noticeGlobalBound = false;  // 전역 이벤트(keydown/visibility) 중복 방지
 var __noticeModalOpen = false;    // 모달 열려있으면 자동전환 중지
 
-// ✅ (추가) 스와이프 직후 클릭으로 모달 열리는 것 방지용
+// ✅ 스와이프 직후 클릭으로 모달 열리는 것 방지용
 var __noticeSuppressClickUntil = 0;
+
+// ✅ 모달 스와이프 이벤트 중복 바인딩 방지용
+var __noticeModalSwipeBound = false;
 
 // ====== (데모) 로그인 ======
 async function demoLogin(name, parent4) {
@@ -376,7 +379,7 @@ async function loadEduScoreSummary(session) {
 }
 
 /* =========================================================
-   ✅ 공지 (dashboard 슬라이드 + 모달 + ✅스와이프 + ✅자동전환)
+   ✅ 공지 (dashboard 슬라이드 + 모달 + ✅스와이프 + ✅자동전환 + ✅모달 스와이프)
 ========================================================= */
 
 async function loadNoticeList(session) {
@@ -454,7 +457,7 @@ function initNoticeInteractions_() {
   const modal = $("noticeModal");
   const modalClose = $("noticeModalClose");
 
-  // ✅ 추가: 공지 내용(제목/메타/프리뷰) 클릭/키보드로도 전체보기(모달) 열기
+  // ✅ 공지 내용(제목/메타/프리뷰) 클릭/키보드로도 모달 열기 (dashboard.html에 noticeTapArea가 있어야 함)
   const tapArea = $("noticeTapArea");
 
   // 버튼 바인딩
@@ -466,7 +469,7 @@ function initNoticeInteractions_() {
   if (tapArea && btnOpen) {
     tapArea.addEventListener("click", () => {
       if (__noticeModalOpen) return;
-      if (Date.now() < __noticeSuppressClickUntil) return; // 스와이프 직후 클릭 방지
+      if (Date.now() < __noticeSuppressClickUntil) return;
       btnOpen.click();
     });
 
@@ -503,7 +506,7 @@ function initNoticeInteractions_() {
     });
   }
 
-  // ✅ 스와이프 대상
+  // ✅ 대시보드 카드 스와이프 대상
   const swipeTarget = $("noticeSwipeArea") || $("noticeCard") || $("noticeSlider");
   if (!swipeTarget) return;
 
@@ -532,7 +535,7 @@ function initNoticeInteractions_() {
     const w = swipeTarget.clientWidth || 1;
     const threshold = w * thresholdRatio;
 
-    // ✅ 스와이프가 실제로 발생한 경우: 직후 클릭으로 모달 열리는 것 방지(짧게)
+    // ✅ 스와이프가 실제로 발생한 경우: 직후 클릭으로 모달 열리는 것 방지
     if (Math.abs(dx) > threshold) {
       __noticeSuppressClickUntil = Date.now() + 350;
     }
@@ -550,6 +553,86 @@ function initNoticeInteractions_() {
   swipeTarget.addEventListener("mousedown", (e) => { e.preventDefault(); onDown(e.clientX); });
   window.addEventListener("mousemove", (e) => onMove(e.clientX), { passive: true });
   window.addEventListener("mouseup",   ()  => onUp(), { passive: true });
+
+  // ✅ 모달에서도 스와이프 가능하게 바인딩 (최초 1회)
+  bindNoticeModalSwipe_();
+}
+
+function bindNoticeModalSwipe_() {
+  if (__noticeModalSwipeBound) return;
+  __noticeModalSwipeBound = true;
+
+  const panel = document.querySelector("#noticeModal .modal-panel");
+  if (!panel) return;
+
+  let startX = 0, startY = 0;
+  let lastX = 0, lastY = 0;
+  let dragging = false;
+
+  // ✅ 가로 스와이프만 판정(세로 스크롤 방해 최소화)
+  const thresholdRatio = 0.18;
+  const vertCancelRatio = 1.2; // 세로 이동이 가로보다 훨씬 크면 스와이프 취소
+
+  function down(x, y) {
+    if (__noticeItems.length < 2) return;
+    if (!__noticeModalOpen) return;
+    dragging = true;
+    startX = lastX = x;
+    startY = lastY = y;
+  }
+  function move(x, y) {
+    if (!dragging) return;
+    lastX = x;
+    lastY = y;
+  }
+  function up() {
+    if (!dragging) return;
+    dragging = false;
+
+    if (!__noticeModalOpen) return;
+
+    const dx = lastX - startX;
+    const dy = lastY - startY;
+
+    // 세로 스크롤 제스처면 무시
+    if (Math.abs(dy) > Math.abs(dx) * vertCancelRatio) return;
+
+    const w = panel.clientWidth || 1;
+    const threshold = w * thresholdRatio;
+
+    if (dx > threshold) {
+      setNoticeIndex_(__noticeIndex - 1);
+      openNoticeModal_(__noticeItems[__noticeIndex]); // ✅ 모달 내용 갱신
+    } else if (dx < -threshold) {
+      setNoticeIndex_(__noticeIndex + 1);
+      openNoticeModal_(__noticeItems[__noticeIndex]); // ✅ 모달 내용 갱신
+    }
+  }
+
+  // 터치
+  panel.addEventListener("touchstart", (e) => {
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    down(t.clientX, t.clientY);
+  }, { passive: true });
+
+  panel.addEventListener("touchmove", (e) => {
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    move(t.clientX, t.clientY);
+  }, { passive: true });
+
+  panel.addEventListener("touchend", () => up());
+
+  // 마우스 드래그
+  panel.addEventListener("mousedown", (e) => {
+    if (!__noticeModalOpen) return;
+    e.preventDefault();
+    down(e.clientX, e.clientY);
+  });
+
+  window.addEventListener("mousemove", (e) => move(e.clientX, e.clientY), { passive: true });
+  window.addEventListener("mouseup", () => up(), { passive: true });
 }
 
 function normalizeNoticeItems_(items) {
