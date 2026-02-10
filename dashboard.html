@@ -91,21 +91,33 @@
         <div id="noticeSwipeArea" style="display:none; margin-top:8px;">
           <!-- 슬라이드 영역 -->
           <div id="noticeSlider">
-            <div id="noticeTitle" style="font-weight:900;"></div>
-            <div id="noticeMeta" class="muted" style="margin-top:6px; font-size:12px;"></div>
 
-            <!-- ✅ 프리뷰는 텍스트 전용 -->
+            <!-- ✅ 추가: 제목/메타/프리뷰 클릭 시 "전체보기"가 열리도록 하는 클릭 전용 영역 -->
+            <!-- (좌/우 버튼 영역은 이 div 밖이라 클릭해도 전체보기가 안 열림) -->
             <div
-              id="noticePreview"
-              class="muted"
-              style="margin-top:8px; line-height:1.5;"
-            ></div>
+              id="noticeTapArea"
+              role="button"
+              tabindex="0"
+              aria-label="공지 전체보기 열기"
+              style="cursor:pointer;"
+            >
+              <div id="noticeTitle" style="font-weight:900;"></div>
+              <div id="noticeMeta" class="muted" style="margin-top:6px; font-size:12px;"></div>
+
+              <!-- ✅ 프리뷰는 텍스트 전용 -->
+              <div
+                id="noticePreview"
+                class="muted"
+                style="margin-top:8px; line-height:1.5;"
+              ></div>
+            </div>
 
             <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
               <button id="noticePrevBtn" class="btn btn-ghost btn-mini" type="button">◀</button>
               <div id="noticeDots" class="muted" style="font-size:12px;"></div>
               <button id="noticeNextBtn" class="btn btn-ghost btn-mini" type="button">▶</button>
             </div>
+
           </div>
         </div>
       </section>
