@@ -53,6 +53,9 @@ var __noticeBound = false;        // 이벤트 중복 바인딩 방지
 var __noticeGlobalBound = false;  // 전역 이벤트(keydown/visibility) 중복 방지
 var __noticeModalOpen = false;    // 모달 열려있으면 자동전환 중지
 
+// ✅ (추가) 스와이프 직후 클릭으로 모달 열리는 것 방지용
+var __noticeSuppressClickUntil = 0;
+
 // ====== (데모) 로그인 ======
 async function demoLogin(name, parent4) {
   if (!name || name.trim().length < 1) throw new Error("이름을 입력하세요.");
@@ -451,10 +454,31 @@ function initNoticeInteractions_() {
   const modal = $("noticeModal");
   const modalClose = $("noticeModalClose");
 
+  // ✅ 추가: 공지 내용(제목/메타/프리뷰) 클릭/키보드로도 전체보기(모달) 열기
+  const tapArea = $("noticeTapArea");
+
   // 버튼 바인딩
   if (btnPrev) btnPrev.onclick = () => { setNoticeIndex_(__noticeIndex - 1); restartNoticeAutoplay_(); };
   if (btnNext) btnNext.onclick = () => { setNoticeIndex_(__noticeIndex + 1); restartNoticeAutoplay_(); };
   if (btnOpen) btnOpen.onclick = () => { openNoticeModal_(__noticeItems[__noticeIndex]); };
+
+  // ✅ 탭 영역 = 전체보기 버튼과 동일 동작 (스와이프 직후 클릭은 무시)
+  if (tapArea && btnOpen) {
+    tapArea.addEventListener("click", () => {
+      if (__noticeModalOpen) return;
+      if (Date.now() < __noticeSuppressClickUntil) return; // 스와이프 직후 클릭 방지
+      btnOpen.click();
+    });
+
+    tapArea.addEventListener("keydown", (e) => {
+      if (__noticeModalOpen) return;
+      if (Date.now() < __noticeSuppressClickUntil) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        btnOpen.click();
+      }
+    });
+  }
 
   // 모달 닫기
   if (modalClose) modalClose.onclick = () => closeNoticeModal_();
@@ -507,6 +531,11 @@ function initNoticeInteractions_() {
     const dx = lastX - startX;
     const w = swipeTarget.clientWidth || 1;
     const threshold = w * thresholdRatio;
+
+    // ✅ 스와이프가 실제로 발생한 경우: 직후 클릭으로 모달 열리는 것 방지(짧게)
+    if (Math.abs(dx) > threshold) {
+      __noticeSuppressClickUntil = Date.now() + 350;
+    }
 
     if (dx > threshold) setNoticeIndex_(__noticeIndex - 1);
     else if (dx < -threshold) setNoticeIndex_(__noticeIndex + 1);
