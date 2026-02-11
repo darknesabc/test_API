@@ -103,57 +103,63 @@ body {
 .link:hover { text-decoration: underline; }
 .muted { color: var(--muted); font-size: 13px; }
 
-
 /* =========================
-   ✅ Select 전용 (드롭다운 깨짐 방지)
+   Select
    ========================= */
 .select-ghost{
-  box-sizing: border-box;
   height: 32px;
-  line-height: 32px;
   min-width: 120px;
-
-  padding: 0 34px 0 12px;   /* 오른쪽 화살표 공간 확보 */
+  padding: 0 34px 0 12px;
   border-radius: 12px;
-
   background: var(--btn2);
   border: 1px solid var(--line);
   color: var(--text);
   font-weight: 700;
   font: inherit;
-
-  -webkit-appearance: none;
-  -moz-appearance: none;
   appearance: none;
-
-  /* 글자 잘림 방지 */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-
-  /* 화살표(커스텀) */
   background-image:
     linear-gradient(45deg, transparent 50%, currentColor 50%),
     linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
-  background-size: 6px 6px, 6px 6px;
+  background-size: 6px 6px;
   background-repeat: no-repeat;
-
-  cursor: pointer;
 }
 .select-ghost:focus{
   outline: none;
   border-color: rgba(255,255,255,.28);
 }
 
-
 /* =========================================================
-   ✅ (추가) dashboard 공지/모달 스타일
-   - notice 슬라이드 버튼/점 표시
-   - 모달(전체화면) + 본문/링크/이미지 세로 나열
+   ✅ 공지 카드 — 완전 고정 높이
    ========================================================= */
 
-/* 버튼 크기 통일용 (dashboard에서 이미 쓰고 있음) */
+/* 🔒 카드 높이 완전 고정 */
+#noticeCard{
+  height: 220px;          /* ← 이 값만 조절하면 됨 */
+  display: flex;
+  flex-direction: column;
+}
+
+/* 내부 레이아웃 안정 */
+#noticeSwipeArea{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 프리뷰는 무조건 3줄 */
+#noticePreview{
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 버튼 */
 .btn-mini{
   padding: 6px 10px;
   border-radius: 10px;
@@ -162,116 +168,52 @@ body {
   line-height: 1;
 }
 
-/* ✅ 베스트 조합: 공지 카드 높이 안정화 + 내부 정렬 안정화 */
-#noticeCard{
-  min-height: 220px; /* 필요하면 200~260px 미세조정 */
-  display: flex;
-  flex-direction: column;
-}
+/* =========================================================
+   모달
+   ========================================================= */
 
-/* noticeSwipeArea가 남는 공간을 먹어 버튼/도트 위치 흔들림 최소화 */
-#noticeSwipeArea{
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-/* 공지 미리보기 3줄 고정 */
-#noticePreview{
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* (선택) 공지 내용 클릭 영역 커서/포커스 느낌 */
-#noticeTapArea{
-  cursor: pointer;
-}
-#noticeTapArea:focus{
-  outline: none;
-}
-
-/* ===== 모달 ===== */
 .modal{
   position: fixed;
   inset: 0;
   z-index: 9999;
 }
-
 .modal-backdrop{
   position: absolute;
   inset: 0;
   background: rgba(0,0,0,0.55);
   backdrop-filter: blur(6px);
 }
-
 .modal-panel{
-  position: relative;
   width: min(920px, calc(100% - 24px));
   max-height: calc(100% - 24px);
   margin: 12px auto;
-  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
-  border: 1px solid var(--line);
   border-radius: 16px;
-  box-shadow: 0 18px 50px rgba(0,0,0,0.55);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
   overflow: hidden;
 }
-
 .modal-header{
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 14px;
+  padding: 14px;
   border-bottom: 1px solid var(--line);
-  background: rgba(0,0,0,0.12);
 }
-
 .modal-body{
   padding: 14px;
   overflow: auto;
   max-height: calc(100vh - 140px);
 }
-
-/* 모달 링크 */
-#noticeModalLinkWrap a,
-#noticeModalLink{
-  color: #9ec5ff;
-  text-decoration: none;
-  font-weight: 800;
-  word-break: break-all;
-}
-#noticeModalLink:hover{
-  text-decoration: underline;
-}
-
-/* 모달 이미지 여러장 세로 */
 #noticeModalImages{
   display: grid;
   gap: 10px;
 }
 #noticeModalImages img{
   width: 100%;
-  max-width: 100%;
   border-radius: 14px;
   border: 1px solid var(--line);
-  background: rgba(0,0,0,0.15);
 }
 
-/* 모바일에서 모달 패널 꽉 차게 */
+/* 모바일 */
 @media (max-width: 720px){
-  .modal-panel{
-    width: calc(100% - 16px);
-    margin: 8px auto;
-    max-height: calc(100% - 16px);
-  }
-  .modal-body{
-    max-height: calc(100vh - 130px);
-  }
-
-  /* 모바일은 카드 높이 살짝 줄여도 보기 좋아서(원치 않으면 삭제 가능) */
   #noticeCard{
-    min-height: 200px;
+    height: 200px; /* 모바일은 살짝 낮게 */
   }
 }
