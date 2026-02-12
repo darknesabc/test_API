@@ -6,15 +6,12 @@
  * - ✅ 교육점수 요약: eduscore_summary
  * - ✅ 교육점수 상세: eduscore_detail (eduscore.html)
  * - ✅ 공지: notice_list (dashboard에서 슬라이드 + 모달)
- * - ✅ (추가) 성적: grade_summary (대시보드 카드) + 회차 드롭다운(현재 3월만)
+ * - ✅ 성적(표): grade_summary (dashboard)
  ***********************/
 
 // ====== 설정 ======
 const DEMO_MODE = false; // 실전
 const SESSION_KEY = "parent_session_v1";
-
-// ✅ 성적 회차 저장 키(대시보드/상세 공용으로 쓰기 좋음)
-const GRADE_EXAM_KEY = "grade_exam_v1";
 
 // ✅ Apps Script Web App URL
 const API_BASE = "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec";
@@ -34,7 +31,7 @@ function clearSession() {
   sessionStorage.removeItem(SESSION_KEY);
 }
 
-// ✅ (추가) 안전 유틸 (sleep.html에서도 쓰기 좋게)
+// ✅ 안전 유틸
 function safeNum_(v, fallback = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
@@ -42,16 +39,6 @@ function safeNum_(v, fallback = 0) {
 function safeText_(v, fallback = "-") {
   const s = String(v ?? "").trim();
   return s ? s : fallback;
-}
-
-// ✅ 성적 회차 저장/로드
-function setGradeExam_(exam) {
-  const v = String(exam ?? "").trim();
-  if (!v) return;
-  sessionStorage.setItem(GRADE_EXAM_KEY, v);
-}
-function getGradeExam_() {
-  return String(sessionStorage.getItem(GRADE_EXAM_KEY) || "").trim();
 }
 
 /* =========================================================
@@ -63,14 +50,11 @@ var __noticeIndex = 0;
 var __noticeTimer = null;
 var __NOTICE_AUTOPLAY_MS = 6000;
 
-var __noticeBound = false;        // 이벤트 중복 바인딩 방지
-var __noticeGlobalBound = false;  // 전역 이벤트(keydown/visibility) 중복 방지
-var __noticeModalOpen = false;    // 모달 열려있으면 자동전환 중지
+var __noticeBound = false;
+var __noticeGlobalBound = false;
+var __noticeModalOpen = false;
 
-// ✅ 스와이프 직후 클릭으로 모달 열리는 것 방지용
 var __noticeSuppressClickUntil = 0;
-
-// ✅ 모달 스와이프 이벤트 중복 바인딩 방지용
 var __noticeModalSwipeBound = false;
 
 // ====== (데모) 로그인 ======
@@ -141,9 +125,6 @@ async function apiLogin(name, parent4) {
         createdAt: Date.now()
       });
 
-      // ✅ 기본 회차(없으면 3월로)
-      if (!getGradeExam_()) setGradeExam_("3월");
-
       location.href = "dashboard.html";
     } catch (err) {
       if (msg) msg.textContent = err?.message ?? String(err);
@@ -190,161 +171,12 @@ async function apiLogin(name, parent4) {
   loadMoveSummary(session);
   loadEduScoreSummary(session);
 
-  // ✅ (추가) 성적 요약 로드 + 회차 드롭다운 초기화
-  initGradeCard_(session);
+  // ✅ 성적(표)
+  loadGradeSummary(session);
 
-  // ✅ 공지 로드 (슬라이드 + 모달 + 스와이프 + 자동전환)
+  // ✅ 공지
   loadNoticeList(session);
 })();
-
-/* =========================================================
-   ✅ 성적 카드 (대시보드)
-   - 회차 드롭다운(현재 3월만)
-   - 요약 표시 영역 채우기
-========================================================= */
-function initGradeCard_(session) {
-  const sel = $("gradeExamSelect");
-  if (!sel) return; // dashboard.html에 없으면 스킵
-
-  // 기본값: 저장된 회차가 있으면 우선, 없으면 3월
-  const saved = getGradeExam_() || "3월";
-  // 옵션에 없다면 첫 옵션으로
-  const exists = Array.from(sel.options || []).some(o => String(o.value) === saved);
-  sel.value = exists ? saved : (sel.options?.[0]?.value || "3월");
-  setGradeExam_(sel.value);
-
-  sel.addEventListener("change", () => {
-    setGradeExam_(sel.value);
-    loadGradeSummary(session, sel.value);
-  });
-
-  // 최초 로드
-  loadGradeSummary(session, sel.value);
-}
-
-async function loadGradeSummary(session, exam) {
-  const loading = $("gradeLoading");
-  const error   = $("gradeError");
-  const box     = $("gradeSummary");
-
-  const topLine = $("gradeTopLine");
-  const korLine = $("gradeKorLine");
-  const mathLine = $("gradeMathLine");
-  const engLine = $("gradeEngLine");
-  const histLine = $("gradeHistLine");
-  const tam1Line = $("gradeTam1Line");
-  const tam2Line = $("gradeTam2Line");
-
-  if (!loading || !error || !box || !topLine || !korLine || !mathLine || !engLine || !histLine || !tam1Line || !tam2Line) return;
-
-  // UI 리셋
-  loading.textContent = "불러오는 중...";
-  error.textContent = "";
-  box.style.display = "none";
-  topLine.textContent = "";
-  korLine.textContent = "-";
-  mathLine.textContent = "-";
-  engLine.textContent = "-";
-  histLine.textContent = "-";
-  tam1Line.textContent = "-";
-  tam2Line.textContent = "-";
-
-  try {
-    const examName = String(exam || "3월").trim() || "3월";
-
-    // ✅ 백엔드가 아직 없을 수 있으니: 실패해도 자연스럽게 처리
-    const res = await fetch(`${API_BASE}?path=grade_summary`, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ token: session.token, exam: examName })
-    });
-
-    // Apps Script가 Unknown path를 주면 ok:false로 올 가능성이 큼
-    const data = await res.json();
-    if (!data.ok) {
-      throw new Error(data.error || "성적 요약 연동이 아직 준비되지 않았습니다.");
-    }
-
-    // ===== 기대 데이터 형태(우리가 백엔드 만들 때 맞춰줄 예정) =====
-    // data.summary = {
-    //   exam: "3월",
-    //   topLine: "...",
-    //   kor:  { choice, common, select, expStd, expPct, expGrade },
-    //   math: { choice, common, select, expStd, expPct, expGrade },
-    //   eng:  { raw, grade },
-    //   hist: { raw, grade },
-    //   tam1: { subject, raw, expStd, expPct, expGrade },
-    //   tam2: { subject, raw, expStd, expPct, expGrade }
-    // }
-
-    const s = data.summary || data || {};
-    loading.textContent = "";
-
-    // 상단 한 줄
-    topLine.textContent = safeText_(s.topLine, `${examName} 성적 요약`);
-
-    // 국어/수학: 선택과목 + 공통/선택 + 예상표준/백분위/등급
-    korLine.textContent  = fmtKorMath_(s.kor);
-    mathLine.textContent = fmtKorMath_(s.math);
-
-    // 영어/한국사: 원점수, 등급
-    engLine.textContent  = fmtEngHist_(s.eng, "영어");
-    histLine.textContent = fmtEngHist_(s.hist, "한국사");
-
-    // 탐구1/2: 과목명 + 원점수 + 예상표준/백/등
-    tam1Line.textContent = fmtTam_(s.tam1, "탐구1");
-    tam2Line.textContent = fmtTam_(s.tam2, "탐구2");
-
-    box.style.display = "";
-  } catch (e) {
-    loading.textContent = "";
-    // ✅ 백엔드가 아직 없으면 여기로 떨어짐 (기존 기능 영향 없음)
-    error.textContent = e?.message ?? String(e);
-    // “추가 예정” 느낌으로 최소 표시
-    topLine.textContent = safeText_(exam, "3월") + " 성적(연동 준비중)";
-    box.style.display = "";
-  }
-}
-
-function fmtKorMath_(o) {
-  if (!o) return "-";
-  const choice = safeText_(o.choice, "");
-  const common = safeText_(o.common, "");
-  const select = safeText_(o.select, "");
-  const expStd = safeText_(o.expStd, "");
-  const expPct = safeText_(o.expPct, "");
-  const expGr  = safeText_(o.expGrade, "");
-
-  // 예: "언매 | 공통 76 / 선택 22 | 예상 137·99·1"
-  const part1 = choice ? `${choice}` : "";
-  const part2 = (common || select) ? `공통 ${common}${select ? ` / 선택 ${select}` : ""}` : "";
-  const part3 = (expStd || expPct || expGr) ? `예상 ${[expStd, expPct, expGr].filter(x => x && x !== "-").join("·")}` : "";
-
-  return [part1, part2, part3].filter(Boolean).join(" | ") || "-";
-}
-
-function fmtEngHist_(o, label) {
-  if (!o) return "-";
-  const raw = safeText_(o.raw, "");
-  const grade = safeText_(o.grade, "");
-  if (!raw && !grade) return "-";
-  // 예: "90점 · 1등급"
-  return `${raw ? `${raw}점` : ""}${raw && grade ? " · " : ""}${grade ? `${grade}등급` : ""}`.trim() || "-";
-}
-
-function fmtTam_(o, label) {
-  if (!o) return "-";
-  const subject = safeText_(o.subject, "");
-  const raw = safeText_(o.raw, "");
-  const expStd = safeText_(o.expStd, "");
-  const expPct = safeText_(o.expPct, "");
-  const expGr  = safeText_(o.expGrade, "");
-
-  // 예: "정법 50 | 예상 70·100·1"
-  const part1 = [subject, raw].filter(Boolean).join(" ");
-  const part2 = (expStd || expPct || expGr) ? `예상 ${[expStd, expPct, expGr].filter(x => x && x !== "-").join("·")}` : "";
-  return [part1, part2].filter(Boolean).join(" | ") || "-";
-}
 
 /* =========================================================
    출결 요약 (대시보드 카드)
@@ -548,14 +380,139 @@ async function loadEduScoreSummary(session) {
 }
 
 /* =========================================================
-   ✅ 공지 (dashboard 슬라이드 + 모달 + ✅스와이프 + ✅자동전환 + ✅모달 스와이프)
+   ✅ 성적(대시보드 표)  ★ 여기서 이미지처럼 출력됨
+========================================================= */
+async function loadGradeSummary(session) {
+  const sel     = $("gradeExamSelect");
+  const loading = $("gradeLoading");
+  const error   = $("gradeError");
+  const wrap    = $("gradeTableWrap");
+  const tbody   = $("gradeTbody");
+
+  // dashboard.html에 성적 카드가 없으면 스킵
+  if (!sel || !loading || !error || !wrap || !tbody) return;
+
+  sel.addEventListener("change", () => fetchAndRender());
+  fetchAndRender();
+
+  async function fetchAndRender() {
+    try {
+      loading.textContent = "불러오는 중...";
+      error.textContent = "";
+      wrap.style.display = "none";
+      tbody.innerHTML = "";
+
+      const exam = String(sel.value || "mar"); // 지금은 mar만
+      const res = await fetch(`${API_BASE}?path=grade_summary`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ token: session.token, exam })
+      });
+
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "성적 불러오기 실패");
+
+      const rows = buildGradeTableRows_(data);
+
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml_(r.label)}</td>
+          <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml_(r.kor)}</td>
+          <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml_(r.math)}</td>
+          <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml_(r.eng)}</td>
+          <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml_(r.hist)}</td>
+          <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml_(r.tam1)}</td>
+          <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml_(r.tam2)}</td>
+        </tr>
+      `).join("");
+
+      loading.textContent = "";
+      wrap.style.display = "";
+    } catch (e) {
+      loading.textContent = "";
+      wrap.style.display = "none";
+      error.textContent = e?.message ?? String(e);
+    }
+  }
+}
+
+/** 이미지처럼: 선택과목/원점수/표준점수/백분위/등급 */
+function buildGradeTableRows_(data) {
+  const kor  = data.kor  || {};
+  const math = data.math || {};
+  const eng  = data.eng  || {};
+  const hist = data.hist || {};
+  const tam1 = data.tam1 || {};
+  const tam2 = data.tam2 || {};
+
+  const dash = "-";
+  const fmt = (v) => {
+    const s = String(v ?? "").trim();
+    return s ? s : dash;
+  };
+  const fmtNum = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && String(v).trim() !== "" ? String(n) : dash;
+  };
+
+  return [
+    {
+      label: "선택과목",
+      kor:  fmt(kor.choice),
+      math: fmt(math.choice),
+      eng:  dash,
+      hist: dash,
+      tam1: fmt(tam1.name),
+      tam2: fmt(tam2.name),
+    },
+    {
+      label: "원점수",
+      kor:  fmtNum(kor.raw_total),
+      math: fmtNum(math.raw_total),
+      eng:  fmtNum(eng.raw),
+      hist: fmtNum(hist.raw),
+      tam1: fmtNum(tam1.raw),
+      tam2: fmtNum(tam2.raw),
+    },
+    {
+      label: "표준점수",
+      kor:  fmtNum(kor.std),
+      math: fmtNum(math.std),
+      eng:  dash,
+      hist: dash,
+      // 탐구는 예상 표준점수로 표시(네 표 모양과 가장 잘 맞음)
+      tam1: fmtNum(tam1.expected_std),
+      tam2: fmtNum(tam2.expected_std),
+    },
+    {
+      label: "백분위",
+      kor:  fmtNum(kor.pct),
+      math: fmtNum(math.pct),
+      eng:  dash,
+      hist: dash,
+      tam1: fmtNum(tam1.expected_pct),
+      tam2: fmtNum(tam2.expected_pct),
+    },
+    {
+      label: "등급",
+      kor:  fmt(kor.grade),
+      math: fmt(math.grade),
+      eng:  fmt(eng.grade),
+      hist: fmt(hist.grade),
+      tam1: fmt(tam1.expected_grade),
+      tam2: fmt(tam2.expected_grade),
+    },
+  ];
+}
+
+/* =========================================================
+   ✅ 공지 (dashboard 슬라이드 + 모달 + 스와이프 + 자동전환 + 모달 스와이프)
 ========================================================= */
 
 async function loadNoticeList(session) {
   const loading = $("noticeLoading");
   const error   = $("noticeError");
 
-  // 대시보드 HTML이 noticeSwipeArea가 있든 없든 대응
   const sliderWrap = $("noticeSwipeArea") || $("noticeSlider");
   const slider  = $("noticeSlider");
 
@@ -599,10 +556,8 @@ async function loadNoticeList(session) {
 
     __noticeIndex = 0;
 
-    // ✅ 버튼/스와이프/전역 이벤트 바인딩(최초 1회)
     initNoticeInteractions_();
 
-    // 첫 렌더
     renderNoticeCard_();
 
     sliderWrap.style.display = "";
@@ -626,15 +581,12 @@ function initNoticeInteractions_() {
   const modal = $("noticeModal");
   const modalClose = $("noticeModalClose");
 
-  // ✅ 공지 내용(제목/메타/프리뷰) 클릭/키보드로도 모달 열기 (dashboard.html에 noticeTapArea가 있어야 함)
   const tapArea = $("noticeTapArea");
 
-  // 버튼 바인딩
   if (btnPrev) btnPrev.onclick = () => { setNoticeIndex_(__noticeIndex - 1); restartNoticeAutoplay_(); };
   if (btnNext) btnNext.onclick = () => { setNoticeIndex_(__noticeIndex + 1); restartNoticeAutoplay_(); };
   if (btnOpen) btnOpen.onclick = () => { openNoticeModal_(__noticeItems[__noticeIndex]); };
 
-  // ✅ 탭 영역 = 전체보기 버튼과 동일 동작 (스와이프 직후 클릭은 무시)
   if (tapArea && btnOpen) {
     tapArea.addEventListener("click", () => {
       if (__noticeModalOpen) return;
@@ -652,7 +604,6 @@ function initNoticeInteractions_() {
     });
   }
 
-  // 모달 닫기
   if (modalClose) modalClose.onclick = () => closeNoticeModal_();
   if (modal) {
     modal.onclick = (e) => {
@@ -661,7 +612,6 @@ function initNoticeInteractions_() {
     };
   }
 
-  // ✅ 전역 이벤트(ESC/visibility)는 한 번만
   if (!__noticeGlobalBound) {
     __noticeGlobalBound = true;
 
@@ -675,7 +625,6 @@ function initNoticeInteractions_() {
     });
   }
 
-  // ✅ 대시보드 카드 스와이프 대상
   const swipeTarget = $("noticeSwipeArea") || $("noticeCard") || $("noticeSlider");
   if (!swipeTarget) return;
 
@@ -704,7 +653,6 @@ function initNoticeInteractions_() {
     const w = swipeTarget.clientWidth || 1;
     const threshold = w * thresholdRatio;
 
-    // ✅ 스와이프가 실제로 발생한 경우: 직후 클릭으로 모달 열리는 것 방지
     if (Math.abs(dx) > threshold) {
       __noticeSuppressClickUntil = Date.now() + 350;
     }
@@ -723,7 +671,6 @@ function initNoticeInteractions_() {
   window.addEventListener("mousemove", (e) => onMove(e.clientX), { passive: true });
   window.addEventListener("mouseup",   ()  => onUp(), { passive: true });
 
-  // ✅ 모달에서도 스와이프 가능하게 바인딩 (최초 1회)
   bindNoticeModalSwipe_();
 }
 
@@ -738,9 +685,8 @@ function bindNoticeModalSwipe_() {
   let lastX = 0, lastY = 0;
   let dragging = false;
 
-  // ✅ 가로 스와이프만 판정(세로 스크롤 방해 최소화)
   const thresholdRatio = 0.18;
-  const vertCancelRatio = 1.2; // 세로 이동이 가로보다 훨씬 크면 스와이프 취소
+  const vertCancelRatio = 1.2;
 
   function down(x, y) {
     if (__noticeItems.length < 2) return;
@@ -763,7 +709,6 @@ function bindNoticeModalSwipe_() {
     const dx = lastX - startX;
     const dy = lastY - startY;
 
-    // 세로 스크롤 제스처면 무시
     if (Math.abs(dy) > Math.abs(dx) * vertCancelRatio) return;
 
     const w = panel.clientWidth || 1;
@@ -771,14 +716,13 @@ function bindNoticeModalSwipe_() {
 
     if (dx > threshold) {
       setNoticeIndex_(__noticeIndex - 1);
-      openNoticeModal_(__noticeItems[__noticeIndex]); // ✅ 모달 내용 갱신
+      openNoticeModal_(__noticeItems[__noticeIndex]);
     } else if (dx < -threshold) {
       setNoticeIndex_(__noticeIndex + 1);
-      openNoticeModal_(__noticeItems[__noticeIndex]); // ✅ 모달 내용 갱신
+      openNoticeModal_(__noticeItems[__noticeIndex]);
     }
   }
 
-  // 터치
   panel.addEventListener("touchstart", (e) => {
     const t = e.touches && e.touches[0];
     if (!t) return;
@@ -793,7 +737,6 @@ function bindNoticeModalSwipe_() {
 
   panel.addEventListener("touchend", () => up());
 
-  // 마우스 드래그
   panel.addEventListener("mousedown", (e) => {
     if (!__noticeModalOpen) return;
     e.preventDefault();
