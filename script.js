@@ -57,7 +57,32 @@ var __noticeModalOpen = false;
 var __noticeSuppressClickUntil = 0;
 var __noticeModalSwipeBound = false;
 
-// ====== (데모) 로그인 ======
+/* =========================================================
+   ✅ (중요) select UI 깨짐 방지
+   - 기존 HTML에서 select에 btn 클래스를 줬을 때(깨짐) 자동으로 교정
+   - styles.css의 .select-ghost를 실제로 적용
+========================================================= */
+function fixSelectUi_() {
+  const sel = $("gradeExamSelect");
+  if (!sel) return;
+
+  // ✅ btn류 클래스가 select에 붙어있으면 제거(브라우저 드롭다운 UI랑 충돌 방지)
+  // 대신 .select-ghost를 붙여서 안정적으로 표시
+  sel.classList.add("select-ghost");
+
+  // 혹시 HTML에서 btn 클래스가 붙어있다면 제거
+  sel.classList.remove("btn");
+  sel.classList.remove("btn-ghost");
+  sel.classList.remove("btn-mini");
+
+  // ✅ inline style padding이 있으면 select-ghost와 충돌할 수 있어서 제거 권장
+  // (원하면 주석 처리 가능)
+  sel.style.padding = "";
+}
+
+/* =========================================================
+   ====== (데모) 로그인 ======
+========================================================= */
 async function demoLogin(name, parent4) {
   if (!name || name.trim().length < 1) throw new Error("이름을 입력하세요.");
   if (!/^\d{4}$/.test(parent4)) throw new Error("부모4자리는 숫자 4자리로 입력하세요.");
@@ -155,6 +180,9 @@ async function apiLogin(name, parent4) {
     location.href = "index.html";
     return;
   }
+
+  // ✅ select UI 깨짐 방지(대시보드 들어오자마자)
+  fixSelectUi_();
 
   const userLine = $("userLine");
   const extra = [session.seat, session.teacher ? `${session.teacher} 담임` : null].filter(Boolean).join(" · ");
@@ -380,7 +408,7 @@ async function loadEduScoreSummary(session) {
 }
 
 /* =========================================================
-   ✅ 성적(대시보드 표)  ★ 여기서 이미지처럼 출력됨
+   ✅ 성적(대시보드 표)
 ========================================================= */
 async function loadGradeSummary(session) {
   const sel     = $("gradeExamSelect");
@@ -389,8 +417,10 @@ async function loadGradeSummary(session) {
   const wrap    = $("gradeTableWrap");
   const tbody   = $("gradeTbody");
 
-  // dashboard.html에 성적 카드가 없으면 스킵
   if (!sel || !loading || !error || !wrap || !tbody) return;
+
+  // ✅ 혹시 대시보드 렌더 전에 클래스가 다시 붙었을 수 있어서 한번 더 보정
+  fixSelectUi_();
 
   sel.addEventListener("change", () => fetchAndRender());
   fetchAndRender();
@@ -402,7 +432,7 @@ async function loadGradeSummary(session) {
       wrap.style.display = "none";
       tbody.innerHTML = "";
 
-      const exam = String(sel.value || "mar"); // 지금은 mar만
+      const exam = String(sel.value || "mar");
       const res = await fetch(`${API_BASE}?path=grade_summary`, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -456,52 +486,11 @@ function buildGradeTableRows_(data) {
   };
 
   return [
-    {
-      label: "선택과목",
-      kor:  fmt(kor.choice),
-      math: fmt(math.choice),
-      eng:  dash,
-      hist: dash,
-      tam1: fmt(tam1.name),
-      tam2: fmt(tam2.name),
-    },
-    {
-      label: "원점수",
-      kor:  fmtNum(kor.raw_total),
-      math: fmtNum(math.raw_total),
-      eng:  fmtNum(eng.raw),
-      hist: fmtNum(hist.raw),
-      tam1: fmtNum(tam1.raw),
-      tam2: fmtNum(tam2.raw),
-    },
-    {
-      label: "표준점수",
-      kor:  fmtNum(kor.std),
-      math: fmtNum(math.std),
-      eng:  dash,
-      hist: dash,
-      // 탐구는 예상 표준점수로 표시(네 표 모양과 가장 잘 맞음)
-      tam1: fmtNum(tam1.expected_std),
-      tam2: fmtNum(tam2.expected_std),
-    },
-    {
-      label: "백분위",
-      kor:  fmtNum(kor.pct),
-      math: fmtNum(math.pct),
-      eng:  dash,
-      hist: dash,
-      tam1: fmtNum(tam1.expected_pct),
-      tam2: fmtNum(tam2.expected_pct),
-    },
-    {
-      label: "등급",
-      kor:  fmt(kor.grade),
-      math: fmt(math.grade),
-      eng:  fmt(eng.grade),
-      hist: fmt(hist.grade),
-      tam1: fmt(tam1.expected_grade),
-      tam2: fmt(tam2.expected_grade),
-    },
+    { label: "선택과목", kor: fmt(kor.choice), math: fmt(math.choice), eng: dash, hist: dash, tam1: fmt(tam1.name), tam2: fmt(tam2.name) },
+    { label: "원점수",   kor: fmtNum(kor.raw_total), math: fmtNum(math.raw_total), eng: fmtNum(eng.raw), hist: fmtNum(hist.raw), tam1: fmtNum(tam1.raw), tam2: fmtNum(tam2.raw) },
+    { label: "표준점수", kor: fmtNum(kor.std), math: fmtNum(math.std), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_std), tam2: fmtNum(tam2.expected_std) },
+    { label: "백분위",   kor: fmtNum(kor.pct), math: fmtNum(math.pct), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_pct), tam2: fmtNum(tam2.expected_pct) },
+    { label: "등급",     kor: fmt(kor.grade), math: fmt(math.grade), eng: fmt(eng.grade), hist: fmt(hist.grade), tam1: fmt(tam1.expected_grade), tam2: fmt(tam2.expected_grade) },
   ];
 }
 
@@ -557,7 +546,6 @@ async function loadNoticeList(session) {
     __noticeIndex = 0;
 
     initNoticeInteractions_();
-
     renderNoticeCard_();
 
     sliderWrap.style.display = "";
