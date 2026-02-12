@@ -9,6 +9,7 @@
 }
 
 * { box-sizing: border-box; }
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
@@ -16,7 +17,11 @@ body {
   color: var(--text);
 }
 
-.wrap { max-width: 960px; margin: 0 auto; padding: 24px; }
+.wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
 
 .card {
   background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
@@ -30,7 +35,14 @@ body {
 .sub { margin: 0 0 16px; color: var(--muted); }
 
 .form { display: grid; gap: 12px; }
-.label { display: grid; gap: 6px; font-size: 14px; color: var(--muted); }
+
+.label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
 .input {
   padding: 12px 12px;
   border-radius: 12px;
@@ -39,7 +51,9 @@ body {
   color: var(--text);
   outline: none;
 }
-.input:focus { border-color: rgba(59,130,246,0.6); }
+.input:focus {
+  border-color: rgba(59,130,246,0.6);
+}
 
 .btn {
   padding: 12px 14px;
@@ -57,7 +71,19 @@ body {
   border: 1px solid var(--line);
 }
 
-.msg { margin: 4px 0 0; min-height: 20px; color: #ffb4b4; }
+.btn-mini {
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.msg {
+  margin: 4px 0 0;
+  min-height: 20px;
+  color: #ffb4b4;
+}
 
 .hint {
   margin-top: 14px;
@@ -69,6 +95,9 @@ body {
   font-size: 13px;
 }
 
+/* =========================
+   Topbar
+   ========================= */
 .topbar {
   position: sticky;
   top: 0;
@@ -88,6 +117,9 @@ body {
 .top-title { font-weight: 800; }
 .top-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
 
+/* =========================
+   Grid
+   ========================= */
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -104,9 +136,10 @@ body {
 .muted { color: var(--muted); font-size: 13px; }
 
 /* =========================
-   Select
+   Select (닫힌 상태)
    ========================= */
-.select-ghost{
+.select-ghost,
+#gradeExamSelect {
   height: 32px;
   min-width: 120px;
   padding: 0 34px 0 12px;
@@ -127,61 +160,56 @@ body {
   background-size: 6px 6px;
   background-repeat: no-repeat;
 }
-.select-ghost:focus{
+
+.select-ghost:focus,
+#gradeExamSelect:focus {
   outline: none;
   border-color: rgba(255,255,255,.28);
 }
 
-/* =========================================================
-   ✅ 공지 카드 — 완전 고정 높이
-   ========================================================= */
+/* =========================
+   ✅ 핵심 수정 부분
+   드롭다운 펼쳤을 때(option 목록)
+   ========================= */
+#gradeExamSelect option,
+.select-ghost option {
+  color: #111 !important;      /* 글자 안 보이던 문제 해결 */
+  background: #fff !important;/* Windows/Edge 기본 흰 배경 대응 */
+}
 
-/* 🔒 카드 높이 완전 고정 */
-#noticeCard{
-  height: 220px;          /* ← 이 값만 조절하면 됨 */
+/* =========================
+   공지 카드
+   ========================= */
+#noticeCard {
+  height: 220px;
   display: flex;
   flex-direction: column;
 }
 
-/* 내부 레이아웃 안정 */
-#noticeSwipeArea{
+#noticeSwipeArea {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-/* 프리뷰는 무조건 3줄 */
-#noticePreview{
+#noticePreview {
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* 버튼 */
-.btn-mini{
-  padding: 6px 10px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-/* =========================================================
-   ✅ 모달 (블러가 패널까지 먹는 현상 수정)
-   - backdrop은 아래(z-index:0)
-   - panel은 위(z-index:1)
-   ========================================================= */
-
-.modal{
+/* =========================
+   Modal
+   ========================= */
+.modal {
   position: fixed;
   inset: 0;
   z-index: 9999;
 }
 
-/* ✅ backdrop이 panel 위로 올라오지 않게 */
-.modal-backdrop{
+.modal-backdrop {
   position: absolute;
   inset: 0;
   background: rgba(0,0,0,0.55);
@@ -189,48 +217,43 @@ body {
   z-index: 0;
 }
 
-/* ✅ panel이 항상 위에 오도록 */
-.modal-panel{
-  position: relative; /* 중요 */
-  z-index: 1;         /* 중요 */
-
+.modal-panel {
+  position: relative;
+  z-index: 1;
   width: min(920px, calc(100% - 24px));
   max-height: calc(100% - 24px);
   margin: 12px auto;
   border-radius: 16px;
   border: 1px solid var(--line);
-
-  /* (선택) 더 선명하게 보이도록 약간 더 불투명하게 */
   background: rgba(15, 22, 40, 0.92);
-
   overflow: hidden;
 }
 
-.modal-header{
+.modal-header {
   padding: 14px;
   border-bottom: 1px solid var(--line);
   background: rgba(0,0,0,0.12);
 }
 
-.modal-body{
+.modal-body {
   padding: 14px;
   overflow: auto;
   max-height: calc(100vh - 140px);
 }
 
-#noticeModalImages{
+#noticeModalImages {
   display: grid;
   gap: 10px;
 }
-#noticeModalImages img{
+#noticeModalImages img {
   width: 100%;
   border-radius: 14px;
   border: 1px solid var(--line);
 }
 
-/* 모바일 */
+/* =========================
+   Mobile
+   ========================= */
 @media (max-width: 720px){
-  #noticeCard{
-    height: 200px; /* 모바일은 살짝 낮게 */
-  }
+  #noticeCard { height: 200px; }
 }
