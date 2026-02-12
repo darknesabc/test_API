@@ -6,11 +6,15 @@
  * - ✅ 교육점수 요약: eduscore_summary
  * - ✅ 교육점수 상세: eduscore_detail (eduscore.html)
  * - ✅ 공지: notice_list (dashboard에서 슬라이드 + 모달)
+ * - ✅ (추가) 성적: grade_summary (대시보드 카드) + 회차 드롭다운(현재 3월만)
  ***********************/
 
 // ====== 설정 ======
 const DEMO_MODE = false; // 실전
 const SESSION_KEY = "parent_session_v1";
+
+// ✅ 성적 회차 저장 키(대시보드/상세 공용으로 쓰기 좋음)
+const GRADE_EXAM_KEY = "grade_exam_v1";
 
 // ✅ Apps Script Web App URL
 const API_BASE = "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec";
@@ -38,6 +42,16 @@ function safeNum_(v, fallback = 0) {
 function safeText_(v, fallback = "-") {
   const s = String(v ?? "").trim();
   return s ? s : fallback;
+}
+
+// ✅ 성적 회차 저장/로드
+function setGradeExam_(exam) {
+  const v = String(exam ?? "").trim();
+  if (!v) return;
+  sessionStorage.setItem(GRADE_EXAM_KEY, v);
+}
+function getGradeExam_() {
+  return String(sessionStorage.getItem(GRADE_EXAM_KEY) || "").trim();
 }
 
 /* =========================================================
@@ -127,6 +141,9 @@ async function apiLogin(name, parent4) {
         createdAt: Date.now()
       });
 
+      // ✅ 기본 회차(없으면 3월로)
+      if (!getGradeExam_()) setGradeExam_("3월");
+
       location.href = "dashboard.html";
     } catch (err) {
       if (msg) msg.textContent = err?.message ?? String(err);
@@ -173,9 +190,161 @@ async function apiLogin(name, parent4) {
   loadMoveSummary(session);
   loadEduScoreSummary(session);
 
+  // ✅ (추가) 성적 요약 로드 + 회차 드롭다운 초기화
+  initGradeCard_(session);
+
   // ✅ 공지 로드 (슬라이드 + 모달 + 스와이프 + 자동전환)
   loadNoticeList(session);
 })();
+
+/* =========================================================
+   ✅ 성적 카드 (대시보드)
+   - 회차 드롭다운(현재 3월만)
+   - 요약 표시 영역 채우기
+========================================================= */
+function initGradeCard_(session) {
+  const sel = $("gradeExamSelect");
+  if (!sel) return; // dashboard.html에 없으면 스킵
+
+  // 기본값: 저장된 회차가 있으면 우선, 없으면 3월
+  const saved = getGradeExam_() || "3월";
+  // 옵션에 없다면 첫 옵션으로
+  const exists = Array.from(sel.options || []).some(o => String(o.value) === saved);
+  sel.value = exists ? saved : (sel.options?.[0]?.value || "3월");
+  setGradeExam_(sel.value);
+
+  sel.addEventListener("change", () => {
+    setGradeExam_(sel.value);
+    loadGradeSummary(session, sel.value);
+  });
+
+  // 최초 로드
+  loadGradeSummary(session, sel.value);
+}
+
+async function loadGradeSummary(session, exam) {
+  const loading = $("gradeLoading");
+  const error   = $("gradeError");
+  const box     = $("gradeSummary");
+
+  const topLine = $("gradeTopLine");
+  const korLine = $("gradeKorLine");
+  const mathLine = $("gradeMathLine");
+  const engLine = $("gradeEngLine");
+  const histLine = $("gradeHistLine");
+  const tam1Line = $("gradeTam1Line");
+  const tam2Line = $("gradeTam2Line");
+
+  if (!loading || !error || !box || !topLine || !korLine || !mathLine || !engLine || !histLine || !tam1Line || !tam2Line) return;
+
+  // UI 리셋
+  loading.textContent = "불러오는 중...";
+  error.textContent = "";
+  box.style.display = "none";
+  topLine.textContent = "";
+  korLine.textContent = "-";
+  mathLine.textContent = "-";
+  engLine.textContent = "-";
+  histLine.textContent = "-";
+  tam1Line.textContent = "-";
+  tam2Line.textContent = "-";
+
+  try {
+    const examName = String(exam || "3월").trim() || "3월";
+
+    // ✅ 백엔드가 아직 없을 수 있으니: 실패해도 자연스럽게 처리
+    const res = await fetch(`${API_BASE}?path=grade_summary`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: session.token, exam: examName })
+    });
+
+    // Apps Script가 Unknown path를 주면 ok:false로 올 가능성이 큼
+    const data = await res.json();
+    if (!data.ok) {
+      throw new Error(data.error || "성적 요약 연동이 아직 준비되지 않았습니다.");
+    }
+
+    // ===== 기대 데이터 형태(우리가 백엔드 만들 때 맞춰줄 예정) =====
+    // data.summary = {
+    //   exam: "3월",
+    //   topLine: "...",
+    //   kor:  { choice, common, select, expStd, expPct, expGrade },
+    //   math: { choice, common, select, expStd, expPct, expGrade },
+    //   eng:  { raw, grade },
+    //   hist: { raw, grade },
+    //   tam1: { subject, raw, expStd, expPct, expGrade },
+    //   tam2: { subject, raw, expStd, expPct, expGrade }
+    // }
+
+    const s = data.summary || data || {};
+    loading.textContent = "";
+
+    // 상단 한 줄
+    topLine.textContent = safeText_(s.topLine, `${examName} 성적 요약`);
+
+    // 국어/수학: 선택과목 + 공통/선택 + 예상표준/백분위/등급
+    korLine.textContent  = fmtKorMath_(s.kor);
+    mathLine.textContent = fmtKorMath_(s.math);
+
+    // 영어/한국사: 원점수, 등급
+    engLine.textContent  = fmtEngHist_(s.eng, "영어");
+    histLine.textContent = fmtEngHist_(s.hist, "한국사");
+
+    // 탐구1/2: 과목명 + 원점수 + 예상표준/백/등
+    tam1Line.textContent = fmtTam_(s.tam1, "탐구1");
+    tam2Line.textContent = fmtTam_(s.tam2, "탐구2");
+
+    box.style.display = "";
+  } catch (e) {
+    loading.textContent = "";
+    // ✅ 백엔드가 아직 없으면 여기로 떨어짐 (기존 기능 영향 없음)
+    error.textContent = e?.message ?? String(e);
+    // “추가 예정” 느낌으로 최소 표시
+    topLine.textContent = safeText_(exam, "3월") + " 성적(연동 준비중)";
+    box.style.display = "";
+  }
+}
+
+function fmtKorMath_(o) {
+  if (!o) return "-";
+  const choice = safeText_(o.choice, "");
+  const common = safeText_(o.common, "");
+  const select = safeText_(o.select, "");
+  const expStd = safeText_(o.expStd, "");
+  const expPct = safeText_(o.expPct, "");
+  const expGr  = safeText_(o.expGrade, "");
+
+  // 예: "언매 | 공통 76 / 선택 22 | 예상 137·99·1"
+  const part1 = choice ? `${choice}` : "";
+  const part2 = (common || select) ? `공통 ${common}${select ? ` / 선택 ${select}` : ""}` : "";
+  const part3 = (expStd || expPct || expGr) ? `예상 ${[expStd, expPct, expGr].filter(x => x && x !== "-").join("·")}` : "";
+
+  return [part1, part2, part3].filter(Boolean).join(" | ") || "-";
+}
+
+function fmtEngHist_(o, label) {
+  if (!o) return "-";
+  const raw = safeText_(o.raw, "");
+  const grade = safeText_(o.grade, "");
+  if (!raw && !grade) return "-";
+  // 예: "90점 · 1등급"
+  return `${raw ? `${raw}점` : ""}${raw && grade ? " · " : ""}${grade ? `${grade}등급` : ""}`.trim() || "-";
+}
+
+function fmtTam_(o, label) {
+  if (!o) return "-";
+  const subject = safeText_(o.subject, "");
+  const raw = safeText_(o.raw, "");
+  const expStd = safeText_(o.expStd, "");
+  const expPct = safeText_(o.expPct, "");
+  const expGr  = safeText_(o.expGrade, "");
+
+  // 예: "정법 50 | 예상 70·100·1"
+  const part1 = [subject, raw].filter(Boolean).join(" ");
+  const part2 = (expStd || expPct || expGr) ? `예상 ${[expStd, expPct, expGr].filter(x => x && x !== "-").join("·")}` : "";
+  return [part1, part2].filter(Boolean).join(" | ") || "-";
+}
 
 /* =========================================================
    출결 요약 (대시보드 카드)
