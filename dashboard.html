@@ -44,10 +44,67 @@
         </div>
       </section>
 
-      <!-- ② 성적 -->
-      <section class="card">
-        <h2 class="card-title">성적</h2>
-        <p class="muted">추가 예정</p>
+      <!-- ② 성적 (✅ 드롭다운 + 요약 자리) -->
+      <section class="card" id="gradeCard">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <h2 class="card-title" style="margin:0;">성적</h2>
+
+          <div style="display:flex; align-items:center; gap:8px;">
+            <!-- ✅ 시험 회차 드롭다운 (지금은 3월만) -->
+            <select id="gradeExamSelect" class="select-ghost">
+              <option value="3월">3월</option>
+            </select>
+
+            <!-- ✅ 상세페이지(추후 구현) -->
+            <a class="btn btn-ghost btn-mini" href="grades.html">자세히</a>
+          </div>
+        </div>
+
+        <p id="gradeLoading" class="muted">불러오는 중...</p>
+        <p id="gradeError" class="msg"></p>
+
+        <!-- ✅ 요약 표시 영역(나중에 script.js에서 채움) -->
+        <div id="gradeSummary" style="display:none; margin-top:8px;">
+          <!-- 한 줄 요약(원하면 바꿔도 됨) -->
+          <div id="gradeTopLine" style="font-weight:900;"></div>
+
+          <!-- 과목별 요약 -->
+          <div style="margin-top:10px; display:grid; gap:8px;">
+            <div id="gradeKor" style="display:flex; justify-content:space-between; gap:10px;">
+              <div style="font-weight:800;">국어</div>
+              <div class="muted" id="gradeKorLine">-</div>
+            </div>
+
+            <div id="gradeMath" style="display:flex; justify-content:space-between; gap:10px;">
+              <div style="font-weight:800;">수학</div>
+              <div class="muted" id="gradeMathLine">-</div>
+            </div>
+
+            <div id="gradeEng" style="display:flex; justify-content:space-between; gap:10px;">
+              <div style="font-weight:800;">영어</div>
+              <div class="muted" id="gradeEngLine">-</div>
+            </div>
+
+            <div id="gradeHist" style="display:flex; justify-content:space-between; gap:10px;">
+              <div style="font-weight:800;">한국사</div>
+              <div class="muted" id="gradeHistLine">-</div>
+            </div>
+
+            <div id="gradeTam1" style="display:flex; justify-content:space-between; gap:10px;">
+              <div style="font-weight:800;">탐구1</div>
+              <div class="muted" id="gradeTam1Line">-</div>
+            </div>
+
+            <div id="gradeTam2" style="display:flex; justify-content:space-between; gap:10px;">
+              <div style="font-weight:800;">탐구2</div>
+              <div class="muted" id="gradeTam2Line">-</div>
+            </div>
+          </div>
+
+          <div class="muted" style="margin-top:10px; font-size:12px;">
+            * 현재는 3월 데이터만 사용합니다. (회차가 늘면 드롭다운 옵션만 추가하면 됨)
+          </div>
+        </div>
       </section>
 
       <!-- ③ 취침 -->
@@ -86,14 +143,9 @@
         <p id="noticeLoading" class="muted">불러오는 중...</p>
         <p id="noticeError" class="msg"></p>
 
-        <!-- ✅ 스와이프 전용 영역(텍스트 갈아끼우는 방식에 최적) -->
-        <!-- script.js에서 이 영역에 touch/mouse 이벤트를 붙이면 됨 -->
         <div id="noticeSwipeArea" style="display:none; margin-top:8px;">
-          <!-- 슬라이드 영역 -->
           <div id="noticeSlider">
 
-            <!-- ✅ 추가: 제목/메타/프리뷰 클릭 시 "전체보기"가 열리도록 하는 클릭 전용 영역 -->
-            <!-- (좌/우 버튼 영역은 이 div 밖이라 클릭해도 전체보기가 안 열림) -->
             <div
               id="noticeTapArea"
               role="button"
@@ -104,7 +156,6 @@
               <div id="noticeTitle" style="font-weight:900;"></div>
               <div id="noticeMeta" class="muted" style="margin-top:6px; font-size:12px;"></div>
 
-              <!-- ✅ 프리뷰는 텍스트 전용 -->
               <div
                 id="noticePreview"
                 class="muted"
@@ -174,7 +225,6 @@
       </div>
 
       <div class="modal-body">
-        <!-- ✅ body_html을 그대로 렌더 -->
         <div id="noticeModalBody" style="line-height:1.6;"></div>
 
         <div id="noticeModalLinkWrap" style="margin-top:12px; display:none;">
@@ -187,7 +237,6 @@
   </div>
 
   <!-- ================= SCRIPT ================= -->
-  <!-- ✅ 스와이프 + N초 자동전환 로직은 script.js에서 처리 -->
   <script src="script.js"></script>
 </body>
 </html>
