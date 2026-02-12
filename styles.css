@@ -169,7 +169,9 @@ body {
 }
 
 /* =========================================================
-   모달
+   ✅ 모달 (블러가 패널까지 먹는 현상 수정)
+   - backdrop은 아래(z-index:0)
+   - panel은 위(z-index:1)
    ========================================================= */
 
 .modal{
@@ -177,30 +179,45 @@ body {
   inset: 0;
   z-index: 9999;
 }
+
+/* ✅ backdrop이 panel 위로 올라오지 않게 */
 .modal-backdrop{
   position: absolute;
   inset: 0;
   background: rgba(0,0,0,0.55);
   backdrop-filter: blur(6px);
+  z-index: 0;
 }
+
+/* ✅ panel이 항상 위에 오도록 */
 .modal-panel{
+  position: relative; /* 중요 */
+  z-index: 1;         /* 중요 */
+
   width: min(920px, calc(100% - 24px));
   max-height: calc(100% - 24px);
   margin: 12px auto;
   border-radius: 16px;
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+
+  /* (선택) 더 선명하게 보이도록 약간 더 불투명하게 */
+  background: rgba(15, 22, 40, 0.92);
+
   overflow: hidden;
 }
+
 .modal-header{
   padding: 14px;
   border-bottom: 1px solid var(--line);
+  background: rgba(0,0,0,0.12);
 }
+
 .modal-body{
   padding: 14px;
   overflow: auto;
   max-height: calc(100vh - 140px);
 }
+
 #noticeModalImages{
   display: grid;
   gap: 10px;
