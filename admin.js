@@ -1,19 +1,25 @@
 /***********************
  * 관리자(Admin) - 학생 검색/상세/상세버튼(출결/취침/이동/교육점수/성적)
- * ✅ Unknown path 방지:
- * - 백엔드 doPost 라우터에 존재하는 path만 호출
- *   attendance, sleep_detail, move_detail, eduscore_detail, grade_exams, grade_detail
  *
  * ✅ 추가(요약 자동 로드)
  * - 학생 선택 시 admin_issue_token으로 token 발급 후
  *   attendance_summary / sleep_summary / move_summary / eduscore_summary / grade_exams+grade_detail
  *   를 자동 호출하여 summary를 채움
+ *
+ * ✅ 추가(캐시/속도 최적화)
+ * - 학생별 요약(summary) 캐시: seat|studentId
+ * - 캐시가 있으면 즉시 표시 후, 백그라운드로 최신값 갱신
+ * - TTL 기본 5분
  ***********************/
 
 // ✅ 여기에 Apps Script Web App URL(…/exec) 넣기
 const API_BASE = "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec";
 
 const ADMIN_SESSION_KEY = "admin_session_v1";
+
+// ====== 캐시 설정 ======
+const SUMMARY_CACHE_TTL_MS = 5 * 60 * 1000; // ✅ 5분 (원하면 조절)
+const SUMMARY_CACHE_KEY = "admin_summary_cache_v1"; // localStorage 저장 키
 
 // ====== DOM ======
 const $ = (id) => document.getElementById(id);
@@ -65,6 +71,65 @@ function pick(obj, keys, fallback = "") {
     if (v !== undefined && v !== null && String(v).trim() !== "") return v;
   }
   return fallback;
+}
+
+// ====== 요약 캐시(메모리 + localStorage) ======
+const __memSummaryCache = new Map();
+
+function makeStudentKey(seat, studentId) {
+  return `${String(seat || "").trim()}|${String(studentId || "").trim()}`;
+}
+
+function loadLocalCache_() {
+  try {
+    const raw = localStorage.getItem(SUMMARY_CACHE_KEY);
+    if (!raw) return {};
+    const obj = JSON.parse(raw);
+    return obj && typeof obj === "object" ? obj : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function saveLocalCache_(obj) {
+  try {
+    localStorage.setItem(SUMMARY_CACHE_KEY, JSON.stringify(obj || {}));
+  } catch (_) {}
+}
+
+function getSummaryCache(key) {
+  const now = Date.now();
+
+  // 1) 메모리 캐시
+  const mem = __memSummaryCache.get(key);
+  if (mem && mem.expireAt > now && mem.summary) return mem.summary;
+
+  // 2) localStorage 캐시
+  const store = loadLocalCache_();
+  const it = store[key];
+  if (it && it.expireAt > now && it.summary) {
+    __memSummaryCache.set(key, it);
+    return it.summary;
+  }
+  return null;
+}
+
+function setSummaryCache(key, summary) {
+  const now = Date.now();
+  const pack = {
+    expireAt: now + SUMMARY_CACHE_TTL_MS,
+    summary
+  };
+  __memSummaryCache.set(key, pack);
+
+  const store = loadLocalCache_();
+  store[key] = pack;
+
+  // 너무 커지는 것 방지: 만료된 것 정리
+  for (const k of Object.keys(store)) {
+    if (!store[k] || store[k].expireAt <= now) delete store[k];
+  }
+  saveLocalCache_(store);
 }
 
 // ====== init ======
@@ -171,7 +236,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       setHint(searchMsg, `검색 결과 ${items.length}명`);
 
-      // ✅ 검색 결과: (좌석 · 이름 · 담임) - 키가 뭐로 와도 표시되게
+      // ✅ 검색 결과: (좌석 · 이름 · 담임)
       resultList.innerHTML = items.map((it, idx) => {
         const seat = pick(it, ["seat","좌석"], "-");
         const name = pick(it, ["name","studentName","이름"], "-");
@@ -203,7 +268,7 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
       }).join("");
 
-      // hover 효과 + 클릭 이벤트
+      // hover + click
       resultList.querySelectorAll(".list-item").forEach(btn => {
         btn.addEventListener("mouseover", () => {
           btn.style.background = "rgba(20,30,50,.65)";
@@ -224,7 +289,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       });
 
-      // ✅ 결과가 1명이면 자동 선택해서 상세 로드
+      // ✅ 결과가 1명이면 자동 선택
       if (items.length === 1) {
         await loadStudentDetail(items[0]);
       }
@@ -248,12 +313,11 @@ document.addEventListener("DOMContentLoaded", () => {
     return data.token;
   }
 
-  // ====== ✅ 요약 자동 로드 ======
+  // ====== ✅ 요약 로드 (네 API 경로들 기준) ======
   async function loadSummariesForStudent_(seat, studentId) {
     const summary = {};
     const token = await issueStudentToken_(seat, studentId);
 
-    // 병렬 호출 (존재하지 않는 path면 ok:false 로 떨어짐)
     const [att, slp, mv, edu] = await Promise.allSettled([
       apiPost("attendance_summary", { token }),
       apiPost("sleep_summary", { token }),
@@ -266,7 +330,7 @@ document.addEventListener("DOMContentLoaded", () => {
     summary.move       = (mv.status === "fulfilled")  ? mv.value  : { ok:false, error:String(mv.reason || "") };
     summary.eduscore   = (edu.status === "fulfilled") ? edu.value : { ok:false, error:String(edu.reason || "") };
 
-    // 성적 요약: 시험목록 → 마지막 시험 → grade_detail
+    // 성적 요약
     try {
       const exams = await apiPost("grade_exams", { token });
       if (exams.ok && Array.isArray(exams.items) && exams.items.length) {
@@ -290,16 +354,20 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ====== load student detail (summary) ======
+  // ✅ 갱신 중인 학생 추적(클릭 연타 시 이전 요청 결과가 덮어씌우는 것 방지)
+  let __activeStudentKey = "";
+
   async function loadStudentDetail(st) {
     const sess = getAdminSession();
     if (!sess?.adminToken) return;
 
-    // ✅ seat/studentId/name 키가 달라도 안전하게
     const seat = String(pick(st, ["seat","좌석"], "")).trim();
     const studentId = String(pick(st, ["studentId","학번"], "")).trim();
     const name = String(pick(st, ["name","studentName","이름"], "")).trim();
 
-    // ✅ 학생 상세 상단 제목: 좌석 · 이름 · 학번
+    const key = makeStudentKey(seat, studentId);
+    __activeStudentKey = key;
+
     detailSub.textContent = `${name} · ${seat} · ${studentId}`.trim();
     detailBody.innerHTML = "불러오는 중…";
     detailResult.innerHTML = "";
@@ -316,19 +384,45 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // 1) 기본정보 먼저 렌더
+      // 기본정보 렌더
       data.summary = data.summary || {};
       renderStudentDetail(data);
 
-      // 2) 요약 로딩 표시 후 자동 로드
+      // ✅ 1) 캐시가 있으면 즉시 표시(초고속)
+      const cached = getSummaryCache(key);
+      if (cached) {
+        data.summary = cached;
+        renderStudentDetail(data);
+
+        // ✅ 2) 동시에 백그라운드로 최신값 갱신(조용히)
+        (async () => {
+          try {
+            const fresh = await loadSummariesForStudent_(seat, studentId);
+            // 클릭이 다른 학생으로 넘어갔으면 반영 X
+            if (__activeStudentKey !== key) return;
+            setSummaryCache(key, fresh || {});
+            data.summary = fresh || {};
+            renderStudentDetail(data);
+          } catch (_) {}
+        })();
+
+        return; // 캐시 있으면 여기서 끝(백그라운드 갱신만)
+      }
+
+      // ✅ 캐시가 없으면 로딩 표시 후 실제 호출
       data.summary = { __loading: true };
       renderStudentDetail(data);
 
       try {
         const summary = await loadSummariesForStudent_(seat, studentId);
+        // 클릭이 다른 학생으로 넘어갔으면 반영 X
+        if (__activeStudentKey !== key) return;
+
+        setSummaryCache(key, summary || {});
         data.summary = summary || {};
         renderStudentDetail(data);
       } catch (_) {
+        if (__activeStudentKey !== key) return;
         data.summary = {};
         renderStudentDetail(data);
       }
@@ -617,7 +711,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ====== 마지막 선택 학생 저장(버튼 상세용) ======
-  // admin_student_detail 성공 시 st 저장
   const _origRender = renderStudentDetail;
   renderStudentDetail = function(data){
     window.__lastStudent = {
