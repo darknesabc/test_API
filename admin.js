@@ -81,8 +81,10 @@ document.addEventListener("DOMContentLoaded", () => {
     logoutBtn.style.display = "inline-flex";
   }
 
-  // login
-  loginBtn.addEventListener("click", async () => {
+  /* =========================================================
+     ✅ 관리자 로그인 (버튼 클릭 + Enter)
+  ========================================================= */
+  async function doAdminLogin() {
     const pw = String(pwInput.value || "").trim();
     if (!pw) return setHint(loginMsg, "비밀번호를 입력하세요.", true);
 
@@ -106,7 +108,22 @@ document.addEventListener("DOMContentLoaded", () => {
     } finally {
       loginBtn.disabled = false;
     }
-  });
+  }
+
+  // ✅ 로그인 버튼 클릭 유지
+  loginBtn.addEventListener("click", doAdminLogin);
+
+  // ✅ Enter로 로그인 (IME/브라우저 차이 대비: keydown + keyup + keypress)
+  const enterLogin = (e) => {
+    const isEnter = (e.key === "Enter") || (e.keyCode === 13);
+    if (!isEnter) return;
+    e.preventDefault();
+    e.stopPropagation();
+    doAdminLogin();
+  };
+  pwInput.addEventListener("keydown", enterLogin);
+  pwInput.addEventListener("keyup", enterLogin);
+  pwInput.addEventListener("keypress", enterLogin);
 
   // logout
   logoutBtn.addEventListener("click", () => {
@@ -326,11 +343,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const sess = getAdminSession();
     if (!sess?.adminToken) return;
 
-    // 현재 detailSub에서 seat/studentId를 추출하기 어렵기 때문에,
-    // detailBody에 마지막으로 렌더된 student 정보를 보관해도 되지만,
-    // 여기서는 DOM에서 표시된 텍스트에서 간단히 파싱하지 않고,
-    // 더 안전하게: 마지막 선택 학생을 window에 저장.
-    // (아래에서 사용)
     if (!window.__lastStudent) {
       detailResult.innerHTML = `<div style="color:#ff6b6b;">학생을 먼저 선택하세요.</div>`;
       return;
@@ -406,7 +418,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // fallback
       detailResult.innerHTML = `<div style="color:#ff6b6b;">지원하지 않는 상세 종류</div>`;
     } catch (e) {
       detailResult.innerHTML = `<div style="color:#ff6b6b;">${escapeHtml(e.message || "오류")}</div>`;
@@ -442,11 +453,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!dates.length || !rows.length) return "출결 상세 데이터가 없습니다.";
 
-    // 너무 길어질 수 있으니 최근 14일만 보여주기
     const showN = Math.min(14, dates.length);
-    const d2 = dates.slice(0, showN); // data가 최신순이 아니라면 여기 조정 필요(현재 백엔드는 헤더 순서 그대로)
-    // 백엔드가 날짜를 좌->우로 반환하므로 "최근"이 오른쪽일 수 있음.
-    // 안전하게: iso로 정렬 후 최근 N개만.
+
     const idxSorted = dates
       .map((d, i) => ({ i, iso: d.iso || "" }))
       .filter(x => x.iso)
@@ -461,7 +469,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const c = cells[i] || {};
         const a = String(c.a ?? "").trim();
         const s = String(c.s ?? "").trim();
-        // 표시: 스케줄/출결
         return `${s ? s : "-"} / ${a ? a : "-"}`;
       }));
       return line;
@@ -519,10 +526,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ====== 마지막 선택 학생 저장(버튼 상세용) ======
-  // admin_student_detail 성공 시 st 저장하도록 훅
   const _origRender = renderStudentDetail;
   renderStudentDetail = function(data){
-    // 학생 저장
     window.__lastStudent = {
       seat: data?.student?.seat || "",
       studentId: data?.student?.studentId || "",
@@ -532,4 +537,3 @@ document.addEventListener("DOMContentLoaded", () => {
     _origRender(data);
   };
 });
-
