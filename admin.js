@@ -657,7 +657,8 @@ function mapAttendance_(val) {
    
   // ✅ 출결 값에 따른 셀 스타일
   function statusStyle_(val) {
-    const t = String(val || "").trim();
+    const t0 = String(val || "").trim();
+    const t = (t0 === "1") ? "출석" : (t0 === "3") ? "결석" : t0;
     if (!t || t === "-" ) return "opacity:.55;";
     if (t.includes("출석")) return "background: rgba(46, 204, 113, .22);";
     if (t.includes("결석")) return "background: rgba(231, 76, 60, .22);";
@@ -793,5 +794,6 @@ function mapAttendance_(val) {
     _origRender(data);
   };
 });
+
 
 
