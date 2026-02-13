@@ -53,6 +53,15 @@ function setHint(el, msg, isError=false) {
   el.innerHTML = msg ? `<span style="color:${isError ? "#ff6b6b" : "inherit"}">${escapeHtml(msg)}</span>` : "";
 }
 
+/** ✅ 어떤 키로 오든 안전하게 값 뽑기 */
+function pick(obj, keys, fallback = "") {
+  for (const k of keys) {
+    const v = obj?.[k];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+  }
+  return fallback;
+}
+
 // ====== init ======
 document.addEventListener("DOMContentLoaded", () => {
   // elements
@@ -157,11 +166,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       setHint(searchMsg, `검색 결과 ${items.length}명`);
 
-      // ✅ 검색 결과: 흰 배경 제거 + 한줄(좌석/이름/담임)
+      // ✅ 검색 결과: (좌석 · 이름 · 담임) - 키가 뭐로 와도 표시되게
       resultList.innerHTML = items.map((it, idx) => {
-        const seat = it.seat || "-";
-        const name = it.name || "-";
-        const teacher = it.teacher || "-";
+        const seat = pick(it, ["seat","좌석"], "-");
+        const name = pick(it, ["name","studentName","이름"], "-");
+        const teacher = pick(it, ["teacher","담임"], "-");
 
         return `
           <button class="list-item" data-idx="${idx}"
@@ -227,10 +236,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const sess = getAdminSession();
     if (!sess?.adminToken) return;
 
-    const seat = String(st?.seat || "").trim();
-    const studentId = String(st?.studentId || "").trim();
+    // ✅ seat/studentId/name 키가 달라도 안전하게
+    const seat = String(pick(st, ["seat","좌석"], "")).trim();
+    const studentId = String(pick(st, ["studentId","학번"], "")).trim();
+    const name = String(pick(st, ["name","studentName","이름"], "")).trim();
 
-    detailSub.textContent = `${st?.name || ""} · ${seat} · ${studentId}`;
+    // ✅ 학생 상세 상단 제목: 좌석 · 이름 · 학번
+    detailSub.textContent = `${name} · ${seat} · ${studentId}`.trim();
     detailBody.innerHTML = "불러오는 중…";
     detailResult.innerHTML = "";
 
@@ -265,7 +277,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     detailBody.innerHTML = `
       <div style="margin-bottom:10px;">
-        ${fmtKeyVal("이름", st.studentName || "-")}
+        ${fmtKeyVal("이름", st.studentName || st.name || "-")}
         ${fmtKeyVal("좌석", st.seat || "-")}
         ${fmtKeyVal("학번", st.studentId || "-")}
         ${fmtKeyVal("담임", st.teacher || "-")}
@@ -522,7 +534,7 @@ document.addEventListener("DOMContentLoaded", () => {
     lines.push(`<div style="margin-bottom:10px;"><b>${escapeHtml(gd.sheetName || "")}</b> (${escapeHtml(gd.exam || "")})</div>`);
     lines.push(fmtKeyVal("좌석", st.seat || ""));
     lines.push(fmtKeyVal("학번", st.studentId || ""));
-    lines.push(fmtKeyVal("이름", st.name || ""));
+    lines.push(fmtKeyVal("이름", st.name || st.studentName || ""));
 
     const rows = [
       ["국어", s.kor?.raw_total ?? s.kor?.raw ?? "", s.kor?.std ?? "", s.kor?.pct ?? "", s.kor?.grade ?? ""],
