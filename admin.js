@@ -3,6 +3,9 @@
  * - admin_login -> adminToken 발급 -> sessionStorage 저장
  * - admin_search -> 리스트 렌더
  * - admin_student_detail -> 상세 렌더
+ * - ✅ 추가(연동 준비): 상세 페이지로 이동 버튼(출결/취침/이동/교육점수/성적)
+ *   - 백엔드에 admin_issue_token 엔드포인트가 생기면 바로 동작
+ *   - (현재는 버튼 클릭 시 "엔드포인트 없음" 에러가 뜰 수 있음)
  ***********************/
 
 // ====== 설정 ======
@@ -10,6 +13,15 @@ const SESSION_KEY_ADMIN = "admin_session_v1";
 
 // ✅ 너의 Apps Script Web App URL (기존 프론트에서 쓰는 것과 동일하게 맞춰줘)
 const API_BASE = "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec";
+
+// ✅ 상세페이지 파일명 매핑
+const STUDENT_PAGES = {
+  attendance: "attendance.html",
+  sleep: "sleep.html",
+  move: "move.html",
+  eduscore: "eduscore.html",
+  grades: "grades.html",
+};
 
 // ====== 유틸 ======
 function $(id) { return document.getElementById(id); }
@@ -49,6 +61,11 @@ function escapeHtml(s) {
   }[m]));
 }
 
+function isAdminExpiredError_(errMsg) {
+  const s = String(errMsg || "");
+  return s.includes("만료") || s.includes("관리자") || s.includes("adminToken");
+}
+
 // ====== UI 제어 ======
 function showLoginUI() {
   $("loginCard").style.display = "";
@@ -62,6 +79,36 @@ function showAdminUI() {
   $("loginCard").style.display = "none";
   $("adminArea").style.display = "";
   $("logoutBtn").style.display = "";
+}
+
+// ====== ✅ 상세 페이지 이동(연동 준비) ======
+async function goStudentPage_(student, pageKey) {
+  const session = getAdminSession();
+  if (!session?.adminToken) {
+    clearAdminSession();
+    showLoginUI();
+    return;
+  }
+
+  const file = STUDENT_PAGES[pageKey] || "dashboard.html";
+
+  // ✅ 학생 상세 페이지는 token 기반으로 이미 만들어져 있으니,
+  // 관리자 권한으로 "학생 토큰"만 발급받으면 그대로 이동 가능
+  const issue = await apiPost("admin_issue_token", {
+    adminToken: session.adminToken,
+    seat: String(student?.seat || "").trim(),
+    studentId: String(student?.studentId || "").trim()
+  });
+
+  if (!issue?.ok || !issue?.token) {
+    // 아직 백엔드에 admin_issue_token이 없으면 여기로 옴
+    alert(issue?.error || "학생 세션 발급 실패 (admin_issue_token 필요)");
+    return;
+  }
+
+  // ✅ token을 query로 전달 (각 상세 페이지에서 ?token=을 읽어 SESSION에 넣는 보정이 필요할 수 있음)
+  const url = `${file}?token=${encodeURIComponent(issue.token)}&from=admin`;
+  window.location.href = url;
 }
 
 // ====== 렌더 ======
@@ -175,7 +222,31 @@ function renderDetail(data) {
         </div>
       ` : `<div class="empty">성적 데이터를 불러오지 못했거나, 시트가 없습니다.</div>`)}
     </div>
+
+    <!-- ✅ 상세 페이지 이동(연동 준비) -->
+    <div style="margin-top:12px;">
+      ${renderMiniCard("상세 페이지", `
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <button class="btn btn-ghost" data-go="attendance">출결 상세</button>
+          <button class="btn btn-ghost" data-go="sleep">취침 상세</button>
+          <button class="btn btn-ghost" data-go="move">이동 상세</button>
+          <button class="btn btn-ghost" data-go="eduscore">교육점수 상세</button>
+          <button class="btn btn-ghost" data-go="grades">성적 상세</button>
+        </div>
+        <div class="hint" style="margin-top:8px;">
+          ※ 버튼 클릭 시 관리자 권한으로 학생 세션(token)을 발급받아 상세 페이지로 이동합니다.
+        </div>
+      `)}
+    </div>
   `;
+
+  // ✅ 버튼 이벤트 바인딩 (innerHTML 이후)
+  body.querySelectorAll("button[data-go]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const pageKey = btn.getAttribute("data-go");
+      await goStudentPage_(student, pageKey);
+    });
+  });
 }
 
 function renderMiniCard(title, html) {
@@ -251,7 +322,7 @@ async function doSearch() {
 
   if (!res.ok) {
     // 세션 만료면 로그인으로
-    if (String(res.error || "").includes("만료") || String(res.error || "").includes("관리자")) {
+    if (isAdminExpiredError_(res.error)) {
       clearAdminSession();
       showLoginUI();
       setHint($("loginMsg"), "관리자 세션이 만료되었습니다. 다시 로그인하세요.", true);
@@ -289,7 +360,7 @@ async function loadStudentDetail({ seat, studentId }) {
   });
 
   if (!res.ok) {
-    if (String(res.error || "").includes("만료") || String(res.error || "").includes("관리자")) {
+    if (isAdminExpiredError_(res.error)) {
       clearAdminSession();
       showLoginUI();
       setHint($("loginMsg"), "관리자 세션이 만료되었습니다. 다시 로그인하세요.", true);
@@ -338,6 +409,11 @@ function injectFallbackCss() {
       user-select:none;
       -webkit-user-select:none;
     }
+
+    /* ✅ 버튼(상세 페이지 이동) 보정: styles.css에 .btn이 이미 있으면 그대로 적용됨 */
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:10px 12px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.06);cursor:pointer;}
+    .btn:hover{filter:brightness(1.05);}
+    .btn:disabled{opacity:.6;cursor:not-allowed;}
   `;
   const style = document.createElement("style");
   style.textContent = css;
