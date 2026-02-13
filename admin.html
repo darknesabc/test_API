@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>관리자 - 학생 조회</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <!-- ================= HEADER ================= -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div>
+        <div class="top-title">관리자</div>
+        <div id="subLine" class="top-sub">학생 검색 · 상세 조회</div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button id="logoutBtn" class="btn btn-ghost" style="display:none;">로그아웃</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= MAIN ================= -->
+  <main class="wrap">
+
+    <!-- ====== 로그인 카드 ====== -->
+    <section id="loginCard" class="card">
+      <div class="card-title">관리자 로그인</div>
+      <div class="card-sub">Script Properties의 <b>ADMIN_PASSWORD</b>로 로그인합니다.</div>
+
+      <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+        <input
+          id="pwInput"
+          type="password"
+          class="input"
+          placeholder="관리자 비밀번호"
+          style="flex:1; min-width:220px;"
+          autocomplete="current-password"
+        />
+        <button id="loginBtn" class="btn">로그인</button>
+      </div>
+
+      <div id="loginMsg" class="hint" style="margin-top:10px;"></div>
+    </section>
+
+    <!-- ====== 검색/결과/상세 영역 ====== -->
+    <section id="adminArea" style="display:none;">
+
+      <!-- 검색 카드 -->
+      <section class="card">
+        <div class="card-title">학생 검색</div>
+        <div class="card-sub">좌석 / 이름 / 학번으로 검색 가능합니다.</div>
+
+        <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+          <input
+            id="qInput"
+            class="input"
+            placeholder="예) 5-1A01 / 홍길동 / 20261234"
+            style="flex:1; min-width:260px;"
+          />
+          <button id="searchBtn" class="btn">검색</button>
+        </div>
+
+        <div id="searchMsg" class="hint" style="margin-top:10px;"></div>
+      </section>
+
+      <!-- 결과 + 상세 : 2단 레이아웃 (좁으면 1단) -->
+      <section class="grid-2" style="margin-top:14px;">
+        <!-- 결과 리스트 -->
+        <section class="card">
+          <div class="card-title">검색 결과</div>
+          <div class="card-sub">목록에서 학생을 클릭하면 상세가 표시됩니다.</div>
+
+          <div id="resultList" class="list" style="margin-top:12px;"></div>
+        </section>
+
+        <!-- 상세 -->
+        <section class="card">
+          <div class="card-title">학생 상세</div>
+          <div class="card-sub" id="detailSub">학생을 선택하세요.</div>
+
+          <div id="detailBody" style="margin-top:12px;"></div>
+        </section>
+      </section>
+
+    </section>
+  </main>
+
+  <script src="admin.js"></script>
+</body>
+</html>
