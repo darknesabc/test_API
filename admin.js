@@ -81,10 +81,13 @@ document.addEventListener("DOMContentLoaded", () => {
     logoutBtn.style.display = "inline-flex";
   }
 
-  /* =========================================================
-     ✅ 관리자 로그인 (버튼 클릭 + Enter)
-  ========================================================= */
-  async function doAdminLogin() {
+  // ✅ 로그인 Enter 지원
+  pwInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") loginBtn.click();
+  });
+
+  // login
+  loginBtn.addEventListener("click", async () => {
     const pw = String(pwInput.value || "").trim();
     if (!pw) return setHint(loginMsg, "비밀번호를 입력하세요.", true);
 
@@ -108,22 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } finally {
       loginBtn.disabled = false;
     }
-  }
-
-  // ✅ 로그인 버튼 클릭 유지
-  loginBtn.addEventListener("click", doAdminLogin);
-
-  // ✅ Enter로 로그인 (IME/브라우저 차이 대비: keydown + keyup + keypress)
-  const enterLogin = (e) => {
-    const isEnter = (e.key === "Enter") || (e.keyCode === 13);
-    if (!isEnter) return;
-    e.preventDefault();
-    e.stopPropagation();
-    doAdminLogin();
-  };
-  pwInput.addEventListener("keydown", enterLogin);
-  pwInput.addEventListener("keyup", enterLogin);
-  pwInput.addEventListener("keypress", enterLogin);
+  });
 
   // logout
   logoutBtn.addEventListener("click", () => {
@@ -152,6 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
     detailSub.textContent = "학생을 선택하세요.";
     detailBody.innerHTML = "";
     detailResult.innerHTML = "";
+    window.__lastStudent = null;
 
     try {
       const data = await apiPost("admin_search", { adminToken: sess.adminToken, q });
@@ -168,28 +157,63 @@ document.addEventListener("DOMContentLoaded", () => {
 
       setHint(searchMsg, `검색 결과 ${items.length}명`);
 
+      // ✅ 검색 결과: 흰 배경 제거 + 한줄(좌석/이름/담임)
       resultList.innerHTML = items.map((it, idx) => {
         const seat = it.seat || "-";
         const name = it.name || "-";
-        const studentId = it.studentId || "-";
-        const teacher = it.teacher || "";
+        const teacher = it.teacher || "-";
 
         return `
-          <button class="list-item" data-idx="${idx}" style="text-align:left;">
-            <div class="list-title">${escapeHtml(name)} <span style="opacity:.7;">(${escapeHtml(seat)})</span></div>
-            <div class="list-sub">학번: ${escapeHtml(studentId)} · 담임: ${escapeHtml(teacher)}</div>
+          <button class="list-item" data-idx="${idx}"
+            style="
+              width:100%;
+              text-align:left;
+              border:1px solid rgba(255,255,255,.10);
+              background: rgba(10,15,25,.55);
+              color: inherit;
+              padding: 12px 14px;
+              border-radius: 12px;
+              cursor: pointer;
+              display:flex;
+              align-items:center;
+              gap:10px;
+              transition: transform .08s ease, background .15s ease, border-color .15s ease;
+              margin: 8px 0;
+            "
+          >
+            <span style="opacity:.9; font-weight:700;">${escapeHtml(seat)}</span>
+            <span style="opacity:.95;">${escapeHtml(name)}</span>
+            <span style="opacity:.7;">·</span>
+            <span style="opacity:.85;">담임 ${escapeHtml(teacher)}</span>
           </button>
         `;
       }).join("");
 
-      // click item => load detail
+      // hover 효과 + 클릭 이벤트
       resultList.querySelectorAll(".list-item").forEach(btn => {
+        btn.addEventListener("mouseover", () => {
+          btn.style.background = "rgba(20,30,50,.65)";
+          btn.style.borderColor = "rgba(255,255,255,.16)";
+        });
+        btn.addEventListener("mouseout", () => {
+          btn.style.background = "rgba(10,15,25,.55)";
+          btn.style.borderColor = "rgba(255,255,255,.10)";
+          btn.style.transform = "scale(1)";
+        });
+        btn.addEventListener("mousedown", () => { btn.style.transform = "scale(0.99)"; });
+        btn.addEventListener("mouseup", () => { btn.style.transform = "scale(1)"; });
+
         btn.addEventListener("click", async () => {
           const idx = Number(btn.dataset.idx);
           const st = items[idx];
           await loadStudentDetail(st);
         });
       });
+
+      // ✅ 결과가 1명이면 자동 선택해서 상세 로드
+      if (items.length === 1) {
+        await loadStudentDetail(items[0]);
+      }
 
     } catch (e) {
       setHint(searchMsg, "네트워크 오류", true);
@@ -348,7 +372,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const st = window.__lastStudent; // {seat, studentId, studentName...}
+    const st = window.__lastStudent;
     const seat = st.seat || "";
     const studentId = st.studentId || "";
 
@@ -357,29 +381,23 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const token = await issueStudentToken_(seat, studentId);
 
-      // 1) 출결 상세
       if (kind === "attendance") {
         const data = await apiPost("attendance", { token });
         if (!data.ok) return showError(data);
-
         detailResult.innerHTML = renderAttendanceDetail_(data);
         return;
       }
 
-      // 2) 취침 상세 (기본 30일)
       if (kind === "sleep_detail") {
         const data = await apiPost("sleep_detail", { token, days: 30 });
         if (!data.ok) return showError(data);
-
         detailResult.innerHTML = renderSleepDetail_(data);
         return;
       }
 
-      // 3) 이동 상세 (기본 30일)
       if (kind === "move_detail") {
         const data = await apiPost("move_detail", { token, days: 30 });
         if (!data.ok) return showError(data);
-
         detailResult.innerHTML = renderSimpleTable_(
           ["날짜", "시간", "사유", "복귀교시"],
           (data.items || []).map(x => [x.date, x.time, x.reason, x.returnPeriod])
@@ -387,11 +405,9 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // 4) 교육점수 상세 (기본 30일)
       if (kind === "eduscore_detail") {
         const data = await apiPost("eduscore_detail", { token, days: 30 });
         if (!data.ok) return showError(data);
-
         detailResult.innerHTML = renderSimpleTable_(
           ["날짜", "시간", "사유", "점수"],
           (data.items || []).map(x => [x.date, x.time, x.reason, x.score])
@@ -399,7 +415,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // 5) 성적 상세: grade_exams로 최신 exam 구한 뒤 grade_detail
       if (kind === "grade_detail") {
         const exams = await apiPost("grade_exams", { token });
         if (!exams.ok) return showError(exams);
@@ -458,7 +473,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const idxSorted = dates
       .map((d, i) => ({ i, iso: d.iso || "" }))
       .filter(x => x.iso)
-      .sort((a,b) => a.iso.localeCompare(b.iso)); // 오름차순
+      .sort((a,b) => a.iso.localeCompare(b.iso));
+
     const lastIdx = idxSorted.slice(-showN).map(x => x.i);
 
     const header = ["교시"].concat(lastIdx.map(i => `${dates[i].md}(${dates[i].dow})`));
@@ -526,6 +542,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ====== 마지막 선택 학생 저장(버튼 상세용) ======
+  // admin_student_detail 성공 시 st 저장
   const _origRender = renderStudentDetail;
   renderStudentDetail = function(data){
     window.__lastStudent = {
