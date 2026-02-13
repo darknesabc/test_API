@@ -1,753 +1,534 @@
 /***********************
- * Admin Frontend (GitHub Pages)
- *
- * ✅ 변경 핵심
- * - 상세 버튼 클릭 시 학부모 상세 페이지로 이동 ❌
- * - 관리자 페이지 내부에서 admin_*_detail API 호출 후 렌더 ✅
+ * 관리자(Admin) - 학생 검색/상세/상세버튼(출결/취침/이동/교육점수/성적)
+ * ✅ Unknown path 방지:
+ * - 백엔드 doPost 라우터에 존재하는 path만 호출
+ *   attendance, sleep_detail, move_detail, eduscore_detail, grade_exams, grade_detail
  ***********************/
 
-// ====== 설정 ======
-const SESSION_KEY_ADMIN = "admin_session_v1";
+// ✅ 여기에 Apps Script Web App URL(…/exec) 넣기
+const API_BASE = "YOUR_APPS_SCRIPT_WEBAPP_URL";
 
-// ✅ Apps Script Web App URL (너의 실전 URL 그대로 유지)
-const API_BASE =
-  "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec";
+const ADMIN_SESSION_KEY = "admin_session_v1";
 
-// 기본 상세 기간
-const DEFAULT_DAYS_SLEEP = 7;
-const DEFAULT_DAYS_MOVE = 30;
-const DEFAULT_DAYS_EDU = 30;
+// ====== DOM ======
+const $ = (id) => document.getElementById(id);
 
-// ====== 유틸 ======
-function $(id) {
-  return document.getElementById(id);
-}
-
-function setAdminSession(session) {
-  sessionStorage.setItem(SESSION_KEY_ADMIN, JSON.stringify(session));
+// ====== session ======
+function setAdminSession(s) {
+  localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(s));
 }
 function getAdminSession() {
-  const raw = sessionStorage.getItem(SESSION_KEY_ADMIN);
+  const raw = localStorage.getItem(ADMIN_SESSION_KEY);
   if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch (_) {
-    return null;
-  }
+  try { return JSON.parse(raw); } catch (_) { return null; }
 }
 function clearAdminSession() {
-  sessionStorage.removeItem(SESSION_KEY_ADMIN);
+  localStorage.removeItem(ADMIN_SESSION_KEY);
 }
 
+// ====== fetch helper ======
 async function apiPost(path, body) {
   const url = `${API_BASE}?path=${encodeURIComponent(path)}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(body || {}),
+    body: JSON.stringify(body || {})
   });
-  const text = await res.text();
-  try {
-    return JSON.parse(text);
-  } catch (_) {
-    return { ok: false, error: "서버 응답 파싱 실패", raw: text };
-  }
+  return await res.json();
 }
 
-function setHint(el, msg, isError = false) {
-  if (!el) return;
-  el.textContent = msg || "";
-  el.style.color = isError ? "var(--danger, #d33)" : "var(--muted, #667)";
-}
-
+// ====== UI helpers ======
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (m) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[m]));
 }
-
-function num(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
+function fmtKeyVal(label, value) {
+  return `<div style="display:flex; gap:8px; margin:2px 0;">
+    <div style="min-width:90px; opacity:.8;">${escapeHtml(label)}</div>
+    <div style="font-weight:600;">${escapeHtml(value)}</div>
+  </div>`;
+}
+function setHint(el, msg, isError=false) {
+  el.innerHTML = msg ? `<span style="color:${isError ? "#ff6b6b" : "inherit"}">${escapeHtml(msg)}</span>` : "";
 }
 
-// ====== UI 제어 ======
-function showLoginUI() {
-  $("loginCard").style.display = "";
-  $("adminArea").style.display = "none";
-  $("logoutBtn").style.display = "none";
-  $("detailSub").textContent = "학생을 선택하세요.";
-  $("detailBody").innerHTML = "";
-}
+// ====== init ======
+document.addEventListener("DOMContentLoaded", () => {
+  // elements
+  const loginCard = $("loginCard");
+  const adminArea = $("adminArea");
 
-function showAdminUI() {
-  $("loginCard").style.display = "none";
-  $("adminArea").style.display = "";
-  $("logoutBtn").style.display = "";
-}
+  const pwInput = $("pwInput");
+  const loginBtn = $("loginBtn");
+  const loginMsg = $("loginMsg");
+  const logoutBtn = $("logoutBtn");
 
-// ====== 상태(현재 선택 학생) ======
-let __currentStudentMeta = null; // { seat, studentId, studentName, teacher }
+  const qInput = $("qInput");
+  const searchBtn = $("searchBtn");
+  const searchMsg = $("searchMsg");
+  const resultList = $("resultList");
 
-// ====== 렌더: 검색결과 ======
-function renderResults(items) {
-  const box = $("resultList");
-  box.innerHTML = "";
+  const detailSub = $("detailSub");
+  const detailBody = $("detailBody");
+  const detailResult = $("detailResult");
 
-  if (!items || items.length === 0) {
-    box.innerHTML = `<div class="empty">검색 결과가 없습니다.</div>`;
-    return;
+  // restore session
+  const sess = getAdminSession();
+  if (sess?.adminToken) {
+    loginCard.style.display = "none";
+    adminArea.style.display = "block";
+    logoutBtn.style.display = "inline-flex";
   }
 
-  items.forEach((it) => {
-    const seat = escapeHtml(it.seat || "");
-    const name = escapeHtml(it.name || "");
-    const studentId = escapeHtml(it.studentId || "");
-    const teacher = escapeHtml(it.teacher || "");
+  // login
+  loginBtn.addEventListener("click", async () => {
+    const pw = String(pwInput.value || "").trim();
+    if (!pw) return setHint(loginMsg, "비밀번호를 입력하세요.", true);
 
-    const row = document.createElement("div");
-    row.className = "list-item";
-    row.setAttribute("role", "button");
-    row.setAttribute("tabindex", "0");
+    loginBtn.disabled = true;
+    setHint(loginMsg, "로그인 중…");
 
-    row.innerHTML = `
-      <div style="display:flex; justify-content:space-between; gap:10px; align-items:center;">
-        <div style="text-align:left;">
-          <div style="font-weight:700;">${name || "-"} <span style="font-weight:500; opacity:.75;">(${seat || "-"})</span></div>
-          <div style="font-size:.92rem; opacity:.8;">학번: ${studentId || "-"} · 담임: ${teacher || "-"}</div>
-        </div>
-        <div style="opacity:.65;">›</div>
+    try {
+      const data = await apiPost("admin_login", { password: pw });
+      if (!data.ok) {
+        setHint(loginMsg, data.error || "로그인 실패", true);
+        return;
+      }
+      setAdminSession({ adminToken: data.adminToken });
+      setHint(loginMsg, "로그인 성공");
+
+      loginCard.style.display = "none";
+      adminArea.style.display = "block";
+      logoutBtn.style.display = "inline-flex";
+    } catch (e) {
+      setHint(loginMsg, "네트워크 오류", true);
+    } finally {
+      loginBtn.disabled = false;
+    }
+  });
+
+  // logout
+  logoutBtn.addEventListener("click", () => {
+    clearAdminSession();
+    location.reload();
+  });
+
+  // search (enter)
+  qInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") searchBtn.click();
+  });
+
+  // search
+  searchBtn.addEventListener("click", async () => {
+    const sess = getAdminSession();
+    if (!sess?.adminToken) return setHint(searchMsg, "관리자 로그인이 필요합니다.", true);
+
+    const q = String(qInput.value || "").trim();
+    if (!q) return setHint(searchMsg, "검색어를 입력하세요.", true);
+
+    searchBtn.disabled = true;
+    setHint(searchMsg, "검색 중…");
+    resultList.innerHTML = "";
+
+    // reset detail
+    detailSub.textContent = "학생을 선택하세요.";
+    detailBody.innerHTML = "";
+    detailResult.innerHTML = "";
+
+    try {
+      const data = await apiPost("admin_search", { adminToken: sess.adminToken, q });
+      if (!data.ok) {
+        setHint(searchMsg, data.error || "검색 실패", true);
+        return;
+      }
+
+      const items = Array.isArray(data.items) ? data.items : [];
+      if (items.length === 0) {
+        setHint(searchMsg, "검색 결과가 없습니다.");
+        return;
+      }
+
+      setHint(searchMsg, `검색 결과 ${items.length}명`);
+
+      resultList.innerHTML = items.map((it, idx) => {
+        const seat = it.seat || "-";
+        const name = it.name || "-";
+        const studentId = it.studentId || "-";
+        const teacher = it.teacher || "";
+
+        return `
+          <button class="list-item" data-idx="${idx}" style="text-align:left;">
+            <div class="list-title">${escapeHtml(name)} <span style="opacity:.7;">(${escapeHtml(seat)})</span></div>
+            <div class="list-sub">학번: ${escapeHtml(studentId)} · 담임: ${escapeHtml(teacher)}</div>
+          </button>
+        `;
+      }).join("");
+
+      // click item => load detail
+      resultList.querySelectorAll(".list-item").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const idx = Number(btn.dataset.idx);
+          const st = items[idx];
+          await loadStudentDetail(st);
+        });
+      });
+
+    } catch (e) {
+      setHint(searchMsg, "네트워크 오류", true);
+    } finally {
+      searchBtn.disabled = false;
+    }
+  });
+
+  // ====== load student detail (summary) ======
+  async function loadStudentDetail(st) {
+    const sess = getAdminSession();
+    if (!sess?.adminToken) return;
+
+    const seat = String(st?.seat || "").trim();
+    const studentId = String(st?.studentId || "").trim();
+
+    detailSub.textContent = `${st?.name || ""} · ${seat} · ${studentId}`;
+    detailBody.innerHTML = "불러오는 중…";
+    detailResult.innerHTML = "";
+
+    try {
+      const data = await apiPost("admin_student_detail", {
+        adminToken: sess.adminToken,
+        seat,
+        studentId
+      });
+
+      if (!data.ok) {
+        detailBody.innerHTML = `<div style="color:#ff6b6b;">${escapeHtml(data.error || "상세 조회 실패")}</div>`;
+        return;
+      }
+
+      renderStudentDetail(data);
+    } catch (e) {
+      detailBody.innerHTML = `<div style="color:#ff6b6b;">네트워크 오류</div>`;
+    }
+  }
+
+  // ====== render summary + buttons ======
+  function renderStudentDetail(data) {
+    const st = data.student || {};
+    const sum = data.summary || {};
+
+    const att = sum.attendance || null;
+    const slp = sum.sleep || null;
+    const mv  = sum.move || null;
+    const edu = sum.eduscore || null;
+    const grd = sum.grade || null;
+
+    detailBody.innerHTML = `
+      <div style="margin-bottom:10px;">
+        ${fmtKeyVal("이름", st.studentName || "-")}
+        ${fmtKeyVal("좌석", st.seat || "-")}
+        ${fmtKeyVal("학번", st.studentId || "-")}
+        ${fmtKeyVal("담임", st.teacher || "-")}
+      </div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin:12px 0;">
+        <button class="btn" id="btnAttDetail">출결 상세</button>
+        <button class="btn" id="btnSleepDetail">취침 상세</button>
+        <button class="btn" id="btnMoveDetail">이동 상세</button>
+        <button class="btn" id="btnEduDetail">교육점수 상세</button>
+        <button class="btn" id="btnGradeDetail">성적 상세</button>
+      </div>
+
+      <div class="grid-2" style="margin-top:10px;">
+        <section class="card" style="padding:14px;">
+          <div class="card-title" style="font-size:15px;">출결 요약</div>
+          <div class="card-sub">
+            ${att && att.ok ? `
+              이번주 출석: <b>${att.present ?? 0}</b><br>
+              이번주 결석: <b>${att.absent ?? 0}</b><br>
+              최근 결석(최대 3): ${
+                Array.isArray(att.recentAbsences) && att.recentAbsences.length
+                  ? `<ul style="margin:6px 0 0 18px;">${
+                      att.recentAbsences.map(x => `<li>${escapeHtml(x.md)}(${escapeHtml(x.dow)}) ${escapeHtml(x.period)}교시</li>`).join("")
+                    }</ul>`
+                  : "없음"
+              }
+            ` : "데이터 없음"}
+          </div>
+        </section>
+
+        <section class="card" style="padding:14px;">
+          <div class="card-title" style="font-size:15px;">취침 요약</div>
+          <div class="card-sub">
+            ${slp && slp.ok ? `
+              최근 7일 취침일수: <b>${slp.sleepCount7d ?? 0}</b><br>
+              최근 7일 취침횟수: <b>${slp.sleepTotal7d ?? 0}</b>
+            ` : "데이터 없음"}
+          </div>
+        </section>
+
+        <section class="card" style="padding:14px;">
+          <div class="card-title" style="font-size:15px;">이동 요약</div>
+          <div class="card-sub">
+            ${mv && mv.ok ? `
+              최근 이동: <b>${escapeHtml(mv.latestText || "-")}</b><br>
+              ${escapeHtml(mv.latestDateTime || "")}
+            ` : "데이터 없음"}
+          </div>
+        </section>
+
+        <section class="card" style="padding:14px;">
+          <div class="card-title" style="font-size:15px;">교육점수 요약</div>
+          <div class="card-sub">
+            ${edu && edu.ok ? `
+              이번달 누적점수: <b>${edu.monthTotal ?? 0}</b><br>
+              최근 항목: <b>${escapeHtml(edu.latestText || "-")}</b><br>
+              ${escapeHtml(edu.latestDateTime || "")}
+            ` : "데이터 없음"}
+          </div>
+        </section>
+
+        <section class="card" style="padding:14px;">
+          <div class="card-title" style="font-size:15px;">성적 요약</div>
+          <div class="card-sub">
+            ${grd && grd.ok ? `
+              (${escapeHtml(grd.sheetName || "")})<br>
+              국어: <b>${grd.kor?.raw_total ?? grd.kor?.raw ?? "-"}</b> / 등급 <b>${grd.kor?.grade ?? "-"}</b><br>
+              수학: <b>${grd.math?.raw_total ?? grd.math?.raw ?? "-"}</b> / 등급 <b>${grd.math?.grade ?? "-"}</b><br>
+              영어: <b>${grd.eng?.raw ?? "-"}</b> / 등급 <b>${grd.eng?.grade ?? "-"}</b>
+            ` : "데이터 없음"}
+          </div>
+        </section>
       </div>
     `;
 
-    const go = () => loadStudentDetail({ seat: it.seat, studentId: it.studentId });
+    // bind detail buttons
+    $("btnAttDetail").addEventListener("click", () => loadDetail("attendance"));
+    $("btnSleepDetail").addEventListener("click", () => loadDetail("sleep_detail"));
+    $("btnMoveDetail").addEventListener("click", () => loadDetail("move_detail"));
+    $("btnEduDetail").addEventListener("click", () => loadDetail("eduscore_detail"));
+    $("btnGradeDetail").addEventListener("click", () => loadDetail("grade_detail"));
+  }
 
-    row.addEventListener("pointerdown", (e) => e.preventDefault());
-    row.addEventListener("click", (e) => {
-      e.preventDefault();
-      go();
+  // ====== issue token for student (admin_issue_token) ======
+  async function issueStudentToken_(seat, studentId) {
+    const sess = getAdminSession();
+    const data = await apiPost("admin_issue_token", {
+      adminToken: sess.adminToken,
+      seat,
+      studentId
     });
-    row.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        go();
+    if (!data.ok) throw new Error(data.error || "token 발급 실패");
+    return data.token;
+  }
+
+  // ====== load detail into detailResult ======
+  async function loadDetail(kind) {
+    const sess = getAdminSession();
+    if (!sess?.adminToken) return;
+
+    // 현재 detailSub에서 seat/studentId를 추출하기 어렵기 때문에,
+    // detailBody에 마지막으로 렌더된 student 정보를 보관해도 되지만,
+    // 여기서는 DOM에서 표시된 텍스트에서 간단히 파싱하지 않고,
+    // 더 안전하게: 마지막 선택 학생을 window에 저장.
+    // (아래에서 사용)
+    if (!window.__lastStudent) {
+      detailResult.innerHTML = `<div style="color:#ff6b6b;">학생을 먼저 선택하세요.</div>`;
+      return;
+    }
+
+    const st = window.__lastStudent; // {seat, studentId, studentName...}
+    const seat = st.seat || "";
+    const studentId = st.studentId || "";
+
+    detailResult.innerHTML = "불러오는 중…";
+
+    try {
+      const token = await issueStudentToken_(seat, studentId);
+
+      // 1) 출결 상세
+      if (kind === "attendance") {
+        const data = await apiPost("attendance", { token });
+        if (!data.ok) return showError(data);
+
+        detailResult.innerHTML = renderAttendanceDetail_(data);
+        return;
       }
-    });
 
-    box.appendChild(row);
-  });
-}
+      // 2) 취침 상세 (기본 30일)
+      if (kind === "sleep_detail") {
+        const data = await apiPost("sleep_detail", { token, days: 30 });
+        if (!data.ok) return showError(data);
 
-// ====== 렌더: 요약 + 상세버튼 + 상세패널 ======
-function renderDetail(data) {
-  const sub = $("detailSub");
-  const body = $("detailBody");
+        detailResult.innerHTML = renderSleepDetail_(data);
+        return;
+      }
 
-  __currentStudentMeta = null;
+      // 3) 이동 상세 (기본 30일)
+      if (kind === "move_detail") {
+        const data = await apiPost("move_detail", { token, days: 30 });
+        if (!data.ok) return showError(data);
 
-  if (!data || !data.ok) {
-    sub.textContent = "상세 조회 실패";
-    body.innerHTML = `<div class="empty">${escapeHtml(data?.error || "알 수 없는 오류")}</div>`;
-    return;
+        detailResult.innerHTML = renderSimpleTable_(
+          ["날짜", "시간", "사유", "복귀교시"],
+          (data.items || []).map(x => [x.date, x.time, x.reason, x.returnPeriod])
+        );
+        return;
+      }
+
+      // 4) 교육점수 상세 (기본 30일)
+      if (kind === "eduscore_detail") {
+        const data = await apiPost("eduscore_detail", { token, days: 30 });
+        if (!data.ok) return showError(data);
+
+        detailResult.innerHTML = renderSimpleTable_(
+          ["날짜", "시간", "사유", "점수"],
+          (data.items || []).map(x => [x.date, x.time, x.reason, x.score])
+        );
+        return;
+      }
+
+      // 5) 성적 상세: grade_exams로 최신 exam 구한 뒤 grade_detail
+      if (kind === "grade_detail") {
+        const exams = await apiPost("grade_exams", { token });
+        if (!exams.ok) return showError(exams);
+
+        const items = Array.isArray(exams.items) ? exams.items : [];
+        if (!items.length) {
+          detailResult.innerHTML = "성적 시험 목록이 없습니다.";
+          return;
+        }
+
+        const lastExam = items[items.length - 1].exam;
+        const gd = await apiPost("grade_detail", { token, exam: lastExam });
+        if (!gd.ok) return showError(gd);
+
+        detailResult.innerHTML = renderGradeDetail_(gd);
+        return;
+      }
+
+      // fallback
+      detailResult.innerHTML = `<div style="color:#ff6b6b;">지원하지 않는 상세 종류</div>`;
+    } catch (e) {
+      detailResult.innerHTML = `<div style="color:#ff6b6b;">${escapeHtml(e.message || "오류")}</div>`;
+    }
   }
 
-  const student = data.student || {};
-  const seat = String(student.seat || "").trim();
-  const studentId = String(student.studentId || "").trim();
-  const studentName = String(student.studentName || "").trim();
-  const teacher = String(student.teacher || "").trim();
+  function showError(data) {
+    detailResult.innerHTML = `<div style="color:#ff6b6b;">${escapeHtml(data.error || "오류")}</div>`;
+  }
 
-  __currentStudentMeta = { seat, studentId, studentName, teacher };
+  // ====== renderers ======
+  function renderSimpleTable_(headers, rows) {
+    const th = headers.map(h => `<th style="text-align:left; padding:8px; border-bottom:1px solid rgba(255,255,255,.08);">${escapeHtml(h)}</th>`).join("");
+    const tr = rows.map(r => `
+      <tr>
+        ${r.map(c => `<td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06);">${escapeHtml(c)}</td>`).join("")}
+      </tr>
+    `).join("");
 
-  sub.textContent = `${studentName || "-"} · ${seat || "-"} · ${studentId || "-"}`;
-
-  const s = data.summary || {};
-  const att = s.attendance || null;
-  const sleep = s.sleep || null;
-  const move = s.move || null;
-  const edu = s.eduscore || null;
-  const grade = s.grade || null;
-
-  const card = (title, inner) => `
-    <div class="mini-card">
-      <div class="mini-title">${escapeHtml(title)}</div>
-      <div class="mini-body">${inner}</div>
-    </div>
-  `;
-
-  const attHtml = att && att.ok
-    ? `
-      <div>이번주 출석: <b>${num(att.present)}</b></div>
-      <div>이번주 결석: <b>${num(att.absent)}</b></div>
-      <div style="margin-top:6px; opacity:.8;">최근 결석(최대 3)</div>
-      <ul style="margin:6px 0 0 18px;">
-        ${(att.recentAbsences || []).map(x =>
-          `<li>${escapeHtml(x.md)}(${escapeHtml(x.dow)}) ${escapeHtml(x.period)}교시</li>`
-        ).join("") || `<li>-</li>`}
-      </ul>
-    `
-    : `<div style="opacity:.8;">요약 없음</div>`;
-
-  const sleepHtml = sleep && sleep.ok
-    ? `
-      <div>최근 7일 취침일수: <b>${num(sleep.sleepCount7d)}</b></div>
-      <div>최근 7일 취침횟수: <b>${num(sleep.sleepTotal7d)}</b></div>
-    `
-    : `<div style="opacity:.8;">요약 없음</div>`;
-
-  const moveHtml = move && move.ok
-    ? `
-      <div>최근 이동: <b>${escapeHtml(move.latestText || "-")}</b></div>
-      <div style="opacity:.8;">${escapeHtml(move.latestDateTime || "")}</div>
-    `
-    : `<div style="opacity:.8;">요약 없음</div>`;
-
-  const eduHtml = edu && edu.ok
-    ? `
-      <div>이번달 누적점수: <b>${num(edu.monthTotal)}</b></div>
-      <div>최근 항목: <b>${escapeHtml(edu.latestText || "-")}</b></div>
-      <div style="opacity:.8;">${escapeHtml(edu.latestDateTime || "")}</div>
-    `
-    : `<div style="opacity:.8;">요약 없음</div>`;
-
-  const gradeHtml = grade && grade.ok
-    ? `
-      <div style="opacity:.85;">(${escapeHtml(grade.sheetName || grade.exam || "")})</div>
-      <div>국어: <b>${num(grade.kor?.raw_total)}</b> / 등급 <b>${escapeHtml(grade.kor?.grade)}</b></div>
-      <div>수학: <b>${num(grade.math?.raw_total)}</b> / 등급 <b>${escapeHtml(grade.math?.grade)}</b></div>
-      <div>영어: <b>${num(grade.eng?.raw)}</b> / 등급 <b>${escapeHtml(grade.eng?.grade)}</b></div>
-    `
-    : `<div style="opacity:.8;">요약 없음</div>`;
-
-  body.innerHTML = `
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
-      <button class="btn" id="btnAttDetail">출결 상세</button>
-      <button class="btn" id="btnSleepDetail">취침 상세</button>
-      <button class="btn" id="btnMoveDetail">이동 상세</button>
-      <button class="btn" id="btnEduDetail">교육점수 상세</button>
-      <button class="btn" id="btnGradeDetail">성적 상세</button>
-    </div>
-
-    <div class="grid-2" style="margin-top:6px;">
-      ${card("출결 요약", attHtml)}
-      ${card("취침 요약", sleepHtml)}
-      ${card("이동 요약", moveHtml)}
-      ${card("교육점수 요약", eduHtml)}
-      ${card("성적 요약", gradeHtml)}
-    </div>
-
-    <div style="margin-top:14px;">
-      <div style="font-weight:800; margin-bottom:6px;">상세 결과</div>
-      <div id="detailPanel" class="panel">
-        <div style="opacity:.8;">상세 버튼을 누르면 여기에 표시됩니다.</div>
+    return `
+      <div style="overflow:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:14px;">
+          <thead><tr>${th}</tr></thead>
+          <tbody>${tr || `<tr><td style="padding:10px; opacity:.8;" colspan="${headers.length}">데이터 없음</td></tr>`}</tbody>
+        </table>
       </div>
-    </div>
-  `;
-
-  // 버튼 바인딩
-  $("btnAttDetail").addEventListener("click", () => openAttendanceDetail());
-  $("btnSleepDetail").addEventListener("click", () => openSleepDetail());
-  $("btnMoveDetail").addEventListener("click", () => openMoveDetail());
-  $("btnEduDetail").addEventListener("click", () => openEduDetail());
-  $("btnGradeDetail").addEventListener("click", () => openGradeDetail());
-}
-
-// ====== 상세 패널 렌더 ======
-function renderPanel(html) {
-  const p = $("detailPanel");
-  if (!p) return;
-  p.innerHTML = html;
-}
-
-function renderPanelLoading(title) {
-  renderPanel(`
-    <div style="opacity:.85;">
-      <b>${escapeHtml(title || "로딩")}</b> 불러오는 중...
-    </div>
-  `);
-}
-
-function renderPanelError(msg) {
-  renderPanel(`<div style="color:var(--danger,#d33);">${escapeHtml(msg || "오류")}</div>`);
-}
-
-// ====== 관리자 API 공통 ======
-function requireAdminToken() {
-  const s = getAdminSession();
-  const t = String(s?.adminToken || "").trim();
-  if (!t) {
-    showLoginUI();
-    throw new Error("관리자 세션이 없습니다.");
+    `;
   }
-  return t;
-}
-function requireStudentMeta() {
-  if (!__currentStudentMeta) throw new Error("학생이 선택되지 않았습니다.");
-  return __currentStudentMeta;
-}
 
-// ====== 상세: 출결 ======
-async function openAttendanceDetail() {
-  try {
-    const adminToken = requireAdminToken();
-    const st = requireStudentMeta();
-
-    renderPanelLoading("출결 상세");
-
-    const data = await apiPost("admin_attendance_detail", {
-      adminToken,
-      studentId: st.studentId,
-      seat: st.seat,
-    });
-
-    if (!data?.ok) return renderPanelError(data?.error || "출결 상세 실패");
-
-    // data: attendance 상세와 동일 구조 { dates:[{md,dow,iso}], rows:[{period,cells:[{s,a}]}] }
+  function renderAttendanceDetail_(data) {
     const dates = data.dates || [];
     const rows = data.rows || [];
 
-    // 헤더 (2줄: M/D, 요일)
-    const head1 = dates.map(d => `<th>${escapeHtml(d.md || "")}</th>`).join("");
-    const head2 = dates.map(d => `<th style="opacity:.75; font-weight:600;">${escapeHtml(d.dow || "")}</th>`).join("");
+    if (!dates.length || !rows.length) return "출결 상세 데이터가 없습니다.";
 
+    // 너무 길어질 수 있으니 최근 14일만 보여주기
+    const showN = Math.min(14, dates.length);
+    const d2 = dates.slice(0, showN); // data가 최신순이 아니라면 여기 조정 필요(현재 백엔드는 헤더 순서 그대로)
+    // 백엔드가 날짜를 좌->우로 반환하므로 "최근"이 오른쪽일 수 있음.
+    // 안전하게: iso로 정렬 후 최근 N개만.
+    const idxSorted = dates
+      .map((d, i) => ({ i, iso: d.iso || "" }))
+      .filter(x => x.iso)
+      .sort((a,b) => a.iso.localeCompare(b.iso)); // 오름차순
+    const lastIdx = idxSorted.slice(-showN).map(x => x.i);
+
+    const header = ["교시"].concat(lastIdx.map(i => `${dates[i].md}(${dates[i].dow})`));
     const body = rows.map(r => {
-      const tds = (r.cells || []).map(c => {
+      const period = r.period || "";
+      const cells = r.cells || [];
+      const line = [period].concat(lastIdx.map(i => {
+        const c = cells[i] || {};
         const a = String(c.a ?? "").trim();
         const s = String(c.s ?? "").trim();
-
-        // a=1 출석, a=3 결석, 그 외 공백
-        let badge = "";
-        if (a === "1") badge = `<span class="badge ok">출석</span>`;
-        else if (a === "3") badge = `<span class="badge bad">결석</span>`;
-        else badge = `<span class="badge">-</span>`;
-
-        const sched = s ? `<div style="opacity:.85; font-size:.85rem; margin-top:2px;">${escapeHtml(s)}</div>` : "";
-        return `<td style="text-align:center;">${badge}${sched}</td>`;
-      }).join("");
-
-      return `<tr><th style="text-align:center; min-width:64px;">${escapeHtml(r.period || "-")}</th>${tds}</tr>`;
-    }).join("");
-
-    renderPanel(`
-      <div style="opacity:.85; margin-bottom:8px;">
-        <b>${escapeHtml(st.studentName || "")}</b> (${escapeHtml(st.seat || "")}) · 출결 상세
-      </div>
-
-      <div style="overflow:auto; border:1px solid rgba(0,0,0,.08); border-radius:12px;">
-        <table class="table" style="border-collapse:separate; border-spacing:0; min-width:700px;">
-          <thead>
-            <tr><th rowspan="2" style="position:sticky; left:0; background:var(--card,#fff); z-index:2;">교시</th>${head1}</tr>
-            <tr>${head2}</tr>
-          </thead>
-          <tbody>${body || `<tr><td colspan="${dates.length + 1}" style="text-align:center; opacity:.8;">데이터 없음</td></tr>`}</tbody>
-        </table>
-      </div>
-    `);
-  } catch (e) {
-    renderPanelError(e.message || "출결 상세 오류");
-  }
-}
-
-// ====== 상세: 취침 ======
-async function openSleepDetail() {
-  try {
-    const adminToken = requireAdminToken();
-    const st = requireStudentMeta();
-
-    renderPanelLoading("취침 상세");
-
-    const data = await apiPost("admin_sleep_detail", {
-      adminToken,
-      studentId: st.studentId,
-      seat: st.seat,
-      days: DEFAULT_DAYS_SLEEP,
+        // 표시: 스케줄/출결
+        return `${s ? s : "-"} / ${a ? a : "-"}`;
+      }));
+      return line;
     });
 
-    if (!data?.ok) return renderPanelError(data?.error || "취침 상세 실패");
+    return renderSimpleTable_(header, body);
+  }
 
-    // data.groups: [{dateIso,total,details:[{period,reason,count}]}]
+  function renderSleepDetail_(data) {
     const groups = data.groups || [];
+    if (!groups.length) return "취침 상세 데이터가 없습니다.";
 
-    const html = groups.map(g => {
-      const details = (g.details || []).map(d => `
-        <div class="rowline">
-          <div><b>${escapeHtml(d.period || "-")}</b>교시</div>
-          <div style="opacity:.85;">${escapeHtml(d.reason || "취침")}</div>
-          <div style="text-align:right;"><b>${num(d.count)}</b></div>
-        </div>
-      `).join("");
-
-      return `
-        <div class="block">
-          <div class="block-head">
-            <div><b>${escapeHtml(g.dateIso || "")}</b></div>
-            <div style="opacity:.85;">합계 <b>${num(g.total)}</b></div>
-          </div>
-          <div class="block-body">
-            ${details || `<div style="opacity:.8;">-</div>`}
-          </div>
-        </div>
-      `;
-    }).join("");
-
-    renderPanel(`
-      <div style="opacity:.85; margin-bottom:8px;">
-        <b>${escapeHtml(st.studentName || "")}</b> (${escapeHtml(st.seat || "")}) · 취침 상세 (최근 ${DEFAULT_DAYS_SLEEP}일)
-      </div>
-      ${html || `<div style="opacity:.8;">데이터 없음</div>`}
-    `);
-  } catch (e) {
-    renderPanelError(e.message || "취침 상세 오류");
-  }
-}
-
-// ====== 상세: 이동 ======
-async function openMoveDetail() {
-  try {
-    const adminToken = requireAdminToken();
-    const st = requireStudentMeta();
-
-    renderPanelLoading("이동 상세");
-
-    const data = await apiPost("admin_move_detail", {
-      adminToken,
-      studentId: st.studentId,
-      seat: st.seat,
-      days: DEFAULT_DAYS_MOVE,
+    const rows = [];
+    groups.forEach(g => {
+      const dateIso = g.dateIso || "";
+      const total = g.total ?? 0;
+      const details = Array.isArray(g.details) ? g.details : [];
+      if (!details.length) {
+        rows.push([dateIso, "", "취침", total]);
+      } else {
+        details.forEach(d => {
+          rows.push([dateIso, d.period || "-", d.reason || "취침", d.count ?? 0]);
+        });
+      }
     });
 
-    if (!data?.ok) return renderPanelError(data?.error || "이동 상세 실패");
-
-    const items = data.items || [];
-
-    const rows = items.map(x => `
-      <tr>
-        <td>${escapeHtml(x.date || "")}</td>
-        <td>${escapeHtml(x.time || "")}</td>
-        <td>${escapeHtml(x.reason || "")}</td>
-        <td style="text-align:center;">${escapeHtml(x.returnPeriod || "")}</td>
-      </tr>
-    `).join("");
-
-    renderPanel(`
-      <div style="opacity:.85; margin-bottom:8px;">
-        <b>${escapeHtml(st.studentName || "")}</b> (${escapeHtml(st.seat || "")}) · 이동 상세 (최근 ${DEFAULT_DAYS_MOVE}일)
-      </div>
-
-      <div style="overflow:auto; border:1px solid rgba(0,0,0,.08); border-radius:12px;">
-        <table class="table" style="min-width:650px;">
-          <thead>
-            <tr>
-              <th>날짜</th>
-              <th>시간</th>
-              <th>사유</th>
-              <th style="text-align:center;">복귀교시</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows || `<tr><td colspan="4" style="text-align:center; opacity:.8;">데이터 없음</td></tr>`}
-          </tbody>
-        </table>
-      </div>
-    `);
-  } catch (e) {
-    renderPanelError(e.message || "이동 상세 오류");
+    return renderSimpleTable_(["날짜", "교시", "사유", "횟수"], rows);
   }
-}
 
-// ====== 상세: 교육점수 ======
-async function openEduDetail() {
-  try {
-    const adminToken = requireAdminToken();
-    const st = requireStudentMeta();
+  function renderGradeDetail_(gd) {
+    const st = gd.student || {};
+    const s = gd.subjects || {};
+    const lines = [];
 
-    renderPanelLoading("교육점수 상세");
+    lines.push(`<div style="margin-bottom:10px;"><b>${escapeHtml(gd.sheetName || "")}</b> (${escapeHtml(gd.exam || "")})</div>`);
+    lines.push(fmtKeyVal("좌석", st.seat || ""));
+    lines.push(fmtKeyVal("학번", st.studentId || ""));
+    lines.push(fmtKeyVal("이름", st.name || ""));
 
-    const data = await apiPost("admin_eduscore_detail", {
-      adminToken,
-      studentId: st.studentId,
-      seat: st.seat,
-      days: DEFAULT_DAYS_EDU,
-    });
+    const rows = [
+      ["국어", s.kor?.raw_total ?? s.kor?.raw ?? "", s.kor?.std ?? "", s.kor?.pct ?? "", s.kor?.grade ?? ""],
+      ["수학", s.math?.raw_total ?? s.math?.raw ?? "", s.math?.std ?? "", s.math?.pct ?? "", s.math?.grade ?? ""],
+      ["영어", s.eng?.raw ?? "", "", "", s.eng?.grade ?? ""],
+      ["한국사", s.hist?.raw ?? "", "", "", s.hist?.grade ?? ""],
+      [s.tam1?.name || "탐구1", s.tam1?.raw ?? "", s.tam1?.expected_std ?? "", s.tam1?.expected_pct ?? "", s.tam1?.expected_grade ?? ""],
+      [s.tam2?.name || "탐구2", s.tam2?.raw ?? "", s.tam2?.expected_std ?? "", s.tam2?.expected_pct ?? "", s.tam2?.expected_grade ?? ""],
+    ];
 
-    if (!data?.ok) return renderPanelError(data?.error || "교육점수 상세 실패");
-
-    const items = data.items || [];
-
-    const rows = items.map(x => `
-      <tr>
-        <td>${escapeHtml(x.date || "")}</td>
-        <td>${escapeHtml(x.time || "")}</td>
-        <td>${escapeHtml(x.reason || "")}</td>
-        <td style="text-align:right;"><b>${num(x.score)}</b></td>
-      </tr>
-    `).join("");
-
-    renderPanel(`
-      <div style="opacity:.85; margin-bottom:8px;">
-        <b>${escapeHtml(st.studentName || "")}</b> (${escapeHtml(st.seat || "")}) · 교육점수 상세 (최근 ${DEFAULT_DAYS_EDU}일)
-      </div>
-
-      <div style="overflow:auto; border:1px solid rgba(0,0,0,.08); border-radius:12px;">
-        <table class="table" style="min-width:650px;">
-          <thead>
-            <tr>
-              <th>날짜</th>
-              <th>시간</th>
-              <th>사유</th>
-              <th style="text-align:right;">점수</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows || `<tr><td colspan="4" style="text-align:center; opacity:.8;">데이터 없음</td></tr>`}
-          </tbody>
-        </table>
-      </div>
-    `);
-  } catch (e) {
-    renderPanelError(e.message || "교육점수 상세 오류");
-  }
-}
-
-// ====== 상세: 성적 ======
-async function openGradeDetail() {
-  try {
-    const adminToken = requireAdminToken();
-    const st = requireStudentMeta();
-
-    renderPanelLoading("성적 상세");
-
-    // 시험 목록 가져와서 최신 exam 선택
-    const ex = await apiPost("admin_grade_exams", { adminToken });
-    if (!ex?.ok) return renderPanelError(ex?.error || "시험 목록 불러오기 실패");
-
-    const items = ex.items || [];
-    const latestExam = items.length ? String(items[items.length - 1].exam || "").trim() : "";
-
-    const data = await apiPost("admin_grade_detail", {
-      adminToken,
-      studentId: st.studentId,
-      seat: st.seat,
-      exam: latestExam, // 없으면 백엔드가 자동으로 최신 선택하도록 되어있음
-    });
-
-    if (!data?.ok) return renderPanelError(data?.error || "성적 상세 실패");
-
-    const sheetName = data.sheetName || data.exam || "";
-    const student = data.student || {};
-    const sub = data.subjects || {};
-
-    const kv = (k, v) => `
-      <div class="kv">
-        <div class="k">${escapeHtml(k)}</div>
-        <div class="v">${escapeHtml(v)}</div>
+    return `
+      <div>${lines.join("")}</div>
+      <div style="margin-top:12px;">
+        ${renderSimpleTable_(["과목", "원점수", "표준", "백분위", "등급"], rows)}
       </div>
     `;
+  }
 
-    const scoreLine = (title, obj, type) => {
-      if (!obj) return `<div class="subj"><b>${escapeHtml(title)}</b>: -</div>`;
-
-      if (type === "kor" || type === "math") {
-        return `
-          <div class="subj">
-            <div style="font-weight:800;">${escapeHtml(title)} <span style="opacity:.8;">(${escapeHtml(obj.choice || "-")})</span></div>
-            <div style="opacity:.9;">원점수: <b>${num(obj.raw_total)}</b> · 표준: <b>${num(obj.std)}</b> · 백분위: <b>${num(obj.pct)}</b> · 등급: <b>${escapeHtml(obj.grade)}</b></div>
-          </div>
-        `;
-      }
-
-      if (type === "simple") {
-        return `
-          <div class="subj">
-            <div style="font-weight:800;">${escapeHtml(title)}</div>
-            <div style="opacity:.9;">원점수: <b>${num(obj.raw)}</b> · 등급: <b>${escapeHtml(obj.grade)}</b></div>
-          </div>
-        `;
-      }
-
-      if (type === "tam") {
-        return `
-          <div class="subj">
-            <div style="font-weight:800;">${escapeHtml(title)} <span style="opacity:.8;">(${escapeHtml(obj.name || "-")})</span></div>
-            <div style="opacity:.9;">원점수: <b>${num(obj.raw)}</b></div>
-          </div>
-        `;
-      }
-
-      return `<div class="subj"><b>${escapeHtml(title)}</b>: -</div>`;
+  // ====== 마지막 선택 학생 저장(버튼 상세용) ======
+  // admin_student_detail 성공 시 st 저장하도록 훅
+  const _origRender = renderStudentDetail;
+  renderStudentDetail = function(data){
+    // 학생 저장
+    window.__lastStudent = {
+      seat: data?.student?.seat || "",
+      studentId: data?.student?.studentId || "",
+      studentName: data?.student?.studentName || "",
+      teacher: data?.student?.teacher || ""
     };
-
-    renderPanel(`
-      <div style="opacity:.85; margin-bottom:8px;">
-        <b>${escapeHtml(st.studentName || "")}</b> (${escapeHtml(st.seat || "")}) · 성적 상세
-        <span style="opacity:.8;">(${escapeHtml(sheetName)})</span>
-      </div>
-
-      <div class="panelbox">
-        ${kv("학교", `${student.schoolName || ""} (${student.schoolCode || ""})`)}
-        ${kv("학번", student.studentId || "")}
-        ${kv("반/번호", `${student.classNo || ""}반 ${student.number || ""}번`)}
-        ${kv("응시지역", student.examArea || "")}
-      </div>
-
-      <div style="margin-top:10px;">
-        ${scoreLine("국어", sub.kor, "kor")}
-        ${scoreLine("수학", sub.math, "math")}
-        ${scoreLine("영어", sub.eng, "simple")}
-        ${scoreLine("한국사", sub.hist, "simple")}
-        ${scoreLine("탐구1", sub.tam1, "tam")}
-        ${scoreLine("탐구2", sub.tam2, "tam")}
-      </div>
-
-      <div style="opacity:.75; margin-top:10px; font-size:.92rem;">
-        ※ 기대값(예상 표준/백분위/등급)이 필요하면 백엔드가 이미 내려주고 있으니, 원하면 표시도 추가해줄게.
-      </div>
-    `);
-  } catch (e) {
-    renderPanelError(e.message || "성적 상세 오류");
-  }
-}
-
-// ====== 로드: 학생 요약(기존 admin_student_detail 사용) ======
-async function loadStudentDetail({ seat, studentId }) {
-  const adminToken = requireAdminToken();
-
-  $("detailSub").textContent = "불러오는 중...";
-  $("detailBody").innerHTML = "";
-
-  const data = await apiPost("admin_student_detail", {
-    adminToken,
-    seat: seat || "",
-    studentId: studentId || "",
-  });
-
-  renderDetail(data);
-}
-
-// ====== 검색 ======
-async function doSearch() {
-  try {
-    const adminToken = requireAdminToken();
-    const q = String($("qInput").value || "").trim();
-    if (!q) {
-      setHint($("searchMsg"), "검색어를 입력하세요.", true);
-      renderResults([]);
-      return;
-    }
-
-    setHint($("searchMsg"), "검색 중...");
-    const res = await apiPost("admin_search", { adminToken, q });
-
-    if (!res?.ok) {
-      setHint($("searchMsg"), res?.error || "검색 실패", true);
-      renderResults([]);
-      return;
-    }
-
-    setHint($("searchMsg"), `결과 ${res.items?.length || 0}건`);
-    renderResults(res.items || []);
-  } catch (e) {
-    setHint($("searchMsg"), e.message || "검색 오류", true);
-  }
-}
-
-// ====== 로그인 ======
-async function doAdminLogin() {
-  const pw = String($("pwInput").value || "").trim();
-  if (!pw) return setHint($("loginMsg"), "비밀번호를 입력하세요.", true);
-
-  setHint($("loginMsg"), "로그인 중...");
-  const res = await apiPost("admin_login", { password: pw });
-
-  if (!res?.ok) {
-    setHint($("loginMsg"), res?.error || "로그인 실패", true);
-    return;
-  }
-
-  setAdminSession({ adminToken: res.adminToken });
-  setHint($("loginMsg"), "");
-  showAdminUI();
-}
-
-// ====== 초기화 ======
-function bindEvents() {
-  $("loginBtn").addEventListener("click", doAdminLogin);
-  $("pwInput").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") doAdminLogin();
-  });
-
-  $("searchBtn").addEventListener("click", doSearch);
-  $("qInput").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") doSearch();
-  });
-
-  $("logoutBtn").addEventListener("click", () => {
-    clearAdminSession();
-    showLoginUI();
-    setHint($("loginMsg"), "로그아웃되었습니다.");
-  });
-}
-
-function boot() {
-  bindEvents();
-
-  const s = getAdminSession();
-  if (s?.adminToken) {
-    showAdminUI();
-  } else {
-    showLoginUI();
-  }
-}
-
-boot();
-
-/***********************
- * ✅ admin 페이지 전용 간단 CSS 클래스가 styles.css에 없을 수도 있어서
- *    최소한의 스타일을 JS에서 추가(없어도 동작은 함)
- ***********************/
-(function injectTinyStyles() {
-  const css = `
-  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-  @media (max-width: 920px){ .grid-2{ grid-template-columns:1fr; } }
-
-  .list { display:flex; flex-direction:column; gap:10px; }
-  .list-item { padding:12px 14px; border:1px solid rgba(0,0,0,.08); border-radius:14px; background:var(--card,#fff); cursor:pointer; }
-  .list-item:hover { box-shadow:0 6px 18px rgba(0,0,0,.06); }
-
-  .empty { padding:12px; opacity:.8; }
-
-  .mini-card { padding:12px 14px; border:1px solid rgba(0,0,0,.08); border-radius:14px; background:var(--card,#fff); }
-  .mini-title { font-weight:800; margin-bottom:6px; }
-  .mini-body { opacity:.95; }
-
-  .panel { padding:12px 14px; border:1px solid rgba(0,0,0,.08); border-radius:14px; background:rgba(0,0,0,.02); }
-
-  .badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:.82rem; border:1px solid rgba(0,0,0,.12); background:#fff; }
-  .badge.ok { border-color: rgba(0,128,0,.22); }
-  .badge.bad { border-color: rgba(200,0,0,.22); }
-
-  .table { width:100%; }
-  .table th,.table td { padding:10px 8px; border-bottom:1px solid rgba(0,0,0,.06); }
-
-  .block { border:1px solid rgba(0,0,0,.08); border-radius:14px; background:var(--card,#fff); margin-bottom:10px; overflow:hidden; }
-  .block-head { display:flex; justify-content:space-between; padding:10px 12px; background:rgba(0,0,0,.02); }
-  .block-body { padding:8px 12px; display:flex; flex-direction:column; gap:6px; }
-  .rowline { display:grid; grid-template-columns: 80px 1fr 60px; gap:10px; align-items:center; padding:6px 0; border-bottom:1px dashed rgba(0,0,0,.08); }
-  .rowline:last-child { border-bottom:none; }
-
-  .panelbox { display:grid; grid-template-columns:1fr 1fr; gap:10px; border:1px solid rgba(0,0,0,.08); background:var(--card,#fff); border-radius:14px; padding:12px; }
-  @media (max-width: 720px){ .panelbox{ grid-template-columns:1fr; } }
-  .kv { display:flex; justify-content:space-between; gap:10px; }
-  .kv .k{ opacity:.75; }
-  .kv .v{ font-weight:700; text-align:right; }
-
-  .subj { padding:10px 12px; border:1px solid rgba(0,0,0,.08); border-radius:14px; background:var(--card,#fff); margin-bottom:10px; }
-  `;
-  const style = document.createElement("style");
-  style.textContent = css;
-  document.head.appendChild(style);
-})();
+    _origRender(data);
+  };
+});
