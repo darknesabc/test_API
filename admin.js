@@ -3,25 +3,15 @@
  * - admin_login -> adminToken 발급 -> sessionStorage 저장
  * - admin_search -> 리스트 렌더
  * - admin_student_detail -> 상세 렌더
- * - ✅ 추가(연동 준비): 상세 페이지로 이동 버튼(출결/취침/이동/교육점수/성적)
- *   - 백엔드에 admin_issue_token 엔드포인트가 생기면 바로 동작
- *   - (현재는 버튼 클릭 시 "엔드포인트 없음" 에러가 뜰 수 있음)
+ * - ✅ 상세 버튼 클릭 시: 학생 세션(token)을 parent_session_v1에 주입 후 각 상세 페이지로 이동
  ***********************/
 
 // ====== 설정 ======
-const SESSION_KEY_ADMIN = "admin_session_v1";
+const SESSION_KEY_ADMIN  = "admin_session_v1";
+const SESSION_KEY_PARENT = "parent_session_v1"; // ✅ 학생(학부모) 상세페이지들이 쓰는 세션키
 
-// ✅ 너의 Apps Script Web App URL (기존 프론트에서 쓰는 것과 동일하게 맞춰줘)
+// ✅ Apps Script Web App URL
 const API_BASE = "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec";
-
-// ✅ 상세페이지 파일명 매핑
-const STUDENT_PAGES = {
-  attendance: "attendance.html",
-  sleep: "sleep.html",
-  move: "move.html",
-  eduscore: "eduscore.html",
-  grades: "grades.html",
-};
 
 // ====== 유틸 ======
 function $(id) { return document.getElementById(id); }
@@ -36,6 +26,14 @@ function getAdminSession() {
 }
 function clearAdminSession() {
   sessionStorage.removeItem(SESSION_KEY_ADMIN);
+}
+
+// ✅ 학생(학부모) 세션 주입
+function setParentSession(session) {
+  sessionStorage.setItem(SESSION_KEY_PARENT, JSON.stringify(session));
+}
+function clearParentSession() {
+  sessionStorage.removeItem(SESSION_KEY_PARENT);
 }
 
 async function apiPost(path, body) {
@@ -61,11 +59,6 @@ function escapeHtml(s) {
   }[m]));
 }
 
-function isAdminExpiredError_(errMsg) {
-  const s = String(errMsg || "");
-  return s.includes("만료") || s.includes("관리자") || s.includes("adminToken");
-}
-
 // ====== UI 제어 ======
 function showLoginUI() {
   $("loginCard").style.display = "";
@@ -81,35 +74,8 @@ function showAdminUI() {
   $("logoutBtn").style.display = "";
 }
 
-// ====== ✅ 상세 페이지 이동(연동 준비) ======
-async function goStudentPage_(student, pageKey) {
-  const session = getAdminSession();
-  if (!session?.adminToken) {
-    clearAdminSession();
-    showLoginUI();
-    return;
-  }
-
-  const file = STUDENT_PAGES[pageKey] || "dashboard.html";
-
-  // ✅ 학생 상세 페이지는 token 기반으로 이미 만들어져 있으니,
-  // 관리자 권한으로 "학생 토큰"만 발급받으면 그대로 이동 가능
-  const issue = await apiPost("admin_issue_token", {
-    adminToken: session.adminToken,
-    seat: String(student?.seat || "").trim(),
-    studentId: String(student?.studentId || "").trim()
-  });
-
-  if (!issue?.ok || !issue?.token) {
-    // 아직 백엔드에 admin_issue_token이 없으면 여기로 옴
-    alert(issue?.error || "학생 세션 발급 실패 (admin_issue_token 필요)");
-    return;
-  }
-
-  // ✅ token을 query로 전달 (각 상세 페이지에서 ?token=을 읽어 SESSION에 넣는 보정이 필요할 수 있음)
-  const url = `${file}?token=${encodeURIComponent(issue.token)}&from=admin`;
-  window.location.href = url;
-}
+// ====== 상태(현재 선택 학생) ======
+let __currentStudentSession = null; // { token, seat, studentId, studentName, teacher }
 
 // ====== 렌더 ======
 function renderResults(items) {
@@ -127,7 +93,6 @@ function renderResults(items) {
     const studentId = escapeHtml(it.studentId || "");
     const teacher = escapeHtml(it.teacher || "");
 
-    // ✅ button 대신 div(role=button)로: 드래그/선택/포커스 꼬임 방지
     const row = document.createElement("div");
     row.className = "list-item";
     row.setAttribute("role", "button");
@@ -143,24 +108,12 @@ function renderResults(items) {
       </div>
     `;
 
-    const go = () => loadStudentDetail({ seat: it.seat, studentId: it.studentId, name: it.name });
+    const go = () => loadStudentDetail({ seat: it.seat, studentId: it.studentId });
 
-    // ✅ 드래그/텍스트선택이 클릭을 씹는 현상 방지
-    row.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-    });
-
-    row.addEventListener("click", (e) => {
-      e.preventDefault();
-      go();
-    });
-
-    // 키보드 접근성(Enter/Space)
+    row.addEventListener("pointerdown", (e) => { e.preventDefault(); });
+    row.addEventListener("click", (e) => { e.preventDefault(); go(); });
     row.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        go();
-      }
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
     });
 
     box.appendChild(row);
@@ -171,6 +124,8 @@ function renderDetail(data) {
   const sub = $("detailSub");
   const body = $("detailBody");
 
+  __currentStudentSession = null;
+
   if (!data || !data.ok) {
     sub.textContent = "상세 조회 실패";
     body.innerHTML = `<div class="empty">${escapeHtml(data?.error || "알 수 없는 오류")}</div>`;
@@ -180,6 +135,18 @@ function renderDetail(data) {
   const student = data.student || {};
   sub.textContent = `${student.studentName || "-"} · ${student.seat || "-"} · ${student.studentId || "-"}`;
 
+  // ✅ 백엔드에서 token을 내려줘야 함 (handleAdminStudentDetail_ 응답에 token 추가)
+  const token = String(data.token || "").trim();
+  if (token) {
+    __currentStudentSession = {
+      token,
+      seat: student.seat || "",
+      teacher: student.teacher || "",
+      studentName: student.studentName || "",
+      studentId: student.studentId || ""
+    };
+  }
+
   const s = data.summary || {};
   const att = s.attendance || null;
   const sleep = s.sleep || null;
@@ -187,7 +154,6 @@ function renderDetail(data) {
   const edu = s.eduscore || null;
   const grade = s.grade || null;
 
-  // 카드형 섹션 렌더(기존 styles.css 톤 유지)
   body.innerHTML = `
     <div class="grid-2" style="gap:10px;">
       ${renderMiniCard("출결(이번주)", att ? `
@@ -223,8 +189,7 @@ function renderDetail(data) {
       ` : `<div class="empty">성적 데이터를 불러오지 못했거나, 시트가 없습니다.</div>`)}
     </div>
 
-    <!-- ✅ 상세 페이지 이동(연동 준비) -->
-    <div style="margin-top:12px;">
+    <div style="margin-top:14px;">
       ${renderMiniCard("상세 페이지", `
         <div style="display:flex; flex-wrap:wrap; gap:8px;">
           <button class="btn btn-ghost" data-go="attendance">출결 상세</button>
@@ -233,20 +198,12 @@ function renderDetail(data) {
           <button class="btn btn-ghost" data-go="eduscore">교육점수 상세</button>
           <button class="btn btn-ghost" data-go="grades">성적 상세</button>
         </div>
-        <div class="hint" style="margin-top:8px;">
-          ※ 버튼 클릭 시 관리자 권한으로 학생 세션(token)을 발급받아 상세 페이지로 이동합니다.
+        <div class="hint" style="margin-top:10px;">
+          ※ 버튼 클릭 시 관리자 권한으로 학생 세션(token)을 발급/주입 후 상세 페이지로 이동합니다.
         </div>
       `)}
     </div>
   `;
-
-  // ✅ 버튼 이벤트 바인딩 (innerHTML 이후)
-  body.querySelectorAll("button[data-go]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const pageKey = btn.getAttribute("data-go");
-      await goStudentPage_(student, pageKey);
-    });
-  });
 }
 
 function renderMiniCard(title, html) {
@@ -265,6 +222,32 @@ function renderRecentAbs(list) {
 function num(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+// ====== 상세 페이지 이동(학생 세션 주입) ======
+function goStudentDetailPage(kind) {
+  if (!__currentStudentSession?.token) {
+    alert("학생 세션(token)을 받지 못했습니다. 백엔드 admin_student_detail 응답에 token을 포함시켜주세요.");
+    return;
+  }
+
+  // ✅ 기존 학부모 상세페이지들이 바라보는 세션키로 주입
+  setParentSession(__currentStudentSession);
+
+  // (선택) 혹시 이전에 남아있는 학생 세션/상태가 꼬일까봐 필요시 추가 정리 가능
+  // clearParentSession(); setParentSession(__currentStudentSession);
+
+  const map = {
+    attendance: "attendance.html",
+    sleep: "sleep.html",
+    move: "move.html",
+    eduscore: "eduscore.html",
+    grades: "grades.html"
+  };
+
+  const url = map[kind];
+  if (!url) return;
+  window.location.href = url;
 }
 
 // ====== 동작 ======
@@ -321,8 +304,7 @@ async function doSearch() {
   $("searchBtn").textContent = "검색";
 
   if (!res.ok) {
-    // 세션 만료면 로그인으로
-    if (isAdminExpiredError_(res.error)) {
+    if (String(res.error || "").includes("만료") || String(res.error || "").includes("관리자")) {
       clearAdminSession();
       showLoginUI();
       setHint($("loginMsg"), "관리자 세션이 만료되었습니다. 다시 로그인하세요.", true);
@@ -336,9 +318,8 @@ async function doSearch() {
   renderResults(items);
   setHint($("searchMsg"), `${items.length}명 찾았습니다.`);
 
-  // ✅ 1명만 나오면 자동으로 상세 로드(원하지 않으면 아래 3줄 주석처리)
   if (items.length === 1) {
-    loadStudentDetail({ seat: items[0].seat, studentId: items[0].studentId, name: items[0].name });
+    loadStudentDetail({ seat: items[0].seat, studentId: items[0].studentId });
   }
 }
 
@@ -360,7 +341,7 @@ async function loadStudentDetail({ seat, studentId }) {
   });
 
   if (!res.ok) {
-    if (isAdminExpiredError_(res.error)) {
+    if (String(res.error || "").includes("만료") || String(res.error || "").includes("관리자")) {
       clearAdminSession();
       showLoginUI();
       setHint($("loginMsg"), "관리자 세션이 만료되었습니다. 다시 로그인하세요.", true);
@@ -376,10 +357,11 @@ function doLogout() {
   $("qInput").value = "";
   $("resultList").innerHTML = "";
   $("detailBody").innerHTML = "";
+  __currentStudentSession = null;
   showLoginUI();
 }
 
-// ====== styles.css에 없는 클래스 보완(있으면 그대로 사용됨) ======
+// ====== styles.css에 없는 클래스 보완 ======
 function injectFallbackCss() {
   const css = `
     .input{padding:12px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);background:var(--card,#fff);color:inherit;outline:none;}
@@ -394,26 +376,9 @@ function injectFallbackCss() {
     .mini-body{font-size:.98rem;}
     .hint{opacity:.8;font-size:.92rem;}
 
-    /* ✅ 결과 클릭/가독성 강제 보정 */
     #resultList{position:relative;z-index:5;}
-    .list-item{
-      position:relative;
-      z-index:10;
-      user-select:none;
-      -webkit-user-select:none;
-      pointer-events:auto;
-      background:rgba(255,255,255,.04);
-    }
-    .list-item *{
-      pointer-events:none; /* ✅ 내부 요소가 클릭을 가로채지 않게 */
-      user-select:none;
-      -webkit-user-select:none;
-    }
-
-    /* ✅ 버튼(상세 페이지 이동) 보정: styles.css에 .btn이 이미 있으면 그대로 적용됨 */
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:10px 12px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.06);cursor:pointer;}
-    .btn:hover{filter:brightness(1.05);}
-    .btn:disabled{opacity:.6;cursor:not-allowed;}
+    .list-item{position:relative;z-index:10;user-select:none;-webkit-user-select:none;pointer-events:auto;background:rgba(255,255,255,.04);}
+    .list-item *{pointer-events:none;user-select:none;-webkit-user-select:none;}
   `;
   const style = document.createElement("style");
   style.textContent = css;
@@ -425,18 +390,22 @@ document.addEventListener("DOMContentLoaded", () => {
   injectFallbackCss();
 
   $("loginBtn").addEventListener("click", doLogin);
-  $("pwInput").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") doLogin();
-  });
+  $("pwInput").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
 
   $("searchBtn").addEventListener("click", doSearch);
-  $("qInput").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") doSearch();
-  });
+  $("qInput").addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
 
   $("logoutBtn").addEventListener("click", doLogout);
 
-  // 세션 있으면 바로 관리자 화면
+  // ✅ 상세 버튼 클릭 (renderDetail에서 data-go를 심어둠)
+  $("detailBody").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-go]");
+    if (!btn) return;
+    const kind = String(btn.getAttribute("data-go") || "").trim();
+    if (!kind) return;
+    goStudentDetailPage(kind);
+  });
+
   const s = getAdminSession();
   if (s?.adminToken) showAdminUI();
   else showLoginUI();
