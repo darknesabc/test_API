@@ -6,7 +6,7 @@
  ***********************/
 
 // ✅ 여기에 Apps Script Web App URL(…/exec) 넣기
-const API_BASE = "YOUR_APPS_SCRIPT_WEBAPP_URL";
+const API_BASE = "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec";
 
 const ADMIN_SESSION_KEY = "admin_session_v1";
 
@@ -532,3 +532,4 @@ document.addEventListener("DOMContentLoaded", () => {
     _origRender(data);
   };
 });
+
