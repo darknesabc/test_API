@@ -631,36 +631,97 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
   }
 
-  function renderAttendanceDetail_(data) {
-    const dates = data.dates || [];
-    const rows = data.rows || [];
+ function renderAttendanceDetail_(data) {
+  const dates = data.dates || [];
+  const rows = data.rows || [];
+  if (!dates.length || !rows.length) return "출결 상세 데이터가 없습니다.";
 
-    if (!dates.length || !rows.length) return "출결 상세 데이터가 없습니다.";
+  const showN = Math.min(14, dates.length);
 
-    const showN = Math.min(14, dates.length);
+  // 날짜 정렬 후 최근 N일만
+  const idxSorted = dates
+    .map((d, i) => ({ i, iso: d.iso || "" }))
+    .filter(x => x.iso)
+    .sort((a,b) => a.iso.localeCompare(b.iso));
 
-    const idxSorted = dates
-      .map((d, i) => ({ i, iso: d.iso || "" }))
-      .filter(x => x.iso)
-      .sort((a,b) => a.iso.localeCompare(b.iso));
+  const lastIdx = idxSorted.slice(-showN).map(x => x.i);
 
-    const lastIdx = idxSorted.slice(-showN).map(x => x.i);
-
-    const header = ["교시"].concat(lastIdx.map(i => `${dates[i].md}(${dates[i].dow})`));
-    const body = rows.map(r => {
-      const period = r.period || "";
-      const cells = r.cells || [];
-      const line = [period].concat(lastIdx.map(i => {
-        const c = cells[i] || {};
-        const a = String(c.a ?? "").trim();
-        const s = String(c.s ?? "").trim();
-        return `${s ? s : "-"} / ${a ? a : "-"}`;
-      }));
-      return line;
-    });
-
-    return renderSimpleTable_(header, body);
+  // ✅ 출결 값에 따른 셀 스타일
+  function statusStyle_(val) {
+    const t = String(val || "").trim();
+    if (!t || t === "-" ) return "opacity:.55;";
+    if (t.includes("출석")) return "background: rgba(46, 204, 113, .22);";
+    if (t.includes("결석")) return "background: rgba(231, 76, 60, .22);";
+    if (t.includes("지각")) return "background: rgba(241, 196, 15, .22);";
+    if (t.includes("조퇴")) return "background: rgba(155, 89, 182, .22);";
+    if (t.includes("외출")) return "background: rgba(52, 152, 219, .22);";
+    return "background: rgba(255,255,255,.06);";
   }
+
+  // ====== 헤더(2줄) 만들기 ======
+  // 1줄: 날짜(각 날짜 colspan=2)
+  const thTop = `
+    <th rowspan="2" style="position:sticky; left:0; z-index:3; background:rgba(8,12,20,.92); padding:10px; border-bottom:1px solid rgba(255,255,255,.10); width:60px;">
+      교시
+    </th>
+    ${lastIdx.map(i => `
+      <th colspan="2" style="text-align:center; padding:10px; border-bottom:1px solid rgba(255,255,255,.10);">
+        ${escapeHtml(`${dates[i].md}(${dates[i].dow})`)}
+      </th>
+    `).join("")}
+  `;
+
+  // 2줄: 스케줄/출결 반복
+  const thSub = lastIdx.map(() => `
+    <th style="text-align:left; padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.08); opacity:.85;">스케줄</th>
+    <th style="text-align:left; padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.08); opacity:.85;">출/결</th>
+  `).join("");
+
+  // ====== 바디 ======
+  const bodyTr = rows.map(r => {
+    const period = r.period || "";
+    const cells = r.cells || [];
+
+    const tds = lastIdx.map(i => {
+      const c = cells[i] || {};
+      const s = String(c.s ?? "").trim();  // 스케줄
+      const a = String(c.a ?? "").trim();  // 출결
+
+      return `
+        <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
+          ${escapeHtml(s || "-")}
+        </td>
+        <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap; ${statusStyle_(a)}">
+          ${escapeHtml(a || "-")}
+        </td>
+      `;
+    }).join("");
+
+    return `
+      <tr>
+        <td style="position:sticky; left:0; z-index:2; background:rgba(8,12,20,.92); padding:10px; border-bottom:1px solid rgba(255,255,255,.06); font-weight:700;">
+          ${escapeHtml(period)}
+        </td>
+        ${tds}
+      </tr>
+    `;
+  }).join("");
+
+  // ====== 최종 테이블 ======
+  return `
+    <div style="overflow:auto; border-radius:14px; border:1px solid rgba(255,255,255,.08);">
+      <table style="width:max-content; min-width:100%; border-collapse:separate; border-spacing:0; font-size:14px;">
+        <thead style="background: rgba(255,255,255,.03);">
+          <tr>${thTop}</tr>
+          <tr>${thSub}</tr>
+        </thead>
+        <tbody>
+          ${bodyTr || `<tr><td style="padding:12px; opacity:.8;" colspan="${1 + lastIdx.length*2}">데이터 없음</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
 
   function renderSleepDetail_(data) {
     const groups = data.groups || [];
@@ -722,3 +783,4 @@ document.addEventListener("DOMContentLoaded", () => {
     _origRender(data);
   };
 });
+
