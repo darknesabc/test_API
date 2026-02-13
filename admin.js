@@ -3,6 +3,11 @@
  * ✅ Unknown path 방지:
  * - 백엔드 doPost 라우터에 존재하는 path만 호출
  *   attendance, sleep_detail, move_detail, eduscore_detail, grade_exams, grade_detail
+ *
+ * ✅ 추가(요약 자동 로드)
+ * - 학생 선택 시 admin_issue_token으로 token 발급 후
+ *   attendance_summary / sleep_summary / move_summary / eduscore_summary / grade_exams+grade_detail
+ *   를 자동 호출하여 summary를 채움
  ***********************/
 
 // ✅ 여기에 Apps Script Web App URL(…/exec) 넣기
@@ -231,6 +236,59 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // ====== issue token for student (admin_issue_token) ======
+  async function issueStudentToken_(seat, studentId) {
+    const sess = getAdminSession();
+    const data = await apiPost("admin_issue_token", {
+      adminToken: sess.adminToken,
+      seat,
+      studentId
+    });
+    if (!data.ok) throw new Error(data.error || "token 발급 실패");
+    return data.token;
+  }
+
+  // ====== ✅ 요약 자동 로드 ======
+  async function loadSummariesForStudent_(seat, studentId) {
+    const summary = {};
+    const token = await issueStudentToken_(seat, studentId);
+
+    // 병렬 호출 (존재하지 않는 path면 ok:false 로 떨어짐)
+    const [att, slp, mv, edu] = await Promise.allSettled([
+      apiPost("attendance_summary", { token }),
+      apiPost("sleep_summary", { token }),
+      apiPost("move_summary", { token }),
+      apiPost("eduscore_summary", { token }),
+    ]);
+
+    summary.attendance = (att.status === "fulfilled") ? att.value : { ok:false, error:String(att.reason || "") };
+    summary.sleep      = (slp.status === "fulfilled") ? slp.value : { ok:false, error:String(slp.reason || "") };
+    summary.move       = (mv.status === "fulfilled")  ? mv.value  : { ok:false, error:String(mv.reason || "") };
+    summary.eduscore   = (edu.status === "fulfilled") ? edu.value : { ok:false, error:String(edu.reason || "") };
+
+    // 성적 요약: 시험목록 → 마지막 시험 → grade_detail
+    try {
+      const exams = await apiPost("grade_exams", { token });
+      if (exams.ok && Array.isArray(exams.items) && exams.items.length) {
+        const lastExam = exams.items[exams.items.length - 1].exam;
+        const gd = await apiPost("grade_detail", { token, exam: lastExam });
+        summary.grade = gd.ok ? {
+          ok: true,
+          sheetName: gd.sheetName,
+          kor: gd.subjects?.kor,
+          math: gd.subjects?.math,
+          eng: gd.subjects?.eng,
+        } : { ok:false, error: gd.error || "grade_detail 실패" };
+      } else {
+        summary.grade = { ok:false, error:"시험 목록 없음" };
+      }
+    } catch (e) {
+      summary.grade = { ok:false, error: e?.message || "성적 오류" };
+    }
+
+    return summary;
+  }
+
   // ====== load student detail (summary) ======
   async function loadStudentDetail(st) {
     const sess = getAdminSession();
@@ -258,7 +316,23 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      // 1) 기본정보 먼저 렌더
+      data.summary = data.summary || {};
       renderStudentDetail(data);
+
+      // 2) 요약 로딩 표시 후 자동 로드
+      data.summary = { __loading: true };
+      renderStudentDetail(data);
+
+      try {
+        const summary = await loadSummariesForStudent_(seat, studentId);
+        data.summary = summary || {};
+        renderStudentDetail(data);
+      } catch (_) {
+        data.summary = {};
+        renderStudentDetail(data);
+      }
+
     } catch (e) {
       detailBody.innerHTML = `<div style="color:#ff6b6b;">네트워크 오류</div>`;
     }
@@ -268,6 +342,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderStudentDetail(data) {
     const st = data.student || {};
     const sum = data.summary || {};
+    const loading = !!sum.__loading;
 
     const att = sum.attendance || null;
     const slp = sum.sleep || null;
@@ -305,7 +380,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }</ul>`
                   : "없음"
               }
-            ` : "데이터 없음"}
+            ` : (loading ? "불러오는 중…" : "데이터 없음")}
           </div>
         </section>
 
@@ -315,7 +390,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ${slp && slp.ok ? `
               최근 7일 취침일수: <b>${slp.sleepCount7d ?? 0}</b><br>
               최근 7일 취침횟수: <b>${slp.sleepTotal7d ?? 0}</b>
-            ` : "데이터 없음"}
+            ` : (loading ? "불러오는 중…" : "데이터 없음")}
           </div>
         </section>
 
@@ -325,7 +400,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ${mv && mv.ok ? `
               최근 이동: <b>${escapeHtml(mv.latestText || "-")}</b><br>
               ${escapeHtml(mv.latestDateTime || "")}
-            ` : "데이터 없음"}
+            ` : (loading ? "불러오는 중…" : "데이터 없음")}
           </div>
         </section>
 
@@ -336,7 +411,7 @@ document.addEventListener("DOMContentLoaded", () => {
               이번달 누적점수: <b>${edu.monthTotal ?? 0}</b><br>
               최근 항목: <b>${escapeHtml(edu.latestText || "-")}</b><br>
               ${escapeHtml(edu.latestDateTime || "")}
-            ` : "데이터 없음"}
+            ` : (loading ? "불러오는 중…" : "데이터 없음")}
           </div>
         </section>
 
@@ -348,7 +423,7 @@ document.addEventListener("DOMContentLoaded", () => {
               국어: <b>${grd.kor?.raw_total ?? grd.kor?.raw ?? "-"}</b> / 등급 <b>${grd.kor?.grade ?? "-"}</b><br>
               수학: <b>${grd.math?.raw_total ?? grd.math?.raw ?? "-"}</b> / 등급 <b>${grd.math?.grade ?? "-"}</b><br>
               영어: <b>${grd.eng?.raw ?? "-"}</b> / 등급 <b>${grd.eng?.grade ?? "-"}</b>
-            ` : "데이터 없음"}
+            ` : (loading ? "불러오는 중…" : "데이터 없음")}
           </div>
         </section>
       </div>
@@ -360,18 +435,6 @@ document.addEventListener("DOMContentLoaded", () => {
     $("btnMoveDetail").addEventListener("click", () => loadDetail("move_detail"));
     $("btnEduDetail").addEventListener("click", () => loadDetail("eduscore_detail"));
     $("btnGradeDetail").addEventListener("click", () => loadDetail("grade_detail"));
-  }
-
-  // ====== issue token for student (admin_issue_token) ======
-  async function issueStudentToken_(seat, studentId) {
-    const sess = getAdminSession();
-    const data = await apiPost("admin_issue_token", {
-      adminToken: sess.adminToken,
-      seat,
-      studentId
-    });
-    if (!data.ok) throw new Error(data.error || "token 발급 실패");
-    return data.token;
   }
 
   // ====== load detail into detailResult ======
