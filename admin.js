@@ -1,21 +1,27 @@
 /***********************
  * Admin Frontend (GitHub Pages)
- * - admin_login -> adminToken 발급 -> sessionStorage 저장
- * - admin_search -> 리스트 렌더
- * - admin_student_detail -> 상세 렌더(요약)
- * - ✅ 상세 버튼 클릭 시:
- *    admin_issue_token -> 학생 token 발급 -> parent_session_v1에 주입 -> 각 상세 페이지로 이동
+ *
+ * ✅ 변경 핵심
+ * - 상세 버튼 클릭 시 학부모 상세 페이지로 이동 ❌
+ * - 관리자 페이지 내부에서 admin_*_detail API 호출 후 렌더 ✅
  ***********************/
 
 // ====== 설정 ======
-const SESSION_KEY_ADMIN  = "admin_session_v1";
-const SESSION_KEY_PARENT = "parent_session_v1"; // ✅ 학생(학부모) 상세페이지들이 쓰는 세션키
+const SESSION_KEY_ADMIN = "admin_session_v1";
 
-// ✅ Apps Script Web App URL
-const API_BASE = "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec";
+// ✅ Apps Script Web App URL (너의 실전 URL 그대로 유지)
+const API_BASE =
+  "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec";
+
+// 기본 상세 기간
+const DEFAULT_DAYS_SLEEP = 7;
+const DEFAULT_DAYS_MOVE = 30;
+const DEFAULT_DAYS_EDU = 30;
 
 // ====== 유틸 ======
-function $(id) { return document.getElementById(id); }
+function $(id) {
+  return document.getElementById(id);
+}
 
 function setAdminSession(session) {
   sessionStorage.setItem(SESSION_KEY_ADMIN, JSON.stringify(session));
@@ -23,18 +29,14 @@ function setAdminSession(session) {
 function getAdminSession() {
   const raw = sessionStorage.getItem(SESSION_KEY_ADMIN);
   if (!raw) return null;
-  try { return JSON.parse(raw); } catch (_) { return null; }
+  try {
+    return JSON.parse(raw);
+  } catch (_) {
+    return null;
+  }
 }
 function clearAdminSession() {
   sessionStorage.removeItem(SESSION_KEY_ADMIN);
-}
-
-// ✅ 학생(학부모) 세션 주입
-function setParentSession(session) {
-  sessionStorage.setItem(SESSION_KEY_PARENT, JSON.stringify(session));
-}
-function clearParentSession() {
-  sessionStorage.removeItem(SESSION_KEY_PARENT);
 }
 
 async function apiPost(path, body) {
@@ -42,11 +44,14 @@ async function apiPost(path, body) {
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(body || {})
+    body: JSON.stringify(body || {}),
   });
   const text = await res.text();
-  try { return JSON.parse(text); }
-  catch (_) { return { ok: false, error: "서버 응답 파싱 실패", raw: text }; }
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    return { ok: false, error: "서버 응답 파싱 실패", raw: text };
+  }
 }
 
 function setHint(el, msg, isError = false) {
@@ -56,9 +61,18 @@ function setHint(el, msg, isError = false) {
 }
 
 function escapeHtml(s) {
-  return String(s ?? "").replace(/[&<>"']/g, m => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  return String(s ?? "").replace(/[&<>"']/g, (m) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
   }[m]));
+}
+
+function num(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
 }
 
 // ====== UI 제어 ======
@@ -79,7 +93,7 @@ function showAdminUI() {
 // ====== 상태(현재 선택 학생) ======
 let __currentStudentMeta = null; // { seat, studentId, studentName, teacher }
 
-// ====== 렌더 ======
+// ====== 렌더: 검색결과 ======
 function renderResults(items) {
   const box = $("resultList");
   box.innerHTML = "";
@@ -112,16 +126,23 @@ function renderResults(items) {
 
     const go = () => loadStudentDetail({ seat: it.seat, studentId: it.studentId });
 
-    row.addEventListener("pointerdown", (e) => { e.preventDefault(); });
-    row.addEventListener("click", (e) => { e.preventDefault(); go(); });
+    row.addEventListener("pointerdown", (e) => e.preventDefault());
+    row.addEventListener("click", (e) => {
+      e.preventDefault();
+      go();
+    });
     row.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        go();
+      }
     });
 
     box.appendChild(row);
   });
 }
 
+// ====== 렌더: 요약 + 상세버튼 + 상세패널 ======
 function renderDetail(data) {
   const sub = $("detailSub");
   const body = $("detailBody");
@@ -151,309 +172,582 @@ function renderDetail(data) {
   const edu = s.eduscore || null;
   const grade = s.grade || null;
 
+  const card = (title, inner) => `
+    <div class="mini-card">
+      <div class="mini-title">${escapeHtml(title)}</div>
+      <div class="mini-body">${inner}</div>
+    </div>
+  `;
+
+  const attHtml = att && att.ok
+    ? `
+      <div>이번주 출석: <b>${num(att.present)}</b></div>
+      <div>이번주 결석: <b>${num(att.absent)}</b></div>
+      <div style="margin-top:6px; opacity:.8;">최근 결석(최대 3)</div>
+      <ul style="margin:6px 0 0 18px;">
+        ${(att.recentAbsences || []).map(x =>
+          `<li>${escapeHtml(x.md)}(${escapeHtml(x.dow)}) ${escapeHtml(x.period)}교시</li>`
+        ).join("") || `<li>-</li>`}
+      </ul>
+    `
+    : `<div style="opacity:.8;">요약 없음</div>`;
+
+  const sleepHtml = sleep && sleep.ok
+    ? `
+      <div>최근 7일 취침일수: <b>${num(sleep.sleepCount7d)}</b></div>
+      <div>최근 7일 취침횟수: <b>${num(sleep.sleepTotal7d)}</b></div>
+    `
+    : `<div style="opacity:.8;">요약 없음</div>`;
+
+  const moveHtml = move && move.ok
+    ? `
+      <div>최근 이동: <b>${escapeHtml(move.latestText || "-")}</b></div>
+      <div style="opacity:.8;">${escapeHtml(move.latestDateTime || "")}</div>
+    `
+    : `<div style="opacity:.8;">요약 없음</div>`;
+
+  const eduHtml = edu && edu.ok
+    ? `
+      <div>이번달 누적점수: <b>${num(edu.monthTotal)}</b></div>
+      <div>최근 항목: <b>${escapeHtml(edu.latestText || "-")}</b></div>
+      <div style="opacity:.8;">${escapeHtml(edu.latestDateTime || "")}</div>
+    `
+    : `<div style="opacity:.8;">요약 없음</div>`;
+
+  const gradeHtml = grade && grade.ok
+    ? `
+      <div style="opacity:.85;">(${escapeHtml(grade.sheetName || grade.exam || "")})</div>
+      <div>국어: <b>${num(grade.kor?.raw_total)}</b> / 등급 <b>${escapeHtml(grade.kor?.grade)}</b></div>
+      <div>수학: <b>${num(grade.math?.raw_total)}</b> / 등급 <b>${escapeHtml(grade.math?.grade)}</b></div>
+      <div>영어: <b>${num(grade.eng?.raw)}</b> / 등급 <b>${escapeHtml(grade.eng?.grade)}</b></div>
+    `
+    : `<div style="opacity:.8;">요약 없음</div>`;
+
   body.innerHTML = `
-    <div class="grid-2" style="gap:10px;">
-      ${renderMiniCard("출결(이번주)", att ? `
-        <div>출석: <b>${num(att.present)}</b> · 결석: <b>${num(att.absent)}</b></div>
-        <div style="opacity:.85; margin-top:6px;">최근 결석: ${renderRecentAbs(att.recentAbsences)}</div>
-      ` : `<div class="empty">데이터 없음</div>`)}
-      
-      ${renderMiniCard("취침(최근7일)", sleep ? `
-        <div>기록일수: <b>${num(sleep.sleepCount7d)}</b></div>
-        <div style="margin-top:6px;">총 횟수: <b>${num(sleep.sleepTotal7d)}</b></div>
-      ` : `<div class="empty">데이터 없음</div>`)}
-      
-      ${renderMiniCard("이동(최근)", move ? `
-        <div style="word-break:break-word;"><b>${escapeHtml(move.latestText || "-")}</b></div>
-        <div style="opacity:.85; margin-top:6px;">${escapeHtml(move.latestDateTime || "")}</div>
-      ` : `<div class="empty">데이터 없음</div>`)}
-      
-      ${renderMiniCard("교육점수(이번달)", edu ? `
-        <div>합계: <b>${num(edu.monthTotal)}</b>점</div>
-        <div style="opacity:.85; margin-top:6px;">최근: ${escapeHtml(edu.latestText || "-")}</div>
-      ` : `<div class="empty">데이터 없음</div>`)}
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+      <button class="btn" id="btnAttDetail">출결 상세</button>
+      <button class="btn" id="btnSleepDetail">취침 상세</button>
+      <button class="btn" id="btnMoveDetail">이동 상세</button>
+      <button class="btn" id="btnEduDetail">교육점수 상세</button>
+      <button class="btn" id="btnGradeDetail">성적 상세</button>
     </div>
 
-    <div style="margin-top:12px;">
-      ${renderMiniCard("성적(최신 자동)", grade ? `
-        <div style="opacity:.85;">시험: <b>${escapeHtml(grade.sheetName || grade.exam || "-")}</b></div>
-        <div style="margin-top:8px; line-height:1.55;">
-          국어: <b>${grade?.kor?.raw_total ?? "-"}</b> / 등급 <b>${escapeHtml(grade?.kor?.grade ?? "-")}</b><br>
-          수학: <b>${grade?.math?.raw_total ?? "-"}</b> / 등급 <b>${escapeHtml(grade?.math?.grade ?? "-")}</b><br>
-          영어: <b>${grade?.eng?.raw ?? "-"}</b> / 등급 <b>${escapeHtml(grade?.eng?.grade ?? "-")}</b><br>
-          한국사: <b>${grade?.hist?.raw ?? "-"}</b> / 등급 <b>${escapeHtml(grade?.hist?.grade ?? "-")}</b>
-        </div>
-      ` : `<div class="empty">성적 데이터를 불러오지 못했거나, 시트가 없습니다.</div>`)}
+    <div class="grid-2" style="margin-top:6px;">
+      ${card("출결 요약", attHtml)}
+      ${card("취침 요약", sleepHtml)}
+      ${card("이동 요약", moveHtml)}
+      ${card("교육점수 요약", eduHtml)}
+      ${card("성적 요약", gradeHtml)}
     </div>
 
     <div style="margin-top:14px;">
-      ${renderMiniCard("상세 페이지", `
-        <div style="display:flex; flex-wrap:wrap; gap:8px;">
-          <button class="btn btn-ghost" data-go="attendance">출결 상세</button>
-          <button class="btn btn-ghost" data-go="sleep">취침 상세</button>
-          <button class="btn btn-ghost" data-go="move">이동 상세</button>
-          <button class="btn btn-ghost" data-go="eduscore">교육점수 상세</button>
-          <button class="btn btn-ghost" data-go="grades">성적 상세</button>
-        </div>
-        <div class="hint" style="margin-top:10px;">
-          ※ 버튼 클릭 시 관리자 권한으로 학생 세션(token)을 발급/주입 후 상세 페이지로 이동합니다.
-        </div>
-      `)}
+      <div style="font-weight:800; margin-bottom:6px;">상세 결과</div>
+      <div id="detailPanel" class="panel">
+        <div style="opacity:.8;">상세 버튼을 누르면 여기에 표시됩니다.</div>
+      </div>
     </div>
   `;
+
+  // 버튼 바인딩
+  $("btnAttDetail").addEventListener("click", () => openAttendanceDetail());
+  $("btnSleepDetail").addEventListener("click", () => openSleepDetail());
+  $("btnMoveDetail").addEventListener("click", () => openMoveDetail());
+  $("btnEduDetail").addEventListener("click", () => openEduDetail());
+  $("btnGradeDetail").addEventListener("click", () => openGradeDetail());
 }
 
-function renderMiniCard(title, html) {
-  return `
-    <div class="mini-card">
-      <div class="mini-title">${escapeHtml(title)}</div>
-      <div class="mini-body">${html}</div>
+// ====== 상세 패널 렌더 ======
+function renderPanel(html) {
+  const p = $("detailPanel");
+  if (!p) return;
+  p.innerHTML = html;
+}
+
+function renderPanelLoading(title) {
+  renderPanel(`
+    <div style="opacity:.85;">
+      <b>${escapeHtml(title || "로딩")}</b> 불러오는 중...
     </div>
-  `;
+  `);
 }
 
-function renderRecentAbs(list) {
-  if (!Array.isArray(list) || list.length === 0) return "-";
-  return list.map(x => `${escapeHtml(x.md)}(${escapeHtml(x.dow)}) ${escapeHtml(x.period)}교시`).join(", ");
-}
-function num(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
+function renderPanelError(msg) {
+  renderPanel(`<div style="color:var(--danger,#d33);">${escapeHtml(msg || "오류")}</div>`);
 }
 
-// ====== ✅ 토큰 발급 + 상세 페이지 이동 ======
-async function issueStudentToken_() {
-  const admin = getAdminSession();
-  if (!admin?.adminToken) {
-    clearAdminSession();
+// ====== 관리자 API 공통 ======
+function requireAdminToken() {
+  const s = getAdminSession();
+  const t = String(s?.adminToken || "").trim();
+  if (!t) {
     showLoginUI();
     throw new Error("관리자 세션이 없습니다.");
   }
-  if (!__currentStudentMeta?.seat && !__currentStudentMeta?.studentId) {
-    throw new Error("선택된 학생 정보가 없습니다. 학생을 먼저 선택하세요.");
-  }
+  return t;
+}
+function requireStudentMeta() {
+  if (!__currentStudentMeta) throw new Error("학생이 선택되지 않았습니다.");
+  return __currentStudentMeta;
+}
 
-  // ✅ 핵심: admin_issue_token 호출
-  const res = await apiPost("admin_issue_token", {
-    adminToken: admin.adminToken,
-    seat: __currentStudentMeta.seat || "",
-    studentId: __currentStudentMeta.studentId || ""
+// ====== 상세: 출결 ======
+async function openAttendanceDetail() {
+  try {
+    const adminToken = requireAdminToken();
+    const st = requireStudentMeta();
+
+    renderPanelLoading("출결 상세");
+
+    const data = await apiPost("admin_attendance_detail", {
+      adminToken,
+      studentId: st.studentId,
+      seat: st.seat,
+    });
+
+    if (!data?.ok) return renderPanelError(data?.error || "출결 상세 실패");
+
+    // data: attendance 상세와 동일 구조 { dates:[{md,dow,iso}], rows:[{period,cells:[{s,a}]}] }
+    const dates = data.dates || [];
+    const rows = data.rows || [];
+
+    // 헤더 (2줄: M/D, 요일)
+    const head1 = dates.map(d => `<th>${escapeHtml(d.md || "")}</th>`).join("");
+    const head2 = dates.map(d => `<th style="opacity:.75; font-weight:600;">${escapeHtml(d.dow || "")}</th>`).join("");
+
+    const body = rows.map(r => {
+      const tds = (r.cells || []).map(c => {
+        const a = String(c.a ?? "").trim();
+        const s = String(c.s ?? "").trim();
+
+        // a=1 출석, a=3 결석, 그 외 공백
+        let badge = "";
+        if (a === "1") badge = `<span class="badge ok">출석</span>`;
+        else if (a === "3") badge = `<span class="badge bad">결석</span>`;
+        else badge = `<span class="badge">-</span>`;
+
+        const sched = s ? `<div style="opacity:.85; font-size:.85rem; margin-top:2px;">${escapeHtml(s)}</div>` : "";
+        return `<td style="text-align:center;">${badge}${sched}</td>`;
+      }).join("");
+
+      return `<tr><th style="text-align:center; min-width:64px;">${escapeHtml(r.period || "-")}</th>${tds}</tr>`;
+    }).join("");
+
+    renderPanel(`
+      <div style="opacity:.85; margin-bottom:8px;">
+        <b>${escapeHtml(st.studentName || "")}</b> (${escapeHtml(st.seat || "")}) · 출결 상세
+      </div>
+
+      <div style="overflow:auto; border:1px solid rgba(0,0,0,.08); border-radius:12px;">
+        <table class="table" style="border-collapse:separate; border-spacing:0; min-width:700px;">
+          <thead>
+            <tr><th rowspan="2" style="position:sticky; left:0; background:var(--card,#fff); z-index:2;">교시</th>${head1}</tr>
+            <tr>${head2}</tr>
+          </thead>
+          <tbody>${body || `<tr><td colspan="${dates.length + 1}" style="text-align:center; opacity:.8;">데이터 없음</td></tr>`}</tbody>
+        </table>
+      </div>
+    `);
+  } catch (e) {
+    renderPanelError(e.message || "출결 상세 오류");
+  }
+}
+
+// ====== 상세: 취침 ======
+async function openSleepDetail() {
+  try {
+    const adminToken = requireAdminToken();
+    const st = requireStudentMeta();
+
+    renderPanelLoading("취침 상세");
+
+    const data = await apiPost("admin_sleep_detail", {
+      adminToken,
+      studentId: st.studentId,
+      seat: st.seat,
+      days: DEFAULT_DAYS_SLEEP,
+    });
+
+    if (!data?.ok) return renderPanelError(data?.error || "취침 상세 실패");
+
+    // data.groups: [{dateIso,total,details:[{period,reason,count}]}]
+    const groups = data.groups || [];
+
+    const html = groups.map(g => {
+      const details = (g.details || []).map(d => `
+        <div class="rowline">
+          <div><b>${escapeHtml(d.period || "-")}</b>교시</div>
+          <div style="opacity:.85;">${escapeHtml(d.reason || "취침")}</div>
+          <div style="text-align:right;"><b>${num(d.count)}</b></div>
+        </div>
+      `).join("");
+
+      return `
+        <div class="block">
+          <div class="block-head">
+            <div><b>${escapeHtml(g.dateIso || "")}</b></div>
+            <div style="opacity:.85;">합계 <b>${num(g.total)}</b></div>
+          </div>
+          <div class="block-body">
+            ${details || `<div style="opacity:.8;">-</div>`}
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    renderPanel(`
+      <div style="opacity:.85; margin-bottom:8px;">
+        <b>${escapeHtml(st.studentName || "")}</b> (${escapeHtml(st.seat || "")}) · 취침 상세 (최근 ${DEFAULT_DAYS_SLEEP}일)
+      </div>
+      ${html || `<div style="opacity:.8;">데이터 없음</div>`}
+    `);
+  } catch (e) {
+    renderPanelError(e.message || "취침 상세 오류");
+  }
+}
+
+// ====== 상세: 이동 ======
+async function openMoveDetail() {
+  try {
+    const adminToken = requireAdminToken();
+    const st = requireStudentMeta();
+
+    renderPanelLoading("이동 상세");
+
+    const data = await apiPost("admin_move_detail", {
+      adminToken,
+      studentId: st.studentId,
+      seat: st.seat,
+      days: DEFAULT_DAYS_MOVE,
+    });
+
+    if (!data?.ok) return renderPanelError(data?.error || "이동 상세 실패");
+
+    const items = data.items || [];
+
+    const rows = items.map(x => `
+      <tr>
+        <td>${escapeHtml(x.date || "")}</td>
+        <td>${escapeHtml(x.time || "")}</td>
+        <td>${escapeHtml(x.reason || "")}</td>
+        <td style="text-align:center;">${escapeHtml(x.returnPeriod || "")}</td>
+      </tr>
+    `).join("");
+
+    renderPanel(`
+      <div style="opacity:.85; margin-bottom:8px;">
+        <b>${escapeHtml(st.studentName || "")}</b> (${escapeHtml(st.seat || "")}) · 이동 상세 (최근 ${DEFAULT_DAYS_MOVE}일)
+      </div>
+
+      <div style="overflow:auto; border:1px solid rgba(0,0,0,.08); border-radius:12px;">
+        <table class="table" style="min-width:650px;">
+          <thead>
+            <tr>
+              <th>날짜</th>
+              <th>시간</th>
+              <th>사유</th>
+              <th style="text-align:center;">복귀교시</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || `<tr><td colspan="4" style="text-align:center; opacity:.8;">데이터 없음</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    `);
+  } catch (e) {
+    renderPanelError(e.message || "이동 상세 오류");
+  }
+}
+
+// ====== 상세: 교육점수 ======
+async function openEduDetail() {
+  try {
+    const adminToken = requireAdminToken();
+    const st = requireStudentMeta();
+
+    renderPanelLoading("교육점수 상세");
+
+    const data = await apiPost("admin_eduscore_detail", {
+      adminToken,
+      studentId: st.studentId,
+      seat: st.seat,
+      days: DEFAULT_DAYS_EDU,
+    });
+
+    if (!data?.ok) return renderPanelError(data?.error || "교육점수 상세 실패");
+
+    const items = data.items || [];
+
+    const rows = items.map(x => `
+      <tr>
+        <td>${escapeHtml(x.date || "")}</td>
+        <td>${escapeHtml(x.time || "")}</td>
+        <td>${escapeHtml(x.reason || "")}</td>
+        <td style="text-align:right;"><b>${num(x.score)}</b></td>
+      </tr>
+    `).join("");
+
+    renderPanel(`
+      <div style="opacity:.85; margin-bottom:8px;">
+        <b>${escapeHtml(st.studentName || "")}</b> (${escapeHtml(st.seat || "")}) · 교육점수 상세 (최근 ${DEFAULT_DAYS_EDU}일)
+      </div>
+
+      <div style="overflow:auto; border:1px solid rgba(0,0,0,.08); border-radius:12px;">
+        <table class="table" style="min-width:650px;">
+          <thead>
+            <tr>
+              <th>날짜</th>
+              <th>시간</th>
+              <th>사유</th>
+              <th style="text-align:right;">점수</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || `<tr><td colspan="4" style="text-align:center; opacity:.8;">데이터 없음</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    `);
+  } catch (e) {
+    renderPanelError(e.message || "교육점수 상세 오류");
+  }
+}
+
+// ====== 상세: 성적 ======
+async function openGradeDetail() {
+  try {
+    const adminToken = requireAdminToken();
+    const st = requireStudentMeta();
+
+    renderPanelLoading("성적 상세");
+
+    // 시험 목록 가져와서 최신 exam 선택
+    const ex = await apiPost("admin_grade_exams", { adminToken });
+    if (!ex?.ok) return renderPanelError(ex?.error || "시험 목록 불러오기 실패");
+
+    const items = ex.items || [];
+    const latestExam = items.length ? String(items[items.length - 1].exam || "").trim() : "";
+
+    const data = await apiPost("admin_grade_detail", {
+      adminToken,
+      studentId: st.studentId,
+      seat: st.seat,
+      exam: latestExam, // 없으면 백엔드가 자동으로 최신 선택하도록 되어있음
+    });
+
+    if (!data?.ok) return renderPanelError(data?.error || "성적 상세 실패");
+
+    const sheetName = data.sheetName || data.exam || "";
+    const student = data.student || {};
+    const sub = data.subjects || {};
+
+    const kv = (k, v) => `
+      <div class="kv">
+        <div class="k">${escapeHtml(k)}</div>
+        <div class="v">${escapeHtml(v)}</div>
+      </div>
+    `;
+
+    const scoreLine = (title, obj, type) => {
+      if (!obj) return `<div class="subj"><b>${escapeHtml(title)}</b>: -</div>`;
+
+      if (type === "kor" || type === "math") {
+        return `
+          <div class="subj">
+            <div style="font-weight:800;">${escapeHtml(title)} <span style="opacity:.8;">(${escapeHtml(obj.choice || "-")})</span></div>
+            <div style="opacity:.9;">원점수: <b>${num(obj.raw_total)}</b> · 표준: <b>${num(obj.std)}</b> · 백분위: <b>${num(obj.pct)}</b> · 등급: <b>${escapeHtml(obj.grade)}</b></div>
+          </div>
+        `;
+      }
+
+      if (type === "simple") {
+        return `
+          <div class="subj">
+            <div style="font-weight:800;">${escapeHtml(title)}</div>
+            <div style="opacity:.9;">원점수: <b>${num(obj.raw)}</b> · 등급: <b>${escapeHtml(obj.grade)}</b></div>
+          </div>
+        `;
+      }
+
+      if (type === "tam") {
+        return `
+          <div class="subj">
+            <div style="font-weight:800;">${escapeHtml(title)} <span style="opacity:.8;">(${escapeHtml(obj.name || "-")})</span></div>
+            <div style="opacity:.9;">원점수: <b>${num(obj.raw)}</b></div>
+          </div>
+        `;
+      }
+
+      return `<div class="subj"><b>${escapeHtml(title)}</b>: -</div>`;
+    };
+
+    renderPanel(`
+      <div style="opacity:.85; margin-bottom:8px;">
+        <b>${escapeHtml(st.studentName || "")}</b> (${escapeHtml(st.seat || "")}) · 성적 상세
+        <span style="opacity:.8;">(${escapeHtml(sheetName)})</span>
+      </div>
+
+      <div class="panelbox">
+        ${kv("학교", `${student.schoolName || ""} (${student.schoolCode || ""})`)}
+        ${kv("학번", student.studentId || "")}
+        ${kv("반/번호", `${student.classNo || ""}반 ${student.number || ""}번`)}
+        ${kv("응시지역", student.examArea || "")}
+      </div>
+
+      <div style="margin-top:10px;">
+        ${scoreLine("국어", sub.kor, "kor")}
+        ${scoreLine("수학", sub.math, "math")}
+        ${scoreLine("영어", sub.eng, "simple")}
+        ${scoreLine("한국사", sub.hist, "simple")}
+        ${scoreLine("탐구1", sub.tam1, "tam")}
+        ${scoreLine("탐구2", sub.tam2, "tam")}
+      </div>
+
+      <div style="opacity:.75; margin-top:10px; font-size:.92rem;">
+        ※ 기대값(예상 표준/백분위/등급)이 필요하면 백엔드가 이미 내려주고 있으니, 원하면 표시도 추가해줄게.
+      </div>
+    `);
+  } catch (e) {
+    renderPanelError(e.message || "성적 상세 오류");
+  }
+}
+
+// ====== 로드: 학생 요약(기존 admin_student_detail 사용) ======
+async function loadStudentDetail({ seat, studentId }) {
+  const adminToken = requireAdminToken();
+
+  $("detailSub").textContent = "불러오는 중...";
+  $("detailBody").innerHTML = "";
+
+  const data = await apiPost("admin_student_detail", {
+    adminToken,
+    seat: seat || "",
+    studentId: studentId || "",
   });
 
-  if (!res.ok) {
-    if (String(res.error || "").includes("만료") || String(res.error || "").includes("관리자")) {
-      clearAdminSession();
-      showLoginUI();
-      throw new Error("관리자 세션이 만료되었습니다. 다시 로그인하세요.");
-    }
-    throw new Error(res.error || "학생 token 발급 실패");
-  }
-
-  const token = String(res.token || "").trim();
-  if (!token) throw new Error("서버에서 token을 받지 못했습니다.");
-
-  return {
-    token,
-    seat: String(res.seat || __currentStudentMeta.seat || "").trim(),
-    teacher: String(res.teacher || __currentStudentMeta.teacher || "").trim(),
-    studentName: String(res.studentName || __currentStudentMeta.studentName || "").trim(),
-    studentId: String(res.studentId || __currentStudentMeta.studentId || "").trim()
-  };
+  renderDetail(data);
 }
 
-async function goStudentDetailPage(kind) {
-  const map = {
-    attendance: "attendance.html",
-    sleep: "sleep.html",
-    move: "move.html",
-    eduscore: "eduscore.html",
-    grades: "grades.html"
-  };
-  const url = map[kind];
-  if (!url) return;
-
+// ====== 검색 ======
+async function doSearch() {
   try {
-    // UX: 버튼 연타 방지/상태 표시
-    const host = $("detailBody");
-    const buttons = host ? host.querySelectorAll("[data-go]") : [];
-    buttons.forEach(b => (b.disabled = true));
-    setHint($("searchMsg"), "학생 세션 발급 중...", false);
+    const adminToken = requireAdminToken();
+    const q = String($("qInput").value || "").trim();
+    if (!q) {
+      setHint($("searchMsg"), "검색어를 입력하세요.", true);
+      renderResults([]);
+      return;
+    }
 
-    const studentSession = await issueStudentToken_();
+    setHint($("searchMsg"), "검색 중...");
+    const res = await apiPost("admin_search", { adminToken, q });
 
-    // ✅ 기존 학부모 상세페이지들이 바라보는 세션키로 주입
-    setParentSession(studentSession);
+    if (!res?.ok) {
+      setHint($("searchMsg"), res?.error || "검색 실패", true);
+      renderResults([]);
+      return;
+    }
 
-    // 이동
-    window.location.href = url;
-  } catch (err) {
-    alert(String(err?.message || err || "이동 실패"));
-  } finally {
-    const host = $("detailBody");
-    const buttons = host ? host.querySelectorAll("[data-go]") : [];
-    buttons.forEach(b => (b.disabled = false));
-    setHint($("searchMsg"), "", false);
+    setHint($("searchMsg"), `결과 ${res.items?.length || 0}건`);
+    renderResults(res.items || []);
+  } catch (e) {
+    setHint($("searchMsg"), e.message || "검색 오류", true);
   }
 }
 
-// ====== 동작 ======
-async function doLogin() {
+// ====== 로그인 ======
+async function doAdminLogin() {
   const pw = String($("pwInput").value || "").trim();
-  setHint($("loginMsg"), "");
+  if (!pw) return setHint($("loginMsg"), "비밀번호를 입력하세요.", true);
 
-  if (!pw) {
-    setHint($("loginMsg"), "비밀번호를 입력하세요.", true);
-    return;
-  }
-
-  $("loginBtn").disabled = true;
-  $("loginBtn").textContent = "로그인 중...";
-
+  setHint($("loginMsg"), "로그인 중...");
   const res = await apiPost("admin_login", { password: pw });
 
-  $("loginBtn").disabled = false;
-  $("loginBtn").textContent = "로그인";
-
-  if (!res.ok) {
-    setHint($("loginMsg"), res.error || "로그인 실패", true);
+  if (!res?.ok) {
+    setHint($("loginMsg"), res?.error || "로그인 실패", true);
     return;
   }
 
   setAdminSession({ adminToken: res.adminToken });
-  $("pwInput").value = "";
   setHint($("loginMsg"), "");
   showAdminUI();
 }
 
-async function doSearch() {
-  const session = getAdminSession();
-  if (!session?.adminToken) {
-    clearAdminSession();
-    showLoginUI();
-    return;
-  }
-
-  const q = String($("qInput").value || "").trim();
-  setHint($("searchMsg"), "");
-
-  if (!q) {
-    setHint($("searchMsg"), "검색어를 입력하세요.", true);
-    return;
-  }
-
-  $("searchBtn").disabled = true;
-  $("searchBtn").textContent = "검색 중...";
-
-  const res = await apiPost("admin_search", { adminToken: session.adminToken, q });
-
-  $("searchBtn").disabled = false;
-  $("searchBtn").textContent = "검색";
-
-  if (!res.ok) {
-    if (String(res.error || "").includes("만료") || String(res.error || "").includes("관리자")) {
-      clearAdminSession();
-      showLoginUI();
-      setHint($("loginMsg"), "관리자 세션이 만료되었습니다. 다시 로그인하세요.", true);
-      return;
-    }
-    setHint($("searchMsg"), res.error || "검색 실패", true);
-    return;
-  }
-
-  const items = res.items || [];
-  renderResults(items);
-  setHint($("searchMsg"), `${items.length}명 찾았습니다.`);
-
-  if (items.length === 1) {
-    loadStudentDetail({ seat: items[0].seat, studentId: items[0].studentId });
-  }
-}
-
-async function loadStudentDetail({ seat, studentId }) {
-  const session = getAdminSession();
-  if (!session?.adminToken) {
-    clearAdminSession();
-    showLoginUI();
-    return;
-  }
-
-  $("detailSub").textContent = "불러오는 중...";
-  $("detailBody").innerHTML = `<div class="empty">잠시만요...</div>`;
-  __currentStudentMeta = null;
-
-  const res = await apiPost("admin_student_detail", {
-    adminToken: session.adminToken,
-    seat: seat || "",
-    studentId: studentId || ""
+// ====== 초기화 ======
+function bindEvents() {
+  $("loginBtn").addEventListener("click", doAdminLogin);
+  $("pwInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") doAdminLogin();
   });
 
-  if (!res.ok) {
-    if (String(res.error || "").includes("만료") || String(res.error || "").includes("관리자")) {
-      clearAdminSession();
-      showLoginUI();
-      setHint($("loginMsg"), "관리자 세션이 만료되었습니다. 다시 로그인하세요.", true);
-      return;
-    }
+  $("searchBtn").addEventListener("click", doSearch);
+  $("qInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") doSearch();
+  });
+
+  $("logoutBtn").addEventListener("click", () => {
+    clearAdminSession();
+    showLoginUI();
+    setHint($("loginMsg"), "로그아웃되었습니다.");
+  });
+}
+
+function boot() {
+  bindEvents();
+
+  const s = getAdminSession();
+  if (s?.adminToken) {
+    showAdminUI();
+  } else {
+    showLoginUI();
   }
-
-  renderDetail(res);
 }
 
-function doLogout() {
-  clearAdminSession();
-  $("qInput").value = "";
-  $("resultList").innerHTML = "";
-  $("detailBody").innerHTML = "";
-  __currentStudentMeta = null;
-  showLoginUI();
-}
+boot();
 
-// ====== styles.css에 없는 클래스 보완 ======
-function injectFallbackCss() {
+/***********************
+ * ✅ admin 페이지 전용 간단 CSS 클래스가 styles.css에 없을 수도 있어서
+ *    최소한의 스타일을 JS에서 추가(없어도 동작은 함)
+ ***********************/
+(function injectTinyStyles() {
   const css = `
-    .input{padding:12px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);background:var(--card,#fff);color:inherit;outline:none;}
-    .list{display:flex;flex-direction:column;gap:8px;}
-    .list-item{border:1px solid rgba(0,0,0,.08);border-radius:14px;padding:12px;cursor:pointer;text-align:left;}
-    .list-item:hover{filter:brightness(1.08);}
-    .empty{opacity:.75;padding:10px 0;}
-    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-    @media (max-width: 900px){.grid-2{grid-template-columns:1fr;}}
-    .mini-card{border:1px solid rgba(0,0,0,.08);border-radius:16px;padding:12px;background:rgba(0,0,0,.02);}
-    .mini-title{font-weight:800;margin-bottom:8px;}
-    .mini-body{font-size:.98rem;}
-    .hint{opacity:.8;font-size:.92rem;}
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width: 920px){ .grid-2{ grid-template-columns:1fr; } }
 
-    #resultList{position:relative;z-index:5;}
-    .list-item{position:relative;z-index:10;user-select:none;-webkit-user-select:none;pointer-events:auto;background:rgba(255,255,255,.04);}
-    .list-item *{pointer-events:none;user-select:none;-webkit-user-select:none;}
+  .list { display:flex; flex-direction:column; gap:10px; }
+  .list-item { padding:12px 14px; border:1px solid rgba(0,0,0,.08); border-radius:14px; background:var(--card,#fff); cursor:pointer; }
+  .list-item:hover { box-shadow:0 6px 18px rgba(0,0,0,.06); }
+
+  .empty { padding:12px; opacity:.8; }
+
+  .mini-card { padding:12px 14px; border:1px solid rgba(0,0,0,.08); border-radius:14px; background:var(--card,#fff); }
+  .mini-title { font-weight:800; margin-bottom:6px; }
+  .mini-body { opacity:.95; }
+
+  .panel { padding:12px 14px; border:1px solid rgba(0,0,0,.08); border-radius:14px; background:rgba(0,0,0,.02); }
+
+  .badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:.82rem; border:1px solid rgba(0,0,0,.12); background:#fff; }
+  .badge.ok { border-color: rgba(0,128,0,.22); }
+  .badge.bad { border-color: rgba(200,0,0,.22); }
+
+  .table { width:100%; }
+  .table th,.table td { padding:10px 8px; border-bottom:1px solid rgba(0,0,0,.06); }
+
+  .block { border:1px solid rgba(0,0,0,.08); border-radius:14px; background:var(--card,#fff); margin-bottom:10px; overflow:hidden; }
+  .block-head { display:flex; justify-content:space-between; padding:10px 12px; background:rgba(0,0,0,.02); }
+  .block-body { padding:8px 12px; display:flex; flex-direction:column; gap:6px; }
+  .rowline { display:grid; grid-template-columns: 80px 1fr 60px; gap:10px; align-items:center; padding:6px 0; border-bottom:1px dashed rgba(0,0,0,.08); }
+  .rowline:last-child { border-bottom:none; }
+
+  .panelbox { display:grid; grid-template-columns:1fr 1fr; gap:10px; border:1px solid rgba(0,0,0,.08); background:var(--card,#fff); border-radius:14px; padding:12px; }
+  @media (max-width: 720px){ .panelbox{ grid-template-columns:1fr; } }
+  .kv { display:flex; justify-content:space-between; gap:10px; }
+  .kv .k{ opacity:.75; }
+  .kv .v{ font-weight:700; text-align:right; }
+
+  .subj { padding:10px 12px; border:1px solid rgba(0,0,0,.08); border-radius:14px; background:var(--card,#fff); margin-bottom:10px; }
   `;
   const style = document.createElement("style");
   style.textContent = css;
   document.head.appendChild(style);
-}
-
-// ====== init ======
-document.addEventListener("DOMContentLoaded", () => {
-  injectFallbackCss();
-
-  $("loginBtn").addEventListener("click", doLogin);
-  $("pwInput").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
-
-  $("searchBtn").addEventListener("click", doSearch);
-  $("qInput").addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
-
-  $("logoutBtn").addEventListener("click", doLogout);
-
-  // ✅ 상세 버튼 클릭 (renderDetail에서 data-go를 심어둠)
-  $("detailBody").addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-go]");
-    if (!btn) return;
-    const kind = String(btn.getAttribute("data-go") || "").trim();
-    if (!kind) return;
-    goStudentDetailPage(kind);
-  });
-
-  const s = getAdminSession();
-  if (s?.adminToken) showAdminUI();
-  else showLoginUI();
-});
+})();
