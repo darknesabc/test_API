@@ -74,15 +74,18 @@ function renderResults(items) {
     return;
   }
 
-  items.forEach((it, idx) => {
+  items.forEach((it) => {
     const seat = escapeHtml(it.seat || "");
     const name = escapeHtml(it.name || "");
     const studentId = escapeHtml(it.studentId || "");
     const teacher = escapeHtml(it.teacher || "");
 
-    const row = document.createElement("button");
+    // ✅ button 대신 div(role=button)로: 드래그/선택/포커스 꼬임 방지
+    const row = document.createElement("div");
     row.className = "list-item";
-    row.type = "button";
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+
     row.innerHTML = `
       <div style="display:flex; justify-content:space-between; gap:10px; align-items:center;">
         <div style="text-align:left;">
@@ -93,13 +96,27 @@ function renderResults(items) {
       </div>
     `;
 
-    row.addEventListener("click", () => loadStudentDetail({ seat: it.seat, studentId: it.studentId, name: it.name }));
-    box.appendChild(row);
+    const go = () => loadStudentDetail({ seat: it.seat, studentId: it.studentId, name: it.name });
 
-    // 첫 결과 자동 선택(원하면 주석처리)
-    if (idx === 0) {
-      // 아무것도 안함(자동선택 원하면 여기서 loadStudentDetail 호출)
-    }
+    // ✅ 드래그/텍스트선택이 클릭을 씹는 현상 방지
+    row.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+    });
+
+    row.addEventListener("click", (e) => {
+      e.preventDefault();
+      go();
+    });
+
+    // 키보드 접근성(Enter/Space)
+    row.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        go();
+      }
+    });
+
+    box.appendChild(row);
   });
 }
 
@@ -244,8 +261,14 @@ async function doSearch() {
     return;
   }
 
-  renderResults(res.items || []);
-  setHint($("searchMsg"), `${(res.items || []).length}명 찾았습니다.`);
+  const items = res.items || [];
+  renderResults(items);
+  setHint($("searchMsg"), `${items.length}명 찾았습니다.`);
+
+  // ✅ 1명만 나오면 자동으로 상세 로드(원하지 않으면 아래 3줄 주석처리)
+  if (items.length === 1) {
+    loadStudentDetail({ seat: items[0].seat, studentId: items[0].studentId, name: items[0].name });
+  }
 }
 
 async function loadStudentDetail({ seat, studentId }) {
@@ -286,14 +309,12 @@ function doLogout() {
 }
 
 // ====== styles.css에 없는 클래스 보완(있으면 그대로 사용됨) ======
-// 네 styles.css에 input/list/mini-card가 이미 있으면 이 부분은 영향 거의 없음.
-// (CSS가 아예 없다면 최소한의 클래스로라도 화면이 깨지지 않게 하기 위함)
 function injectFallbackCss() {
   const css = `
     .input{padding:12px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);background:var(--card,#fff);color:inherit;outline:none;}
     .list{display:flex;flex-direction:column;gap:8px;}
-    .list-item{border:1px solid rgba(0,0,0,.08);background:var(--card,#fff);border-radius:14px;padding:12px;cursor:pointer;text-align:left;}
-    .list-item:hover{filter:brightness(.98);}
+    .list-item{border:1px solid rgba(0,0,0,.08);border-radius:14px;padding:12px;cursor:pointer;text-align:left;}
+    .list-item:hover{filter:brightness(1.08);}
     .empty{opacity:.75;padding:10px 0;}
     .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
     @media (max-width: 900px){.grid-2{grid-template-columns:1fr;}}
@@ -301,6 +322,22 @@ function injectFallbackCss() {
     .mini-title{font-weight:800;margin-bottom:8px;}
     .mini-body{font-size:.98rem;}
     .hint{opacity:.8;font-size:.92rem;}
+
+    /* ✅ 결과 클릭/가독성 강제 보정 */
+    #resultList{position:relative;z-index:5;}
+    .list-item{
+      position:relative;
+      z-index:10;
+      user-select:none;
+      -webkit-user-select:none;
+      pointer-events:auto;
+      background:rgba(255,255,255,.04);
+    }
+    .list-item *{
+      pointer-events:none; /* ✅ 내부 요소가 클릭을 가로채지 않게 */
+      user-select:none;
+      -webkit-user-select:none;
+    }
   `;
   const style = document.createElement("style");
   style.textContent = css;
