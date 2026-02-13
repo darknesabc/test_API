@@ -2,8 +2,9 @@
  * Admin Frontend (GitHub Pages)
  * - admin_login -> adminToken 발급 -> sessionStorage 저장
  * - admin_search -> 리스트 렌더
- * - admin_student_detail -> 상세 렌더
- * - ✅ 상세 버튼 클릭 시: 학생 세션(token)을 parent_session_v1에 주입 후 각 상세 페이지로 이동
+ * - admin_student_detail -> 상세 렌더(요약)
+ * - ✅ 상세 버튼 클릭 시:
+ *    admin_issue_token -> 학생 token 발급 -> parent_session_v1에 주입 -> 각 상세 페이지로 이동
  ***********************/
 
 // ====== 설정 ======
@@ -44,7 +45,8 @@ async function apiPost(path, body) {
     body: JSON.stringify(body || {})
   });
   const text = await res.text();
-  try { return JSON.parse(text); } catch (_) { return { ok: false, error: "서버 응답 파싱 실패", raw: text }; }
+  try { return JSON.parse(text); }
+  catch (_) { return { ok: false, error: "서버 응답 파싱 실패", raw: text }; }
 }
 
 function setHint(el, msg, isError = false) {
@@ -75,7 +77,7 @@ function showAdminUI() {
 }
 
 // ====== 상태(현재 선택 학생) ======
-let __currentStudentSession = null; // { token, seat, studentId, studentName, teacher }
+let __currentStudentMeta = null; // { seat, studentId, studentName, teacher }
 
 // ====== 렌더 ======
 function renderResults(items) {
@@ -124,7 +126,7 @@ function renderDetail(data) {
   const sub = $("detailSub");
   const body = $("detailBody");
 
-  __currentStudentSession = null;
+  __currentStudentMeta = null;
 
   if (!data || !data.ok) {
     sub.textContent = "상세 조회 실패";
@@ -133,19 +135,14 @@ function renderDetail(data) {
   }
 
   const student = data.student || {};
-  sub.textContent = `${student.studentName || "-"} · ${student.seat || "-"} · ${student.studentId || "-"}`;
+  const seat = String(student.seat || "").trim();
+  const studentId = String(student.studentId || "").trim();
+  const studentName = String(student.studentName || "").trim();
+  const teacher = String(student.teacher || "").trim();
 
-  // ✅ 백엔드에서 token을 내려줘야 함 (handleAdminStudentDetail_ 응답에 token 추가)
-  const token = String(data.token || "").trim();
-  if (token) {
-    __currentStudentSession = {
-      token,
-      seat: student.seat || "",
-      teacher: student.teacher || "",
-      studentName: student.studentName || "",
-      studentId: student.studentId || ""
-    };
-  }
+  __currentStudentMeta = { seat, studentId, studentName, teacher };
+
+  sub.textContent = `${studentName || "-"} · ${seat || "-"} · ${studentId || "-"}`;
 
   const s = data.summary || {};
   const att = s.attendance || null;
@@ -224,19 +221,47 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-// ====== 상세 페이지 이동(학생 세션 주입) ======
-function goStudentDetailPage(kind) {
-  if (!__currentStudentSession?.token) {
-    alert("학생 세션(token)을 받지 못했습니다. 백엔드 admin_student_detail 응답에 token을 포함시켜주세요.");
-    return;
+// ====== ✅ 토큰 발급 + 상세 페이지 이동 ======
+async function issueStudentToken_() {
+  const admin = getAdminSession();
+  if (!admin?.adminToken) {
+    clearAdminSession();
+    showLoginUI();
+    throw new Error("관리자 세션이 없습니다.");
+  }
+  if (!__currentStudentMeta?.seat && !__currentStudentMeta?.studentId) {
+    throw new Error("선택된 학생 정보가 없습니다. 학생을 먼저 선택하세요.");
   }
 
-  // ✅ 기존 학부모 상세페이지들이 바라보는 세션키로 주입
-  setParentSession(__currentStudentSession);
+  // ✅ 핵심: admin_issue_token 호출
+  const res = await apiPost("admin_issue_token", {
+    adminToken: admin.adminToken,
+    seat: __currentStudentMeta.seat || "",
+    studentId: __currentStudentMeta.studentId || ""
+  });
 
-  // (선택) 혹시 이전에 남아있는 학생 세션/상태가 꼬일까봐 필요시 추가 정리 가능
-  // clearParentSession(); setParentSession(__currentStudentSession);
+  if (!res.ok) {
+    if (String(res.error || "").includes("만료") || String(res.error || "").includes("관리자")) {
+      clearAdminSession();
+      showLoginUI();
+      throw new Error("관리자 세션이 만료되었습니다. 다시 로그인하세요.");
+    }
+    throw new Error(res.error || "학생 token 발급 실패");
+  }
 
+  const token = String(res.token || "").trim();
+  if (!token) throw new Error("서버에서 token을 받지 못했습니다.");
+
+  return {
+    token,
+    seat: String(res.seat || __currentStudentMeta.seat || "").trim(),
+    teacher: String(res.teacher || __currentStudentMeta.teacher || "").trim(),
+    studentName: String(res.studentName || __currentStudentMeta.studentName || "").trim(),
+    studentId: String(res.studentId || __currentStudentMeta.studentId || "").trim()
+  };
+}
+
+async function goStudentDetailPage(kind) {
   const map = {
     attendance: "attendance.html",
     sleep: "sleep.html",
@@ -244,10 +269,31 @@ function goStudentDetailPage(kind) {
     eduscore: "eduscore.html",
     grades: "grades.html"
   };
-
   const url = map[kind];
   if (!url) return;
-  window.location.href = url;
+
+  try {
+    // UX: 버튼 연타 방지/상태 표시
+    const host = $("detailBody");
+    const buttons = host ? host.querySelectorAll("[data-go]") : [];
+    buttons.forEach(b => (b.disabled = true));
+    setHint($("searchMsg"), "학생 세션 발급 중...", false);
+
+    const studentSession = await issueStudentToken_();
+
+    // ✅ 기존 학부모 상세페이지들이 바라보는 세션키로 주입
+    setParentSession(studentSession);
+
+    // 이동
+    window.location.href = url;
+  } catch (err) {
+    alert(String(err?.message || err || "이동 실패"));
+  } finally {
+    const host = $("detailBody");
+    const buttons = host ? host.querySelectorAll("[data-go]") : [];
+    buttons.forEach(b => (b.disabled = false));
+    setHint($("searchMsg"), "", false);
+  }
 }
 
 // ====== 동작 ======
@@ -333,6 +379,7 @@ async function loadStudentDetail({ seat, studentId }) {
 
   $("detailSub").textContent = "불러오는 중...";
   $("detailBody").innerHTML = `<div class="empty">잠시만요...</div>`;
+  __currentStudentMeta = null;
 
   const res = await apiPost("admin_student_detail", {
     adminToken: session.adminToken,
@@ -357,7 +404,7 @@ function doLogout() {
   $("qInput").value = "";
   $("resultList").innerHTML = "";
   $("detailBody").innerHTML = "";
-  __currentStudentSession = null;
+  __currentStudentMeta = null;
   showLoginUI();
 }
 
