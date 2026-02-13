@@ -646,6 +646,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const lastIdx = idxSorted.slice(-showN).map(x => x.i);
 
+function mapAttendance_(val) {
+  const t = String(val ?? "").trim();
+  if (t === "1") return "출석";
+  if (t === "3") return "결석";
+  if (t === "2") return "지각";   // 혹시 쓰면 대비용
+  if (t === "4") return "조퇴";   // 혹시 쓰면 대비용
+  return t || "-";               // 이미 문자면 그대로
+}
+   
   // ✅ 출결 값에 따른 셀 스타일
   function statusStyle_(val) {
     const t = String(val || "").trim();
@@ -685,14 +694,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const tds = lastIdx.map(i => {
       const c = cells[i] || {};
       const s = String(c.s ?? "").trim();  // 스케줄
-      const a = String(c.a ?? "").trim();  // 출결
+      const aRaw = String(c.a ?? "").trim();   // 원본(1/3 등)
+      const aText = mapAttendance_(aRaw);      // 표시용(출석/결석)
 
       return `
         <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
           ${escapeHtml(s || "-")}
         </td>
-        <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap; ${statusStyle_(a)}">
-          ${escapeHtml(a || "-")}
+        <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap; ${statusStyle_(aText)}">
+          ${escapeHtml(aText)}
         </td>
       `;
     }).join("");
@@ -783,4 +793,5 @@ document.addEventListener("DOMContentLoaded", () => {
     _origRender(data);
   };
 });
+
 
