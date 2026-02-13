@@ -218,6 +218,87 @@
       box.style.display = "";
     }
 
+    // ==============================
+    // ✅ 이동 데이터로 스케줄 공백 채우기
+    // ==============================
+
+    // move_detail의 date 포맷이 무엇이든 ISO(YYYY-MM-DD)로 정규화
+    function normalizeMoveDateToIso(dateVal) {
+      const s = String(dateVal ?? "").trim();
+      if (!s) return "";
+
+      // 이미 ISO
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+      // "2026. 2. 10" / "2026.2.10" / "2026/2/10" 등
+      let m = s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+      if (m) {
+        const y = m[1];
+        const mm = String(m[2]).padStart(2, "0");
+        const dd = String(m[3]).padStart(2, "0");
+        return `${y}-${mm}-${dd}`;
+      }
+
+      // "02/10" 같은 md 형태만 오는 경우는 attendance의 iso가 없으면 매칭 불가(일단 빈값)
+      return "";
+    }
+
+    // 이동 기록을 map[iso][period] = reason 으로 변환
+    function buildMoveMap(moveItems) {
+      const map = {}; // { [iso]: { [period]: reason } }
+
+      for (const it of (moveItems || [])) {
+        const iso = normalizeMoveDateToIso(it.date);
+        const reason = String(it.reason ?? "").trim();
+        const rp = Number(it.returnPeriod ?? 0); // 복귀교시
+
+        if (!iso || !reason || !rp) continue;
+
+        map[iso] ||= {};
+
+        // ✅ 룰: 복귀교시 rp이면 (rp-1)~rp 교시에 reason 채움
+        const from = Math.max(1, rp - 1);
+        const to = rp;
+        for (let p = from; p <= to; p++) {
+          map[iso][p] = reason;
+        }
+      }
+      return map;
+    }
+
+    // attendance 그리드의 스케줄 공백만 이동 사유로 채움
+    function applyMoveToAttendance(attData, datesNorm, moveMap) {
+      const rows = attData.rows || [];
+      const isoByIdx = (datesNorm || []).map(d => String(d.iso || "").trim());
+
+      for (const r of rows) {
+        const periodNum = Number(r.period || 0);
+        const cells = r.cells || [];
+
+        for (let i = 0; i < cells.length; i++) {
+          const iso = isoByIdx[i];
+          if (!iso) continue;
+
+          const c = cells[i] || {};
+          const sched = String(c.s ?? "").trim();
+
+          // ✅ 공백(또는 "-")만 채우기
+          const isEmptySched = (sched === "" || sched === "-");
+          if (!isEmptySched) continue;
+
+          const reason = moveMap?.[iso]?.[periodNum];
+          if (reason) {
+            c.s = reason;
+            cells[i] = c;
+          }
+        }
+        r.cells = cells;
+      }
+
+      attData.rows = rows;
+      return attData;
+    }
+
     (async function () {
       const raw = sessionStorage.getItem("parent_session_v1");
       const session = raw ? JSON.parse(raw) : null;
@@ -232,6 +313,7 @@
       const tbody = document.getElementById("tbody");
 
       try {
+        // 1) 출결 상세 가져오기
         const res = await fetch(`${API_BASE}?path=attendance`, {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -241,12 +323,31 @@
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "불러오기 실패");
 
-        loading.textContent = "";
-
         const datesNorm = normalizeDates(data.dates);
         const rows = data.rows || [];
 
-        // ✅ 이번 주 요약(오늘 기준 미래 제외)
+        // 2) 이동 상세도 가져와서(표 범위에 맞춰) 스케줄 공백 채우기
+        //    - attendance가 iso를 주는 경우에만 정확히 매칭됨
+        //    - days는 넉넉하게 60일로 (원하면 더 줄여도 됨)
+        try {
+          const moveRes = await fetch(`${API_BASE}?path=move_detail`, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ token: session.token, days: 60 })
+          });
+          const moveData = await moveRes.json();
+
+          if (moveData && moveData.ok) {
+            const moveMap = buildMoveMap(moveData.items || []);
+            applyMoveToAttendance(data, datesNorm, moveMap);
+          }
+        } catch (_) {
+          // 이동 불러오기 실패해도 출결 표는 정상 출력되게 그냥 무시
+        }
+
+        loading.textContent = "";
+
+        // ✅ 이번 주 요약(오늘 기준 미래 제외) - "이동 사유로 채운 스케줄" 반영됨
         buildWeeklySummary(data, datesNorm);
 
         // ===== 헤더(2행) =====
