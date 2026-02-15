@@ -6,46 +6,33 @@
   <title>출결 상세</title>
   <link rel="stylesheet" href="styles.css" />
   <style>
-    .att-wrap { overflow:auto; border:1px solid rgba(255,255,255,0.08); border-radius:12px; }
-    table.att { border-collapse: collapse; width: max-content; min-width: 100%; }
-    table.att th, table.att td {
-      padding: 10px;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      border-right: 1px solid rgba(255,255,255,0.06);
-      white-space: nowrap;
-      text-align: left;
-      vertical-align: middle;
-    }
-    table.att th { border-bottom: 1px solid rgba(255,255,255,0.12); }
+    .att-wrap { overflow:auto; border:1px solid rgba(255,255,255,0.08); border-radius:16px; }
+    table.att { width:100%; border-collapse:separate; border-spacing:0; min-width:980px; }
+    .att th, .att td { padding:10px 10px; border-bottom:1px solid rgba(255,255,255,0.08); border-right:1px solid rgba(255,255,255,0.08); vertical-align:middle; }
+    .att th { background:rgba(255,255,255,0.03); font-weight:700; }
+    .att .day-head { text-align:center; font-size:14px; }
+    .att .sub-head { font-size:12px; opacity:.8; }
+    .col-period { width:60px; text-align:center; font-weight:700; background:rgba(255,255,255,0.02); }
+    .col-sched { width:170px; }
+    .col-status { width:80px; text-align:center; font-weight:700; }
 
-    .sticky-top { position: sticky; top: 0; z-index: 5; background: rgba(10,16,30,0.96); }
-    .sticky-left { position: sticky; left: 0; z-index: 6; background: rgba(10,16,30,0.92); }
-    .sticky-corner { position: sticky; top:0; left:0; z-index: 7; background: rgba(10,16,30,0.98); }
+    .sched-text { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
+    .sched-muted { opacity:.25; }
 
-    .day-head { font-weight: 900; letter-spacing: 0.2px; }
-    .sub-head { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+    .status-present { background:rgba(40, 200, 120, 0.18); }
+    .status-absent  { background:rgba(220, 70, 90, 0.20); }
+    .status-empty   { opacity:.75; }
 
-    .col-period { min-width: 56px; text-align: center; }
-    .col-sched { min-width: 160px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
-    .col-status { min-width: 84px; text-align: center; font-weight: 900; }
+    /* sticky header/left */
+    .sticky-top { position:sticky; top:0; z-index:3; }
+    .sticky-left { position:sticky; left:0; z-index:2; }
+    .sticky-corner { position:sticky; left:0; top:0; z-index:4; }
 
-    .status-present { background: rgba(120,255,170,0.18); border-right: 1px solid rgba(120,255,170,0.12); }
-    .status-absent  { background: rgba(255,120,120,0.18); border-right: 1px solid rgba(255,120,120,0.12); }
-    .status-empty   { color: rgba(255,255,255,0.5); }
-
-    .sched-text { color: rgba(255,255,255,0.90); }
-    .sched-muted { color: rgba(255,255,255,0.65); font-size: 12px; }
-
-    .summary-box{
-      margin: 12px 0 14px;
-      padding: 12px 14px;
-      border: 1px solid rgba(255,255,255,0.10);
-      border-radius: 12px;
-      background: rgba(255,255,255,0.04);
-    }
-    .summary-title{ font-weight: 900; margin-bottom: 6px; }
-    .summary-line{ color: rgba(255,255,255,0.88); }
-    .summary-sub{ margin-top: 6px; color: rgba(255,255,255,0.75); font-size: 13px; }
+    /* summary */
+    .summary-box { margin:12px 0 8px; padding:14px 14px; border:1px solid rgba(255,255,255,0.08); border-radius:16px; background:rgba(255,255,255,0.02); }
+    .summary-title { font-weight:800; margin-bottom:6px; }
+    .summary-line { font-weight:700; }
+    .summary-sub { margin-top:4px; opacity:.9; font-size:13px; }
   </style>
 </head>
 
@@ -56,7 +43,7 @@
         <div class="top-title">출결 상세</div>
         <div id="titleLine" class="top-sub"></div>
       </div>
-      <a class="btn btn-ghost" href="dashboard.html">대시보드</a>
+      <button id="logoutBtn" class="btn btn-ghost">로그아웃</button>
     </div>
   </header>
 
@@ -74,6 +61,8 @@
           * 결석은 “스케줄 공란 + 결석”만 집계됩니다. (오늘 기준, 미래 제외)
         </div>
       </div>
+
+      <button id="toggleViewBtn" class="btn btn-ghost" style="margin:10px 0 14px 0; display:none;">주간 전체 보기</button>
 
       <div class="att-wrap">
         <table class="att">
@@ -95,6 +84,114 @@
       if (s === "1") return "출석";
       if (s === "3") return "결석";
       return "";
+    }
+
+    // ✅ 기본: 오늘만(모든 교시) 표시, 버튼으로 주간 전체 토글
+    let SHOW_WEEK_ALL = false; // false=오늘만, true=주간 전체
+    window.__ATT_CACHE__ = null; // { data, datesNorm }
+
+    function getTodayIdx(datesNorm, todayIso) {
+      if (!datesNorm || !datesNorm.length) return 0;
+      const t = String(todayIso || "").trim();
+      if (t) {
+        const idx = datesNorm.findIndex(d => String(d.iso || "").trim() === t);
+        if (idx >= 0) return idx;
+      }
+      // iso가 없거나 매칭 실패하면 마지막(가장 최근) 날짜를 기본으로
+      return Math.max(0, datesNorm.length - 1);
+    }
+
+    function sliceToTodayView(data, datesNorm) {
+      const keep = getTodayIdx(datesNorm, data?.todayIso);
+      const dates = [datesNorm[keep]];
+      const rows = (data.rows || []).map(r => {
+        const cells = (r.cells || []);
+        return { ...r, cells: [cells[keep] || {}] };
+      });
+      return { data: { ...data, rows }, datesNorm: dates };
+    }
+
+    function renderTable(data, datesNorm) {
+      const thead = document.getElementById("thead");
+      const tbody = document.getElementById("tbody");
+
+      const view = SHOW_WEEK_ALL ? { data, datesNorm } : sliceToTodayView(data, datesNorm);
+      const dNorm = view.datesNorm;
+      const rows = view.data.rows || [];
+
+      // ===== 헤더(2행) =====
+      const topCells = dNorm.map(d => {
+        return `
+            <th class="sticky-top day-head" colspan="2">
+              <div>${d.md || ""}</div>
+              <div class="sub-head">${d.dow || ""}</div>
+            </th>
+          `;
+      }).join("");
+
+      const subCells = dNorm.map(() => `
+          <th class="sticky-top sub-head">스케줄</th>
+          <th class="sticky-top sub-head">출/결</th>
+        `).join("");
+
+      thead.innerHTML = `
+          <tr>
+            <th class="sticky-corner sticky-top col-period">교시</th>
+            ${topCells}
+          </tr>
+          <tr>
+            <th class="sticky-corner sticky-top col-period"></th>
+            ${subCells}
+          </tr>
+        `;
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td style="padding:10px;">기록이 없습니다.</td></tr>`;
+        return;
+      }
+
+      // ===== 바디 =====
+      tbody.innerHTML = rows.map(r => {
+        const tds = (r.cells || []).map(cell => {
+          const sched = String(cell?.s ?? "").trim();
+          const status = attText(cell?.a);
+          const cls = statusClass(status);
+
+          const schedHtml = sched
+            ? `<div class="sched-text" title="${sched}">${sched}</div>`
+            : `<div class="sched-muted"> </div>`;
+
+          const statusHtml = status ? status : "-";
+
+          return `
+              <td class="col-sched">${schedHtml}</td>
+              <td class="col-status ${cls}">${statusHtml}</td>
+            `;
+        }).join("");
+
+        return `
+            <tr>
+              <td class="sticky-left col-period">${r.period || ""}</td>
+              ${tds}
+            </tr>
+          `;
+      }).join("");
+    }
+
+    function setupToggleButton() {
+      const btn = document.getElementById("toggleViewBtn");
+      if (!btn) return;
+
+      btn.style.display = "";
+      btn.textContent = SHOW_WEEK_ALL ? "오늘만 보기" : "주간 전체 보기";
+
+      btn.addEventListener("click", () => {
+        SHOW_WEEK_ALL = !SHOW_WEEK_ALL;
+        btn.textContent = SHOW_WEEK_ALL ? "오늘만 보기" : "주간 전체 보기";
+
+        const cache = window.__ATT_CACHE__;
+        if (cache) renderTable(cache.data, cache.datesNorm);
+      });
     }
 
     // ✅ dates가 "문자열"이든 "객체({md,dow,iso})"든 통일해서 쓰기
@@ -220,25 +317,20 @@
 
     // ==============================
     // ✅ 이동 데이터로 스케줄 공백 채우기
-    // ✅ NEW: 입력시간(time)로 "시작교시" 계산해서 start~복귀교시까지 채움
+    // ✅ 입력시간(time)로 "시작교시" 계산해서 start~복귀교시까지 채움
     // ==============================
 
-    // ✅ NEW: 시간표(분 단위 비교용)
     const PERIODS = [
       { p: 1, start: "08:00", end: "08:30" },
       { p: 2, start: "08:50", end: "10:10" },
       { p: 3, start: "10:30", end: "12:00" },
-      // 점심 12:00~13:10
       { p: 4, start: "13:10", end: "14:30" },
       { p: 5, start: "14:50", end: "15:50" },
       { p: 6, start: "16:10", end: "17:30" },
-      // 저녁 17:30~18:40
       { p: 7, start: "18:40", end: "20:10" },
       { p: 8, start: "20:30", end: "22:00" },
-      // 필요하면 9~10교시도 여기 추가 가능
     ];
 
-    // ✅ NEW: "HH:MM" -> minutes
     function hhmmToMin(t) {
       const m = String(t ?? "").trim().match(/^(\d{1,2}):(\d{2})$/);
       if (!m) return NaN;
@@ -247,9 +339,6 @@
       return h * 60 + mm;
     }
 
-    // ✅ NEW: 입력시간으로 시작교시 추정
-    // - 교시 진행 중이면 그 교시부터
-    // - 쉬는시간이면 다음 교시부터
     function inferStartPeriodByTime(timeHHMM) {
       const t = hhmmToMin(timeHHMM);
       if (!Number.isFinite(t)) return 0;
@@ -259,30 +348,22 @@
         const s = hhmmToMin(cur.start);
         const e = hhmmToMin(cur.end);
 
-        // 교시 진행 중
         if (t >= s && t <= e) return cur.p;
 
-        // 쉬는시간 -> 다음 교시
         const next = PERIODS[i+1];
         if (next) {
           const ns = hhmmToMin(next.start);
           if (t > e && t < ns) return next.p;
         }
       }
-
-      // 범위 밖(예: 너무 이른/늦은 시간) -> 0(사용 안함)
       return 0;
     }
 
-    // move_detail의 date 포맷이 무엇이든 ISO(YYYY-MM-DD)로 정규화
     function normalizeMoveDateToIso(dateVal) {
       const s = String(dateVal ?? "").trim();
       if (!s) return "";
-
-      // 이미 ISO
       if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
 
-      // "2026. 2. 10" / "2026.2.10" / "2026/2/10" 등
       let m = s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
       if (m) {
         const y = m[1];
@@ -290,43 +371,31 @@
         const dd = String(m[3]).padStart(2, "0");
         return `${y}-${mm}-${dd}`;
       }
-
       return "";
     }
 
-    // ✅ NEW: 이동 기록을 map[iso][period] = reason 으로 변환
-    // - startPeriod는 입력시간으로 추정
-    // - 최종 적용 범위: startPeriod ~ returnPeriod
-    // - time이 없거나 startPeriod 계산 실패하면 fallback: (rp-1)~rp
     function buildMoveMap(moveItems) {
-      const map = {}; // { [iso]: { [period]: reason } }
-
+      const map = {};
       for (const it of (moveItems || [])) {
         const iso = normalizeMoveDateToIso(it.date);
         const reason = String(it.reason ?? "").trim();
-        const rp = Number(it.returnPeriod ?? 0); // 복귀교시
+        const rp = Number(it.returnPeriod ?? 0);
         const time = String(it.time ?? "").trim();
-
         if (!iso || !reason || !rp) continue;
 
         map[iso] ||= {};
-
-        const sp = inferStartPeriodByTime(time); // ✅ NEW
-        const from = sp > 0 ? sp : Math.max(1, rp - 1); // ✅ NEW fallback
+        const sp = inferStartPeriodByTime(time);
+        const from = sp > 0 ? sp : Math.max(1, rp - 1);
         const to = rp;
 
-        // 방어: from이 to보다 크면 (이상치) 기존룰로 보정
         const f = (from <= to) ? from : Math.max(1, rp - 1);
-
         for (let p = f; p <= to; p++) {
-          // 같은 날짜/교시에 여러 이동이 있으면 마지막 값이 덮어씀(원하면 later: 합치기 가능)
           map[iso][p] = reason;
         }
       }
       return map;
     }
 
-    // attendance 그리드의 스케줄 공백만 이동 사유로 채움
     function applyMoveToAttendance(attData, datesNorm, moveMap) {
       const rows = attData.rows || [];
       const isoByIdx = (datesNorm || []).map(d => String(d.iso || "").trim());
@@ -342,7 +411,6 @@
           const c = cells[i] || {};
           const sched = String(c.s ?? "").trim();
 
-          // ✅ 공백(또는 "-")만 채우기
           const isEmptySched = (sched === "" || sched === "-");
           if (!isEmptySched) continue;
 
@@ -369,8 +437,6 @@
 
       const loading = document.getElementById("loading");
       const err = document.getElementById("err");
-      const thead = document.getElementById("thead");
-      const tbody = document.getElementById("tbody");
 
       try {
         // 1) 출결 상세 가져오기
@@ -384,7 +450,6 @@
         if (!data.ok) throw new Error(data.error || "불러오기 실패");
 
         const datesNorm = normalizeDates(data.dates);
-        const rows = data.rows || [];
 
         // 2) 이동 상세도 가져와서 스케줄 공백 채우기
         try {
@@ -406,67 +471,15 @@
         loading.textContent = "";
 
         // ✅ 이번 주 요약(오늘 기준 미래 제외)
-        // (주의) 지금은 "이동이 채운 스케줄"이 있으면 결석 집계에서 제외될 수 있음
-        //        (원래 정책이 '스케줄 공란 + 결석만 결석 집계' 이므로 정상)
         buildWeeklySummary(data, datesNorm);
 
-        // ===== 헤더(2행) =====
-        const topCells = datesNorm.map(d => {
-          return `
-            <th class="sticky-top day-head" colspan="2">
-              <div>${d.md || ""}</div>
-              <div class="sub-head">${d.dow || ""}</div>
-            </th>
-          `;
-        }).join("");
+        // ✅ 캐시 저장 + 토글 버튼 세팅
+        window.__ATT_CACHE__ = { data, datesNorm };
+        document.getElementById("toggleViewBtn").style.display = "";
+        setupToggleButton();
 
-        const subCells = datesNorm.map(() => `
-          <th class="sticky-top sub-head">스케줄</th>
-          <th class="sticky-top sub-head">출/결</th>
-        `).join("");
-
-        thead.innerHTML = `
-          <tr>
-            <th class="sticky-corner sticky-top col-period">교시</th>
-            ${topCells}
-          </tr>
-          <tr>
-            <th class="sticky-corner sticky-top col-period"></th>
-            ${subCells}
-          </tr>
-        `;
-
-        if (rows.length === 0) {
-          tbody.innerHTML = `<tr><td style="padding:10px;">기록이 없습니다.</td></tr>`;
-          return;
-        }
-
-        // ===== 바디 =====
-        tbody.innerHTML = rows.map(r => {
-          const tds = (r.cells || []).map(cell => {
-            const sched = String(cell?.s ?? "").trim();
-            const status = attText(cell?.a);
-            const cls = statusClass(status);
-
-            const schedHtml = sched
-              ? `<div class="sched-text" title="${sched}">${sched}</div>`
-              : `<div class="sched-muted"> </div>`;
-
-            const statusHtml = status ? status : "-";
-
-            return `
-              <td class="col-sched">${schedHtml}</td>
-              <td class="col-status ${cls}">${statusHtml}</td>
-            `;
-          }).join("");
-
-          return `
-            <tr>
-              <td class="sticky-left col-period">${r.period || ""}</td>
-              ${tds}
-            </tr>
-          `;
-        }).join("");
+        // ✅ 기본은 "오늘만 + 모든 교시"
+        renderTable(data, datesNorm);
 
       } catch (e) {
         loading.textContent = "";
