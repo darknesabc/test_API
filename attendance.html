@@ -216,6 +216,36 @@
       const dNorm = view.datesNorm;
       const rows = view.data.rows || [];
 
+
+    // ===== 교시 시간 힌트(겹침 방지: 테이블 위에 표시) =====
+    function periodTimeText(p){
+      const it = PERIODS.find(x => x.p === Number(p));
+      return it ? `${it.start} ~ ${it.end}` : "";
+    }
+    function showPeriodHint(p){
+      const box = document.getElementById("periodHint");
+      if (!box) return;
+      const t = periodTimeText(p);
+      if (!t) { box.style.display = "none"; box.textContent = ""; return; }
+      box.textContent = `${p}교시  ${t}`;
+      box.style.display = "";
+    }
+    function hidePeriodHint(){
+      const box = document.getElementById("periodHint");
+      if (!box) return;
+      box.style.display = "none";
+      box.textContent = "";
+    }
+
+    function getCurrentPeriod(){
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2,"0");
+      const mm = String(now.getMinutes()).padStart(2,"0");
+      // inferStartPeriodByTime는 이미 아래에 있음(입력시간으로 교시 추정)
+      const p = inferStartPeriodByTime(`${hh}:${mm}`);
+      return p || 0;
+    }
+
       if (table) {
         table.classList.toggle("one-day", dNorm.length === 1);
         table.classList.toggle("week-wide", dNorm.length > 1);
@@ -322,6 +352,39 @@
       let absent = 0;
       const absEvents = [];
 
+      // ✅ 오늘은 '현재 교시' 이후(미래 교시) 집계 제외
+      const curP = getCurrentPeriod();
+
+
+    // ===== 교시 시간 힌트(겹침 방지: 테이블 위에 표시) =====
+    function periodTimeText(p){
+      const it = PERIODS.find(x => x.p === Number(p));
+      return it ? `${it.start} ~ ${it.end}` : "";
+    }
+    function showPeriodHint(p){
+      const box = document.getElementById("periodHint");
+      if (!box) return;
+      const t = periodTimeText(p);
+      if (!t) { box.style.display = "none"; box.textContent = ""; return; }
+      box.textContent = `${p}교시  ${t}`;
+      box.style.display = "";
+    }
+    function hidePeriodHint(){
+      const box = document.getElementById("periodHint");
+      if (!box) return;
+      box.style.display = "none";
+      box.textContent = "";
+    }
+
+    function getCurrentPeriod(){
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2,"0");
+      const mm = String(now.getMinutes()).padStart(2,"0");
+      // inferStartPeriodByTime는 이미 아래에 있음(입력시간으로 교시 추정)
+      const p = inferStartPeriodByTime(`${hh}:${mm}`);
+      return p || 0;
+    }
+
       for (const r of rows) {
         const period = r.period || "";
         const cells = r.cells || [];
@@ -329,6 +392,12 @@
           const cell = cells[i] || {};
           const sched = String(cell.s ?? "").trim();
           const status = attText(cell.a);
+
+          // ✅ 오늘(같은 날짜)인데 현재 교시 이후면 건너뜀
+          if (String(datesNorm[i].iso||"") === String(todayIso) && curP > 0) {
+            const pNum = Number(period);
+            if (Number.isFinite(pNum) && pNum > curP) continue;
+          }
 
           if (status === "출석") present++;
           if (isCountedAbsence(sched, status)) {
