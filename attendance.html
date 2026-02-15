@@ -305,6 +305,9 @@
           </tr>
         `;
       }).join("");
+
+      // ✅ 교시 시간 힌트 바인딩(렌더 후)
+      try { bindPeriodHintEvents(); } catch(_) {}
     }
 
     // ===== 요약 =====
