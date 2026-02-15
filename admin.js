@@ -552,15 +552,16 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const exams = await apiPost("grade_exams", { token });
       if (exams.ok && Array.isArray(exams.items) && exams.items.length) {
-        const lastExam = exams.items[exams.items.length - 1].exam;
-        const gd = await apiPost("grade_detail", { token, exam: lastExam });
-        summary.grade = gd.ok ? {
+        const last = exams.items[exams.items.length - 1] || {};
+        const lastExam = String(last.exam || "");
+        const gs = await apiPost("grade_summary", { token, exam: lastExam });
+
+        summary.grade = gs.ok ? {
           ok: true,
-          sheetName: gd.sheetName,
-          kor: gd.subjects?.kor,
-          math: gd.subjects?.math,
-          eng: gd.subjects?.eng,
-        } : { ok:false, error: gd.error || "grade_detail 실패" };
+          exam: lastExam,
+          sheetName: gs.sheetName || last.label || last.name || "",
+          data: gs, // ✅ 학부모/관리자 상세와 동일한 데이터(표 렌더용)
+        } : { ok:false, error: gs.error || "grade_summary 실패" };
       } else {
         summary.grade = { ok:false, error:"시험 목록 없음" };
       }
@@ -731,12 +732,9 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="card-title" style="font-size:15px;">성적 요약</div>
           <div class="card-sub">
             ${grd && grd.ok ? `
-              (${escapeHtml(grd.sheetName || "")})<br>
-              국어: <b>${grd.kor?.raw_total ?? grd.kor?.raw ?? "-"}</b> / 등급 <b>${grd.kor?.grade ?? "-"}</b><br>
-              수학: <b>${grd.math?.raw_total ?? grd.math?.raw ?? "-"}</b> / 등급 <b>${grd.math?.grade ?? "-"}</b><br>
-              영어: <b>${grd.eng?.raw ?? "-"}</b> / 등급 <b>${grd.eng?.grade ?? "-"}</b>
-            ` : (loading ? "불러오는 중…" : "데이터 없음")}
-          </div>
+              <div style="margin-bottom:8px;">(${escapeHtml(grd.sheetName || "")})</div>
+              ${renderGradeTableHtml_(buildGradeTableRows_(grd.data || grd || {}))}
+            ` : (loading ? "불러오는 중…" : "데이터 없음")}</div>
         </section>
       </div>
     `;
