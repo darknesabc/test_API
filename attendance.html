@@ -55,23 +55,6 @@
     table.att.one-day th.col-status, table.att.one-day td.col-status { width: 30%; }
   
     .col-period{ cursor:help; }
-  
-    /* ===== 교시 시간(1안): 교시 셀 안에서 표시 (PC hover / Mobile tap) ===== */
-    .col-period { cursor: default; }
-    .period-num { font-weight: 800; line-height: 1.1; }
-    .period-time {
-      margin-top: 4px;
-      font-size: 12px;
-      opacity: 0;
-      transform: translateY(-2px);
-      transition: opacity .15s ease, transform .15s ease;
-      color: rgba(255,255,255,0.65);
-      white-space: nowrap;
-      pointer-events: none;
-    }
-    .col-period:hover .period-time { opacity: 1; transform: translateY(0); }
-    .col-period.show-time .period-time { opacity: 1; transform: translateY(0); }
-
   </style>
 </head>
 
@@ -102,6 +85,9 @@
           * 결석은 “스케줄 공란 + 결석”만 집계됩니다. (오늘 기준, 미래 제외)
         </div>
       </div>
+
+      <div id="periodHint" style="display:none; margin:8px 0 10px; padding:10px 12px; border:1px solid rgba(255,255,255,0.08); border-radius:12px; background:rgba(255,255,255,0.03); font-weight:700;"></div>
+
       <button id="toggleViewBtn" class="btn btn-ghost" style="margin:10px 0 14px 0; display:none;">주간 전체 보기</button>
 
       <div class="att-wrap">
@@ -216,7 +202,7 @@
           btn.textContent = SHOW_WEEK_ALL ? "오늘만 보기" : "주간 전체 보기";
           const cache = window.__ATT_CACHE__;
           if (cache) renderTable(cache.data, cache.datesNorm);
-        
+        try { bindPeriodHintEvents(); } catch(_) {}
         });
       }
     }
@@ -229,10 +215,34 @@
       const view = SHOW_WEEK_ALL ? { data, datesNorm } : sliceToTodayView(data, datesNorm);
       const dNorm = view.datesNorm;
       const rows = view.data.rows || [];
-, { passive:true });
-      });
+
+
+    // ===== 교시 시간 힌트(겹침 방지: 테이블 위에 표시) =====
+    function periodTimeText(p){
+      const it = PERIODS.find(x => x.p === Number(p));
+      return it ? `${it.start} ~ ${it.end}` : "";
     }
-:${mm}`);
+    function showPeriodHint(p){
+      const box = document.getElementById("periodHint");
+      if (!box) return;
+      const t = periodTimeText(p);
+      if (!t) { box.style.display = "none"; box.textContent = ""; return; }
+      box.textContent = `${p}교시  ${t}`;
+      box.style.display = "";
+    }
+    function hidePeriodHint(){
+      const box = document.getElementById("periodHint");
+      if (!box) return;
+      box.style.display = "none";
+      box.textContent = "";
+    }
+
+    function getCurrentPeriod(){
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2,"0");
+      const mm = String(now.getMinutes()).padStart(2,"0");
+      // inferStartPeriodByTime는 이미 아래에 있음(입력시간으로 교시 추정)
+      const p = inferStartPeriodByTime(`${hh}:${mm}`);
       return p || 0;
     }
 
@@ -290,14 +300,11 @@
 
         return `
           <tr>
-            <td class="sticky-left col-period" data-period="${r.period || ""}"><div class="period-num">${r.period || ""}</div><div class="period-time">${periodRangeText(r.period || "")}</div></td>
+            <td class="sticky-left col-period" data-period="${r.period || ""}">${r.period || ""}</td>
             ${tds}
           </tr>
         `;
       }).join("");
-
-      // ✅ 교시 시간 힌트 바인딩(렌더 후)
-      
     }
 
     // ===== 요약 =====
@@ -347,10 +354,34 @@
 
       // ✅ 오늘은 '현재 교시' 이후(미래 교시) 집계 제외
       const curP = getCurrentPeriod();
-, { passive:true });
-      });
+
+
+    // ===== 교시 시간 힌트(겹침 방지: 테이블 위에 표시) =====
+    function periodTimeText(p){
+      const it = PERIODS.find(x => x.p === Number(p));
+      return it ? `${it.start} ~ ${it.end}` : "";
     }
-:${mm}`);
+    function showPeriodHint(p){
+      const box = document.getElementById("periodHint");
+      if (!box) return;
+      const t = periodTimeText(p);
+      if (!t) { box.style.display = "none"; box.textContent = ""; return; }
+      box.textContent = `${p}교시  ${t}`;
+      box.style.display = "";
+    }
+    function hidePeriodHint(){
+      const box = document.getElementById("periodHint");
+      if (!box) return;
+      box.style.display = "none";
+      box.textContent = "";
+    }
+
+    function getCurrentPeriod(){
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2,"0");
+      const mm = String(now.getMinutes()).padStart(2,"0");
+      // inferStartPeriodByTime는 이미 아래에 있음(입력시간으로 교시 추정)
+      const p = inferStartPeriodByTime(`${hh}:${mm}`);
       return p || 0;
     }
 
@@ -538,7 +569,7 @@
         renderTable(data, datesNorm);
 
         // ✅ 교시 힌트 이벤트 바인딩
-        
+        try { bindPeriodHintEvents(); } catch(_) {}
 
       } catch (e) {
         showError(e.message || String(e));
