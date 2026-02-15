@@ -55,6 +55,22 @@
     table.att.one-day th.col-status, table.att.one-day td.col-status { width: 30%; }
   
     .col-period{ cursor:help; }
+  
+    /* ===== 교시 시간(1안): 셀 안에 표시, hover/터치 시에만 노출 ===== */
+    .col-period { cursor: default; }
+    .period-num { font-weight: 800; }
+    .period-time {
+      margin-top: 4px;
+      font-size: 12px;
+      opacity: 0;
+      transform: translateY(-2px);
+      transition: opacity .15s ease, transform .15s ease;
+      color: rgba(255,255,255,0.65);
+      white-space: nowrap;
+    }
+    .col-period:hover .period-time { opacity: 1; transform: translateY(0); }
+    .col-period.show-time .period-time { opacity: 1; transform: translateY(0); }
+
   </style>
 </head>
 
@@ -85,10 +101,7 @@
           * 결석은 “스케줄 공란 + 결석”만 집계됩니다. (오늘 기준, 미래 제외)
         </div>
       </div>
-
-      <div id="periodHint" style="display:none; margin:8px 0 10px; padding:10px 12px; border:1px solid rgba(255,255,255,0.08); border-radius:12px; background:rgba(255,255,255,0.03); font-weight:700;"></div>
-
-      <button id="toggleViewBtn" class="btn btn-ghost" style="margin:10px 0 14px 0; display:none;">주간 전체 보기</button>
+<button id="toggleViewBtn" class="btn btn-ghost" style="margin:10px 0 14px 0; display:none;">주간 전체 보기</button>
 
       <div class="att-wrap">
         <table class="att">
@@ -202,7 +215,7 @@
           btn.textContent = SHOW_WEEK_ALL ? "오늘만 보기" : "주간 전체 보기";
           const cache = window.__ATT_CACHE__;
           if (cache) renderTable(cache.data, cache.datesNorm);
-        if (typeof bindPeriodHintEvents==='function') bindPeriodHintEvents();
+        
         });
       }
     }
@@ -215,50 +228,7 @@
       const view = SHOW_WEEK_ALL ? { data, datesNorm } : sliceToTodayView(data, datesNorm);
       const dNorm = view.datesNorm;
       const rows = view.data.rows || [];
-
-
-    // ===== 교시 시간 힌트(겹침 방지: 테이블 위에 표시) =====
-    function periodTimeText(p){
-      const it = PERIODS.find(x => x.p === Number(p));
-      return it ? `${it.start} ~ ${it.end}` : "";
-    }
-    function showPeriodHint(p){
-      const box = document.getElementById("periodHint");
-      if (!box) return;
-      const t = periodTimeText(p);
-      if (!t) { box.style.display = "none"; box.textContent = ""; return; }
-      box.textContent = `${p}교시  ${t}`;
-      box.style.display = "";
-    }
-    function hidePeriodHint(){
-      const box = document.getElementById("periodHint");
-      if (!box) return;
-      box.style.display = "none";
-      box.textContent = "";
-    }
-
-    
-
-    function bindPeriodHintEvents(){
-      const box = document.getElementById("periodHint");
-      const tbody = document.getElementById("tbody");
-      if (!box || !tbody) return;
-
-      const cells = tbody.querySelectorAll("td.col-period[data-period]");
-      cells.forEach(td => {
-        if (td.__periodHintBound) return;
-        td.__periodHintBound = true;
-
-        const p = td.getAttribute("data-period");
-
-        td.addEventListener("mouseenter", () => showPeriodHint(p));
-        td.addEventListener("mouseleave", () => hidePeriodHint());
-
-        td.addEventListener("click", () => {
-          showPeriodHint(p);
-          clearTimeout(window.__periodHintTimer__);
-          window.__periodHintTimer__ = setTimeout(hidePeriodHint, 2000);
-        }, { passive:true });
+, { passive:true });
       });
     }
 function getCurrentPeriod(){
@@ -324,14 +294,14 @@ function getCurrentPeriod(){
 
         return `
           <tr>
-            <td class="sticky-left col-period" data-period="${r.period || ""}">${r.period || ""}</td>
+            <td class="sticky-left col-period" data-period="${r.period || ""}"><div class="period-num">${r.period || ""}</div><div class="period-time">${periodRangeText(r.period || "")}</div></td>
             ${tds}
           </tr>
         `;
       }).join("");
 
       // ✅ 교시 시간 힌트 바인딩(렌더 후)
-      if (typeof bindPeriodHintEvents==='function') bindPeriodHintEvents();
+      
     }
 
     // ===== 요약 =====
@@ -381,50 +351,7 @@ function getCurrentPeriod(){
 
       // ✅ 오늘은 '현재 교시' 이후(미래 교시) 집계 제외
       const curP = getCurrentPeriod();
-
-
-    // ===== 교시 시간 힌트(겹침 방지: 테이블 위에 표시) =====
-    function periodTimeText(p){
-      const it = PERIODS.find(x => x.p === Number(p));
-      return it ? `${it.start} ~ ${it.end}` : "";
-    }
-    function showPeriodHint(p){
-      const box = document.getElementById("periodHint");
-      if (!box) return;
-      const t = periodTimeText(p);
-      if (!t) { box.style.display = "none"; box.textContent = ""; return; }
-      box.textContent = `${p}교시  ${t}`;
-      box.style.display = "";
-    }
-    function hidePeriodHint(){
-      const box = document.getElementById("periodHint");
-      if (!box) return;
-      box.style.display = "none";
-      box.textContent = "";
-    }
-
-    
-
-    function bindPeriodHintEvents(){
-      const box = document.getElementById("periodHint");
-      const tbody = document.getElementById("tbody");
-      if (!box || !tbody) return;
-
-      const cells = tbody.querySelectorAll("td.col-period[data-period]");
-      cells.forEach(td => {
-        if (td.__periodHintBound) return;
-        td.__periodHintBound = true;
-
-        const p = td.getAttribute("data-period");
-
-        td.addEventListener("mouseenter", () => showPeriodHint(p));
-        td.addEventListener("mouseleave", () => hidePeriodHint());
-
-        td.addEventListener("click", () => {
-          showPeriodHint(p);
-          clearTimeout(window.__periodHintTimer__);
-          window.__periodHintTimer__ = setTimeout(hidePeriodHint, 2000);
-        }, { passive:true });
+, { passive:true });
       });
     }
 function getCurrentPeriod(){
@@ -503,6 +430,30 @@ function getCurrentPeriod(){
       }
       return 0;
     }
+
+
+    function periodRangeText(p){
+      const it = PERIODS.find(x => x.p === Number(p));
+      return it ? `${it.start} ~ ${it.end}` : "";
+    }
+
+    function bindPeriodInlineTime(){
+      const tbody = document.getElementById("tbody");
+      if (!tbody) return;
+      const cells = tbody.querySelectorAll("td.col-period[data-period]");
+      cells.forEach(td => {
+        if (td.__periodInlineBound) return;
+        td.__periodInlineBound = true;
+
+        td.addEventListener("click", () => {
+          // 모바일/터치: 토글 + 2초 후 자동 해제
+          td.classList.add("show-time");
+          clearTimeout(td.__periodInlineTimer);
+          td.__periodInlineTimer = setTimeout(() => td.classList.remove("show-time"), 2000);
+        }, { passive:true });
+      });
+    }
+
     function normalizeMoveDateToIso(dateVal) {
       const s = String(dateVal ?? "").trim();
       if (!s) return "";
@@ -620,7 +571,7 @@ function getCurrentPeriod(){
         renderTable(data, datesNorm);
 
         // ✅ 교시 힌트 이벤트 바인딩
-        if (typeof bindPeriodHintEvents==='function') bindPeriodHintEvents();
+        
 
       } catch (e) {
         showError(e.message || String(e));
