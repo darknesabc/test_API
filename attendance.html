@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="ko">
 <head>
@@ -221,7 +220,59 @@
 
     // ==============================
     // ✅ 이동 데이터로 스케줄 공백 채우기
+    // ✅ NEW: 입력시간(time)로 "시작교시" 계산해서 start~복귀교시까지 채움
     // ==============================
+
+    // ✅ NEW: 시간표(분 단위 비교용)
+    const PERIODS = [
+      { p: 1, start: "08:00", end: "08:30" },
+      { p: 2, start: "08:50", end: "10:10" },
+      { p: 3, start: "10:30", end: "12:00" },
+      // 점심 12:00~13:10
+      { p: 4, start: "13:10", end: "14:30" },
+      { p: 5, start: "14:50", end: "15:50" },
+      { p: 6, start: "16:10", end: "17:30" },
+      // 저녁 17:30~18:40
+      { p: 7, start: "18:40", end: "20:10" },
+      { p: 8, start: "20:30", end: "22:00" },
+      // 필요하면 9~10교시도 여기 추가 가능
+    ];
+
+    // ✅ NEW: "HH:MM" -> minutes
+    function hhmmToMin(t) {
+      const m = String(t ?? "").trim().match(/^(\d{1,2}):(\d{2})$/);
+      if (!m) return NaN;
+      const h = Number(m[1]), mm = Number(m[2]);
+      if (!Number.isFinite(h) || !Number.isFinite(mm)) return NaN;
+      return h * 60 + mm;
+    }
+
+    // ✅ NEW: 입력시간으로 시작교시 추정
+    // - 교시 진행 중이면 그 교시부터
+    // - 쉬는시간이면 다음 교시부터
+    function inferStartPeriodByTime(timeHHMM) {
+      const t = hhmmToMin(timeHHMM);
+      if (!Number.isFinite(t)) return 0;
+
+      for (let i = 0; i < PERIODS.length; i++) {
+        const cur = PERIODS[i];
+        const s = hhmmToMin(cur.start);
+        const e = hhmmToMin(cur.end);
+
+        // 교시 진행 중
+        if (t >= s && t <= e) return cur.p;
+
+        // 쉬는시간 -> 다음 교시
+        const next = PERIODS[i+1];
+        if (next) {
+          const ns = hhmmToMin(next.start);
+          if (t > e && t < ns) return next.p;
+        }
+      }
+
+      // 범위 밖(예: 너무 이른/늦은 시간) -> 0(사용 안함)
+      return 0;
+    }
 
     // move_detail의 date 포맷이 무엇이든 ISO(YYYY-MM-DD)로 정규화
     function normalizeMoveDateToIso(dateVal) {
@@ -240,11 +291,13 @@
         return `${y}-${mm}-${dd}`;
       }
 
-      // "02/10" 같은 md 형태만 오는 경우는 attendance의 iso가 없으면 매칭 불가(일단 빈값)
       return "";
     }
 
-    // 이동 기록을 map[iso][period] = reason 으로 변환
+    // ✅ NEW: 이동 기록을 map[iso][period] = reason 으로 변환
+    // - startPeriod는 입력시간으로 추정
+    // - 최종 적용 범위: startPeriod ~ returnPeriod
+    // - time이 없거나 startPeriod 계산 실패하면 fallback: (rp-1)~rp
     function buildMoveMap(moveItems) {
       const map = {}; // { [iso]: { [period]: reason } }
 
@@ -252,15 +305,21 @@
         const iso = normalizeMoveDateToIso(it.date);
         const reason = String(it.reason ?? "").trim();
         const rp = Number(it.returnPeriod ?? 0); // 복귀교시
+        const time = String(it.time ?? "").trim();
 
         if (!iso || !reason || !rp) continue;
 
         map[iso] ||= {};
 
-        // ✅ 룰: 복귀교시 rp이면 (rp-1)~rp 교시에 reason 채움
-        const from = Math.max(1, rp - 1);
+        const sp = inferStartPeriodByTime(time); // ✅ NEW
+        const from = sp > 0 ? sp : Math.max(1, rp - 1); // ✅ NEW fallback
         const to = rp;
-        for (let p = from; p <= to; p++) {
+
+        // 방어: from이 to보다 크면 (이상치) 기존룰로 보정
+        const f = (from <= to) ? from : Math.max(1, rp - 1);
+
+        for (let p = f; p <= to; p++) {
+          // 같은 날짜/교시에 여러 이동이 있으면 마지막 값이 덮어씀(원하면 later: 합치기 가능)
           map[iso][p] = reason;
         }
       }
@@ -327,9 +386,7 @@
         const datesNorm = normalizeDates(data.dates);
         const rows = data.rows || [];
 
-        // 2) 이동 상세도 가져와서(표 범위에 맞춰) 스케줄 공백 채우기
-        //    - attendance가 iso를 주는 경우에만 정확히 매칭됨
-        //    - days는 넉넉하게 60일로 (원하면 더 줄여도 됨)
+        // 2) 이동 상세도 가져와서 스케줄 공백 채우기
         try {
           const moveRes = await fetch(`${API_BASE}?path=move_detail`, {
             method: "POST",
@@ -343,12 +400,14 @@
             applyMoveToAttendance(data, datesNorm, moveMap);
           }
         } catch (_) {
-          // 이동 불러오기 실패해도 출결 표는 정상 출력되게 그냥 무시
+          // 이동 실패는 무시
         }
 
         loading.textContent = "";
 
-        // ✅ 이번 주 요약(오늘 기준 미래 제외) - "이동 사유로 채운 스케줄" 반영됨
+        // ✅ 이번 주 요약(오늘 기준 미래 제외)
+        // (주의) 지금은 "이동이 채운 스케줄"이 있으면 결석 집계에서 제외될 수 있음
+        //        (원래 정책이 '스케줄 공란 + 결석만 결석 집계' 이므로 정상)
         buildWeeklySummary(data, datesNorm);
 
         // ===== 헤더(2행) =====
