@@ -530,7 +530,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // ✅ 1) 캐시가 있으면 즉시 표시(초고속)
       const cached = getSummaryCache(key);
-      if (cached) {
+      const hasAny = !!(cached && (cached.attendance || cached.sleep || cached.move || cached.eduscore || cached.grade || (Array.isArray(cached.gradeExams) && cached.gradeExams.length)));
+      if (hasAny) {
         data.summary = cached;
         renderStudentDetail(data);
 
@@ -538,7 +539,6 @@ document.addEventListener("DOMContentLoaded", () => {
         (async () => {
           try {
             const fresh = await loadSummariesForStudent_(seat, studentId);
-            // 클릭이 다른 학생으로 넘어갔으면 반영 X
             if (__activeStudentKey !== key) return;
             setSummaryCache(key, fresh || {});
             data.summary = fresh || {};
@@ -546,7 +546,7 @@ document.addEventListener("DOMContentLoaded", () => {
           } catch (_) {}
         })();
 
-        return; // 캐시 있으면 여기서 끝(백그라운드 갱신만)
+        return; // 캐시가 '유효'하면 여기서 끝(백그라운드 갱신만)
       }
 
       // ✅ 캐시가 없으면 로딩 표시 후 실제 호출
