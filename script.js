@@ -237,21 +237,52 @@ async function loadAttendanceSummary(session) {
     });
 
     const data = await res.json();
-    if (!data.ok) throw new Error(data.error || "출결 요약 불러오기 실패");
+    if (!data || !data.ok) throw new Error(data?.error || "출결 요약 불러오기 실패");
 
     loading.textContent = "";
 
-    const present = Number(data.present ?? 0);
-    const absent = Number(data.absent ?? 0);
-    const rec = Array.isArray(data.recentAbsences) ? data.recentAbsences : [];
+    // ✅ 1) present/absent 키가 어디에 있든 다 흡수
+    // - (A) data.present / data.absent
+    // - (B) data.week.present / data.week.absent
+    // - (C) data.summary.present / data.summary.absent
+    const present =
+      safeNum_(data.present,
+        safeNum_(data.week?.present,
+          safeNum_(data.summary?.present, 0)
+        )
+      );
 
-    counts.innerHTML = `이번 주 출결 요약<br>출석 ${present}회 · 결석 ${absent}회`;
+    const absent =
+      safeNum_(data.absent,
+        safeNum_(data.week?.absent,
+          safeNum_(data.summary?.absent, 0)
+        )
+      );
+
+    // ✅ 2) 서버 기준 오늘 표시(있으면)
+    const todayIso = safeText_(data.todayIso, "");
+    const todayTag = todayIso ? ` · 서버 오늘(${todayIso})` : "";
+
+    counts.innerHTML = `이번 주 출결 요약<br>출석 ${present}회 · 결석 ${absent}회${todayTag}`;
+
+    // ✅ 3) recentAbsences도 형태 다양하게 대응
+    const rec = Array.isArray(data.recentAbsences) ? data.recentAbsences
+              : Array.isArray(data.recent) ? data.recent
+              : [];
 
     if (!rec.length) {
       recent.textContent = "최근 결석: 없음";
     } else {
-      const items = rec.map(x => `${fmtMdDow_(x.md, x.dow)} ${x.period}교시`);
-      recent.textContent = `최근 결석: ${items.join(", ")}`;
+      // period가 없을 수도 있으니 안전하게
+      const items = rec.slice(0, 2).map(x => {
+        const md = x.md ?? x.dateMd ?? x.mdDow ?? "";
+        const dow = x.dow ?? x.day ?? "";
+        const p = x.period ?? x.p ?? x.classPeriod ?? "";
+        const left = fmtMdDow_(md, dow) || safeText_(x.date || "", "");
+        return p ? `${left} ${p}교시` : left;
+      }).filter(Boolean);
+
+      recent.textContent = items.length ? `최근 결석: ${items.join(", ")}` : "최근 결석: 없음";
     }
 
     box.style.display = "";
@@ -1172,3 +1203,4 @@ function escapeHtml_(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[m]));
 }
+
