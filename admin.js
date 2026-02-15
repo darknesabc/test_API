@@ -118,6 +118,71 @@ async function apiPost(path, body) {
 }
 
 // ====== UI helpers ======
+
+/** =========================
+ * ✅ 성적(학부모 대시보드와 동일 양식) 렌더 헬퍼
+ * - backend: grade_exams (시험목록) + grade_summary (표 데이터)
+ * ========================= */
+function buildGradeTableRows_(data) {
+  const kor  = data.kor  || {};
+  const math = data.math || {};
+  const eng  = data.eng  || {};
+  const hist = data.hist || {};
+  const tam1 = data.tam1 || {};
+  const tam2 = data.tam2 || {};
+
+  const dash = "-";
+  const fmt = (v) => {
+    const s = String(v ?? "").trim();
+    return s ? s : dash;
+  };
+  const fmtNum = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && String(v).trim() !== "" ? String(n) : dash;
+  };
+
+  return [
+    { label: "선택과목", kor: fmt(kor.choice), math: fmt(math.choice), eng: dash, hist: dash, tam1: fmt(tam1.name), tam2: fmt(tam2.name) },
+    { label: "원점수",   kor: fmtNum(kor.raw_total), math: fmtNum(math.raw_total), eng: fmtNum(eng.raw), hist: fmtNum(hist.raw), tam1: fmtNum(tam1.raw), tam2: fmtNum(tam2.raw) },
+    { label: "표준점수", kor: fmtNum(kor.std), math: fmtNum(math.std), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_std), tam2: fmtNum(tam2.expected_std) },
+    { label: "백분위",   kor: fmtNum(kor.pct), math: fmtNum(math.pct), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_pct), tam2: fmtNum(tam2.expected_pct) },
+    { label: "등급",     kor: fmt(kor.grade), math: fmt(math.grade), eng: fmt(eng.grade), hist: fmt(hist.grade), tam1: fmt(tam1.expected_grade), tam2: fmt(tam2.expected_grade) },
+  ];
+}
+
+function renderGradeTableHtml_(rows) {
+  return `
+    <div style="margin-top:10px; overflow:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead>
+          <tr>
+            <th style="text-align:left; padding:8px; border-bottom:1px solid rgba(255,255,255,.10); white-space:nowrap;">과목</th>
+            <th style="text-align:left; padding:8px; border-bottom:1px solid rgba(255,255,255,.10); white-space:nowrap;">국어</th>
+            <th style="text-align:left; padding:8px; border-bottom:1px solid rgba(255,255,255,.10); white-space:nowrap;">수학</th>
+            <th style="text-align:left; padding:8px; border-bottom:1px solid rgba(255,255,255,.10); white-space:nowrap;">영어</th>
+            <th style="text-align:left; padding:8px; border-bottom:1px solid rgba(255,255,255,.10); white-space:nowrap;">한국사</th>
+            <th style="text-align:left; padding:8px; border-bottom:1px solid rgba(255,255,255,.10); white-space:nowrap;">탐구1</th>
+            <th style="text-align:left; padding:8px; border-bottom:1px solid rgba(255,255,255,.10); white-space:nowrap;">탐구2</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr>
+              <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml(r.label)}</td>
+              <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml(r.kor)}</td>
+              <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml(r.math)}</td>
+              <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml(r.eng)}</td>
+              <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml(r.hist)}</td>
+              <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml(r.tam1)}</td>
+              <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml(r.tam2)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (m) => ({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
@@ -600,7 +665,77 @@ document.addEventListener("DOMContentLoaded", () => {
     $("btnGradeDetail").addEventListener("click", () => loadDetail("grade_detail"));
   }
 
-  // ====== load detail into detailResult ======
+  
+  // ====== grade detail (관리자) - 학부모와 동일 양식 ======
+  async function loadAdminGradeDetailUI_(token) {
+    const host = $("detailResult");
+    if (!host) return;
+
+    host.innerHTML = `
+      <div class="card" style="padding:14px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div style="font-weight:700;">성적</div>
+          <select id="adminGradeExamSelect" class="btn btn-ghost btn-mini" style="padding:6px 10px; max-width: 280px;"></select>
+        </div>
+        <p id="adminGradeLoading" class="muted" style="margin-top:10px;">불러오는 중...</p>
+        <p id="adminGradeError" class="msg" style="margin-top:6px;"></p>
+        <div id="adminGradeTableWrap" style="display:none;"></div>
+      </div>
+    `;
+
+    const sel = $("adminGradeExamSelect");
+    const loading = $("adminGradeLoading");
+    const error = $("adminGradeError");
+    const wrap = $("adminGradeTableWrap");
+
+    try {
+      // 1) 시험 목록
+      const exams = await apiPost("grade_exams", { token });
+      if (!exams.ok || !Array.isArray(exams.items) || !exams.items.length) {
+        throw new Error(exams.error || "시험 목록이 없습니다.");
+      }
+
+      // items: [{exam, label}] 형태 가정. label 없으면 exam 그대로 표시
+      sel.innerHTML = exams.items.map(it => {
+        const v = String(it.exam || "");
+        const lab = String(it.label || it.name || it.sheetName || v);
+        return `<option value="${escapeHtml(v)}">${escapeHtml(lab)}</option>`;
+      }).join("");
+
+      // 기본 선택: 마지막(최신)
+      sel.value = String(exams.items[exams.items.length - 1].exam || "");
+
+      sel.addEventListener("change", () => fetchAndRender(sel.value));
+      await fetchAndRender(sel.value);
+    } catch (e) {
+      loading.textContent = "";
+      error.textContent = e?.message || "성적 불러오기 실패";
+      wrap.style.display = "none";
+    }
+
+    async function fetchAndRender(exam) {
+      try {
+        loading.textContent = "불러오는 중...";
+        error.textContent = "";
+        wrap.style.display = "none";
+        wrap.innerHTML = "";
+
+        const data = await apiPost("grade_summary", { token, exam: String(exam || "") });
+        if (!data.ok) throw new Error(data.error || "성적 불러오기 실패");
+
+        const rows = buildGradeTableRows_(data);
+        wrap.innerHTML = renderGradeTableHtml_(rows);
+        wrap.style.display = "block";
+        loading.textContent = "";
+      } catch (e) {
+        loading.textContent = "";
+        error.textContent = e?.message || "성적 불러오기 실패";
+        wrap.style.display = "none";
+      }
+    }
+  }
+
+// ====== load detail into detailResult ======
   async function loadDetail(kind) {
     const sess = getAdminSession();
     if (!sess?.adminToken) return;
@@ -661,20 +796,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (kind === "grade_detail") {
-        const exams = await apiPost("grade_exams", { token });
-        if (!exams.ok) return showError(exams);
-
-        const items = Array.isArray(exams.items) ? exams.items : [];
-        if (!items.length) {
-          detailResult.innerHTML = "성적 시험 목록이 없습니다.";
-          return;
-        }
-
-        const lastExam = items[items.length - 1].exam;
-        const gd = await apiPost("grade_detail", { token, exam: lastExam });
-        if (!gd.ok) return showError(gd);
-
-        detailResult.innerHTML = renderGradeDetail_(gd);
+        await loadAdminGradeDetailUI_(token);
         return;
       }
 
