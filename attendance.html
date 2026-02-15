@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="ko">
 <head>
@@ -46,34 +47,6 @@
     .summary-title{ font-weight: 900; margin-bottom: 6px; }
     .summary-line{ color: rgba(255,255,255,0.88); }
     .summary-sub{ margin-top: 6px; color: rgba(255,255,255,0.75); font-size: 13px; }
-
-    /* ✅ NEW: 상단 토글 버튼 */
-    .att-controls{
-      display:flex; align-items:center; justify-content:space-between;
-      gap:10px; margin: 8px 0 12px;
-    }
-    .att-controls .left{
-      display:flex; gap:8px; align-items:center; flex-wrap:wrap;
-    }
-    .att-pill{
-      border:1px solid rgba(255,255,255,0.10);
-      background: rgba(255,255,255,0.04);
-      color: rgba(255,255,255,0.90);
-      border-radius: 999px;
-      padding: 8px 12px;
-      font-weight: 800;
-      cursor:pointer;
-      user-select:none;
-    }
-    .att-pill[disabled]{ opacity:.5; cursor:not-allowed; }
-    .att-pill.active{
-      border-color: rgba(120,255,170,0.40);
-      background: rgba(120,255,170,0.10);
-    }
-    .att-hint{
-      color: rgba(255,255,255,0.75);
-      font-size: 12px;
-    }
   </style>
 </head>
 
@@ -91,16 +64,6 @@
   <main class="wrap">
     <section class="card">
       <h2 class="card-title">출결 기록</h2>
-
-      <!-- ✅ NEW: 오늘만/전체보기 토글 -->
-      <div class="att-controls">
-        <div class="left">
-          <button id="btnToday" class="att-pill active" type="button">오늘만</button>
-          <button id="btnAll" class="att-pill" type="button" style="display:none;">전체보기</button>
-          <span id="modeHint" class="att-hint"></span>
-        </div>
-      </div>
-
       <p id="loading" class="muted">불러오는 중...</p>
       <p id="err" class="msg"></p>
 
@@ -135,6 +98,7 @@
       return "";
     }
 
+    // ✅ dates가 "문자열"이든 "객체({md,dow,iso})"든 통일해서 쓰기
     function normalizeDates(datesRaw) {
       const dayMap = {
         Mon: "월", Tue: "화", Wed: "수", Thu: "목", Fri: "금", Sat: "토", Sun: "일",
@@ -142,13 +106,15 @@
       };
 
       return (datesRaw || []).map(d => {
+        // 객체 형태
         if (d && typeof d === "object") {
-          const md = String(d.md ?? "").trim();
-          const dow = String(d.dow ?? "").trim();
-          const iso = String(d.iso ?? "").trim();
+          const md = String(d.md ?? "").trim();   // "2/2"
+          const dow = String(d.dow ?? "").trim(); // "월"
+          const iso = String(d.iso ?? "").trim(); // "2026-02-02"
           return { md, dow: (dayMap[dow] || dow), iso };
         }
 
+        // 문자열 형태: "2/2 (Mon)" 같은 기존 포맷
         const s = String(d ?? "").trim();
         const m = s.match(/^(.+?)\s*\((.+?)\)\s*$/);
         if (m) {
@@ -156,6 +122,7 @@
           const dow = (dayMap[m[2]] || m[2]);
           return { md, dow, iso: "" };
         }
+        // "2/2"만 있는 경우
         return { md: s, dow: "", iso: "" };
       });
     }
@@ -173,13 +140,14 @@
 
     function mondayOf(d) {
       const x = new Date(d);
-      const day = x.getDay();
+      const day = x.getDay(); // 0=Sun..6=Sat
       const diff = (day === 0 ? -6 : 1 - day);
       x.setDate(x.getDate() + diff);
       x.setHours(0,0,0,0);
       return x;
     }
 
+    // ✅ 결석 카운트 조건: 스케줄 공란 + 결석만
     function isCountedAbsence(schedule, statusText) {
       if (statusText !== "결석") return false;
       return String(schedule ?? "").trim() === "";
@@ -193,17 +161,16 @@
       const rows = data.rows || [];
       const todayIso = data.todayIso || "";
 
-      if (!datesNorm.length || !rows.length || !todayIso) {
-        box.style.display = "none";
-        return;
-      }
+      if (!datesNorm.length || !rows.length || !todayIso) return;
 
       const today = parseIso(todayIso);
       today.setHours(0,0,0,0);
 
+      // 이번 주: 오늘이 속한 주(월~일)
       const weekStart = mondayOf(today);
       const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
 
+      // 이번 주 + 오늘(미래 제외) 컬럼만 선택 (iso가 있을 때만 정확히 필터)
       const weekIdx = [];
       datesNorm.forEach((d, i) => {
         if (!d.iso) return;
@@ -212,14 +179,11 @@
         if (dd >= weekStart && dd <= weekEnd && dd <= today) weekIdx.push(i);
       });
 
-      if (!weekIdx.length) {
-        box.style.display = "none";
-        return;
-      }
+      if (!weekIdx.length) return;
 
       let present = 0;
       let absent = 0;
-      const absEvents = [];
+      const absEvents = []; // {idx, period}
 
       for (const r of rows) {
         const period = r.period || "";
@@ -239,6 +203,7 @@
         }
       }
 
+      // 최근 결석: 오늘 기준 과거 중 최신(인덱스가 뒤일수록 최근이라고 가정)
       absEvents.sort((a,b) => b.idx - a.idx);
       const top2 = absEvents.slice(0, 2);
 
@@ -255,53 +220,18 @@
     }
 
     // ==============================
-    // ✅ 이동 데이터로 스케줄 공백 채우기 (네가 준 로직 그대로)
+    // ✅ 이동 데이터로 스케줄 공백 채우기
     // ==============================
 
-    const PERIODS = [
-      { p: 1, start: "08:00", end: "08:30" },
-      { p: 2, start: "08:50", end: "10:10" },
-      { p: 3, start: "10:30", end: "12:00" },
-      { p: 4, start: "13:10", end: "14:30" },
-      { p: 5, start: "14:50", end: "15:50" },
-      { p: 6, start: "16:10", end: "17:30" },
-      { p: 7, start: "18:40", end: "20:10" },
-      { p: 8, start: "20:30", end: "22:00" },
-    ];
-
-    function hhmmToMin(t) {
-      const m = String(t ?? "").trim().match(/^(\d{1,2}):(\d{2})$/);
-      if (!m) return NaN;
-      const h = Number(m[1]), mm = Number(m[2]);
-      if (!Number.isFinite(h) || !Number.isFinite(mm)) return NaN;
-      return h * 60 + mm;
-    }
-
-    function inferStartPeriodByTime(timeHHMM) {
-      const t = hhmmToMin(timeHHMM);
-      if (!Number.isFinite(t)) return 0;
-
-      for (let i = 0; i < PERIODS.length; i++) {
-        const cur = PERIODS[i];
-        const s = hhmmToMin(cur.start);
-        const e = hhmmToMin(cur.end);
-
-        if (t >= s && t <= e) return cur.p;
-
-        const next = PERIODS[i+1];
-        if (next) {
-          const ns = hhmmToMin(next.start);
-          if (t > e && t < ns) return next.p;
-        }
-      }
-      return 0;
-    }
-
+    // move_detail의 date 포맷이 무엇이든 ISO(YYYY-MM-DD)로 정규화
     function normalizeMoveDateToIso(dateVal) {
       const s = String(dateVal ?? "").trim();
       if (!s) return "";
+
+      // 이미 ISO
       if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
 
+      // "2026. 2. 10" / "2026.2.10" / "2026/2/10" 등
       let m = s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
       if (m) {
         const y = m[1];
@@ -309,35 +239,35 @@
         const dd = String(m[3]).padStart(2, "0");
         return `${y}-${mm}-${dd}`;
       }
+
+      // "02/10" 같은 md 형태만 오는 경우는 attendance의 iso가 없으면 매칭 불가(일단 빈값)
       return "";
     }
 
+    // 이동 기록을 map[iso][period] = reason 으로 변환
     function buildMoveMap(moveItems) {
-      const map = {};
+      const map = {}; // { [iso]: { [period]: reason } }
 
       for (const it of (moveItems || [])) {
         const iso = normalizeMoveDateToIso(it.date);
         const reason = String(it.reason ?? "").trim();
-        const rp = Number(it.returnPeriod ?? 0);
-        const time = String(it.time ?? "").trim();
+        const rp = Number(it.returnPeriod ?? 0); // 복귀교시
 
         if (!iso || !reason || !rp) continue;
 
         map[iso] ||= {};
 
-        const sp = inferStartPeriodByTime(time);
-        const from = sp > 0 ? sp : Math.max(1, rp - 1);
+        // ✅ 룰: 복귀교시 rp이면 (rp-1)~rp 교시에 reason 채움
+        const from = Math.max(1, rp - 1);
         const to = rp;
-
-        const f = (from <= to) ? from : Math.max(1, rp - 1);
-
-        for (let p = f; p <= to; p++) {
+        for (let p = from; p <= to; p++) {
           map[iso][p] = reason;
         }
       }
       return map;
     }
 
+    // attendance 그리드의 스케줄 공백만 이동 사유로 채움
     function applyMoveToAttendance(attData, datesNorm, moveMap) {
       const rows = attData.rows || [];
       const isoByIdx = (datesNorm || []).map(d => String(d.iso || "").trim());
@@ -353,6 +283,7 @@
           const c = cells[i] || {};
           const sched = String(c.s ?? "").trim();
 
+          // ✅ 공백(또는 "-")만 채우기
           const isEmptySched = (sched === "" || sched === "-");
           if (!isEmptySched) continue;
 
@@ -369,150 +300,7 @@
       return attData;
     }
 
-    // ==============================
-    // ✅ NEW: 오늘만/전체보기 로딩
-    // ==============================
-    const btnToday = document.getElementById("btnToday");
-    const btnAll   = document.getElementById("btnAll");
-    const modeHint = document.getElementById("modeHint");
-
-    function setModeUI(isTodayOnly, canExpand, todayIso) {
-      btnToday.classList.toggle("active", isTodayOnly);
-      btnAll.classList.toggle("active", !isTodayOnly);
-
-      // todayOnly일 때만 "전체보기" 버튼 노출(펼칠 게 있을 때만)
-      btnAll.style.display = (isTodayOnly && canExpand) ? "" : (isTodayOnly ? "none" : "");
-
-      if (isTodayOnly) {
-        modeHint.textContent = todayIso ? `서버 기준 오늘(${todayIso})만 표시 중` : `오늘만 표시 중`;
-      } else {
-        modeHint.textContent = `전체 출결 표시 중`;
-      }
-    }
-
-    function renderAttendanceTable(data, datesNorm) {
-      const thead = document.getElementById("thead");
-      const tbody = document.getElementById("tbody");
-
-      const rows = data.rows || [];
-
-      const topCells = datesNorm.map(d => `
-        <th class="sticky-top day-head" colspan="2">
-          <div>${d.md || ""}</div>
-          <div class="sub-head">${d.dow || ""}</div>
-        </th>
-      `).join("");
-
-      const subCells = datesNorm.map(() => `
-        <th class="sticky-top sub-head">스케줄</th>
-        <th class="sticky-top sub-head">출/결</th>
-      `).join("");
-
-      thead.innerHTML = `
-        <tr>
-          <th class="sticky-corner sticky-top col-period">교시</th>
-          ${topCells}
-        </tr>
-        <tr>
-          <th class="sticky-corner sticky-top col-period"></th>
-          ${subCells}
-        </tr>
-      `;
-
-      if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td style="padding:10px;">기록이 없습니다.</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = rows.map(r => {
-        const tds = (r.cells || []).map(cell => {
-          const sched = String(cell?.s ?? "").trim();
-          const status = attText(cell?.a);
-          const cls = statusClass(status);
-
-          const schedHtml = sched
-            ? `<div class="sched-text" title="${sched}">${sched}</div>`
-            : `<div class="sched-muted"> </div>`;
-
-          const statusHtml = status ? status : "-";
-
-          return `
-            <td class="col-sched">${schedHtml}</td>
-            <td class="col-status ${cls}">${statusHtml}</td>
-          `;
-        }).join("");
-
-        return `
-          <tr>
-            <td class="sticky-left col-period">${r.period || ""}</td>
-            ${tds}
-          </tr>
-        `;
-      }).join("");
-    }
-
-    async function loadAttendance(onlyToday) {
-      const loading = document.getElementById("loading");
-      const err = document.getElementById("err");
-      const weeklyBox = document.getElementById("weeklySummary");
-
-      err.textContent = "";
-      loading.textContent = "불러오는 중...";
-      weeklyBox.style.display = "none";
-
-      const raw = sessionStorage.getItem("parent_session_v1");
-      const session = raw ? JSON.parse(raw) : null;
-      if (!session) return;
-
-      try {
-        // 1) 출결 호출 (✅ onlyToday 옵션)
-        const res = await fetch(`${API_BASE}?path=attendance`, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ token: session.token, onlyToday: !!onlyToday })
-        });
-
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.error || "불러오기 실패");
-
-        const datesNorm = normalizeDates(data.dates);
-
-        // 2) 이동 호출 + 공백 채우기 (기존 로직 유지)
-        try {
-          const moveRes = await fetch(`${API_BASE}?path=move_detail`, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({ token: session.token, days: 60 })
-          });
-          const moveData = await moveRes.json();
-          if (moveData && moveData.ok) {
-            const moveMap = buildMoveMap(moveData.items || []);
-            applyMoveToAttendance(data, datesNorm, moveMap);
-          }
-        } catch (_) {}
-
-        loading.textContent = "";
-
-        // ✅ 주간 요약은 "전체보기"일 때만 보여주는 게 자연스러움(원하면 todayOnly에서도 켤 수 있음)
-        if (!onlyToday) {
-          buildWeeklySummary(data, datesNorm);
-        } else {
-          weeklyBox.style.display = "none";
-        }
-
-        // ✅ UI 상태 반영
-        setModeUI(!!onlyToday, !!data.canExpand, data.todayIso || "");
-
-        // ✅ 렌더
-        renderAttendanceTable(data, datesNorm);
-
-      } catch (e) {
-        loading.textContent = "";
-        err.textContent = e.message || String(e);
-      }
-    }
-
-    (function init() {
+    (async function () {
       const raw = sessionStorage.getItem("parent_session_v1");
       const session = raw ? JSON.parse(raw) : null;
       if (!session) return;
@@ -520,16 +308,111 @@
       document.getElementById("titleLine").textContent =
         `${session.studentName} (${session.seat || ""}${session.teacher ? " · " + session.teacher + " 담임" : ""})`;
 
-      // ✅ 기본: 오늘만
-      loadAttendance(true);
+      const loading = document.getElementById("loading");
+      const err = document.getElementById("err");
+      const thead = document.getElementById("thead");
+      const tbody = document.getElementById("tbody");
 
-      // ✅ 버튼 이벤트
-      btnToday.addEventListener("click", () => {
-        loadAttendance(true);
-      });
-      btnAll.addEventListener("click", () => {
-        loadAttendance(false);
-      });
+      try {
+        // 1) 출결 상세 가져오기
+        const res = await fetch(`${API_BASE}?path=attendance`, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ token: session.token })
+        });
+
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "불러오기 실패");
+
+        const datesNorm = normalizeDates(data.dates);
+        const rows = data.rows || [];
+
+        // 2) 이동 상세도 가져와서(표 범위에 맞춰) 스케줄 공백 채우기
+        //    - attendance가 iso를 주는 경우에만 정확히 매칭됨
+        //    - days는 넉넉하게 60일로 (원하면 더 줄여도 됨)
+        try {
+          const moveRes = await fetch(`${API_BASE}?path=move_detail`, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ token: session.token, days: 60 })
+          });
+          const moveData = await moveRes.json();
+
+          if (moveData && moveData.ok) {
+            const moveMap = buildMoveMap(moveData.items || []);
+            applyMoveToAttendance(data, datesNorm, moveMap);
+          }
+        } catch (_) {
+          // 이동 불러오기 실패해도 출결 표는 정상 출력되게 그냥 무시
+        }
+
+        loading.textContent = "";
+
+        // ✅ 이번 주 요약(오늘 기준 미래 제외) - "이동 사유로 채운 스케줄" 반영됨
+        buildWeeklySummary(data, datesNorm);
+
+        // ===== 헤더(2행) =====
+        const topCells = datesNorm.map(d => {
+          return `
+            <th class="sticky-top day-head" colspan="2">
+              <div>${d.md || ""}</div>
+              <div class="sub-head">${d.dow || ""}</div>
+            </th>
+          `;
+        }).join("");
+
+        const subCells = datesNorm.map(() => `
+          <th class="sticky-top sub-head">스케줄</th>
+          <th class="sticky-top sub-head">출/결</th>
+        `).join("");
+
+        thead.innerHTML = `
+          <tr>
+            <th class="sticky-corner sticky-top col-period">교시</th>
+            ${topCells}
+          </tr>
+          <tr>
+            <th class="sticky-corner sticky-top col-period"></th>
+            ${subCells}
+          </tr>
+        `;
+
+        if (rows.length === 0) {
+          tbody.innerHTML = `<tr><td style="padding:10px;">기록이 없습니다.</td></tr>`;
+          return;
+        }
+
+        // ===== 바디 =====
+        tbody.innerHTML = rows.map(r => {
+          const tds = (r.cells || []).map(cell => {
+            const sched = String(cell?.s ?? "").trim();
+            const status = attText(cell?.a);
+            const cls = statusClass(status);
+
+            const schedHtml = sched
+              ? `<div class="sched-text" title="${sched}">${sched}</div>`
+              : `<div class="sched-muted"> </div>`;
+
+            const statusHtml = status ? status : "-";
+
+            return `
+              <td class="col-sched">${schedHtml}</td>
+              <td class="col-status ${cls}">${statusHtml}</td>
+            `;
+          }).join("");
+
+          return `
+            <tr>
+              <td class="sticky-left col-period">${r.period || ""}</td>
+              ${tds}
+            </tr>
+          `;
+        }).join("");
+
+      } catch (e) {
+        loading.textContent = "";
+        err.textContent = e.message || String(e);
+      }
     })();
   </script>
 </body>
