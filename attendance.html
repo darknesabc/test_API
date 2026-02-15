@@ -55,6 +55,24 @@
     table.att.one-day th.col-status, table.att.one-day td.col-status { width: 30%; }
   
     .col-period{ cursor:help; }
+  
+    /* ===== 교시 시간 (1안): 교시 셀 안에서 표시 (겹침 없음) ===== */
+    #periodHint{ display:none !important; } /* 기존 힌트바 숨김 */
+    .col-period { cursor: default; }
+    .period-num { font-weight: 900; line-height: 1.1; }
+    .period-time {
+      margin-top: 4px;
+      font-size: 12px;
+      opacity: 0;
+      transform: translateY(-2px);
+      transition: opacity .15s ease, transform .15s ease;
+      color: rgba(255,255,255,0.65);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .col-period:hover .period-time { opacity: 1; transform: translateY(0); }
+    .col-period.show-time .period-time { opacity: 1; transform: translateY(0); }
+
   </style>
 </head>
 
@@ -300,7 +318,7 @@
 
         return `
           <tr>
-            <td class="sticky-left col-period" data-period="${r.period || ""}">${r.period || ""}</td>
+            <td class="sticky-left col-period" data-period="${r.period || ""}"><div class="period-num">${r.period || ""}</div><div class="period-time">${periodRangeText(r.period || "")}</div></td>
             ${tds}
           </tr>
         `;
@@ -568,13 +586,38 @@
         setupToggleButton();
         renderTable(data, datesNorm);
 
-        // ✅ 교시 힌트 이벤트 바인딩
-        try { bindPeriodHintEvents(); } catch(_) {}
+        // ✅ 교시 시간(1안) 이벤트 바인딩
+        try { bindPeriodInlineTime(); } catch(_) {}
 
       } catch (e) {
         showError(e.message || String(e));
       }
     })();
-  </script>
+
+    // ===== 교시 시간(1안) 헬퍼 =====
+    function periodRangeText(p){
+      const it = PERIODS.find(x => x.p === Number(p));
+      return it ? `${it.start} ~ ${it.end}` : "";
+    }
+
+    function bindPeriodInlineTime(){
+      const tbody = document.getElementById("tbody");
+      if (!tbody) return;
+
+      // 모바일: 터치 시 2초간 표시
+      const cells = tbody.querySelectorAll('td.col-period[data-period]');
+      cells.forEach(td => {
+        if (td.__periodInlineBound) return;
+        td.__periodInlineBound = true;
+
+        td.addEventListener("click", () => {
+          td.classList.add("show-time");
+          clearTimeout(td.__periodInlineTimer);
+          td.__periodInlineTimer = setTimeout(() => td.classList.remove("show-time"), 2000);
+        }, { passive:true });
+      });
+    }
+
+</script>
 </body>
 </html>
