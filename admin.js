@@ -231,24 +231,97 @@ function saveLocalCache_(obj) {
   } catch (_) {}
 }
 
+
+// ✅ 요약 캐시 유효성 검사 (빈/깨진 캐시로 '데이터 없음' 고착 방지)
+function isValidSummaryForCache(summary) {
+  if (!summary || typeof summary !== "object") return false;
+
+  // summary가 실제 데이터(숫자/문자/배열/객체)를 담고 있는지 느슨하게 판단
+  const hasMeaningful = (v) => {
+    if (v === null || v === undefined) return false;
+    if (typeof v === "number") return true;              // 0도 의미가 있을 수 있으니 true
+    if (typeof v === "string") return v.trim().length > 0;
+    if (Array.isArray(v)) return v.length > 0;
+    if (typeof v === "object") {
+      // 너무 깊게 가지 않고 1단계만 검사
+      const ks = Object.keys(v);
+      if (ks.length === 0) return false;
+      for (const k of ks) {
+        if (hasMeaningful(v[k])) return true;
+      }
+      return false;
+    }
+    if (typeof v === "boolean") return true;
+    return false;
+  };
+
+  // 자주 쓰는 섹션들 우선 확인
+  const sections = ["attendance", "sleep", "move", "eduscore", "grade"];
+  for (const k of sections) {
+    if (summary[k] && typeof summary[k] === "object" && hasMeaningful(summary[k])) return true;
+  }
+
+  // 학생 기본정보라도 있으면(좌석/이름/학번) 캐시로 인정
+  if (summary.student && typeof summary.student === "object" && hasMeaningful(summary.student)) return true;
+
+  // 그 외: 전체 스캔(1단계)로 의미 있는 값이 있는지
+  return hasMeaningful(summary);
+}
+
+function clearSummaryCache(key) {
+  __memSummaryCache.delete(key);
+  try {
+    const store = loadLocalCache_();
+    if (store && store[key]) {
+      delete store[key];
+      saveLocalCache_(store);
+    }
+  } catch (_) {}
+}
+
+function clearAllSummaryCache() {
+  __memSummaryCache.clear();
+  try { localStorage.removeItem(SUMMARY_CACHE_KEY); } catch (_) {}
+}
 function getSummaryCache(key) {
   const now = Date.now();
 
   // 1) 메모리 캐시
   const mem = __memSummaryCache.get(key);
-  if (mem && mem.expireAt > now && mem.summary) return mem.summary;
+  if (mem) {
+    if (mem.expireAt <= now) {
+      __memSummaryCache.delete(key);
+    } else if (mem.summary && isValidSummaryForCache(mem.summary)) {
+      return mem.summary;
+    } else {
+      // 깨진/빈 캐시 제거
+      __memSummaryCache.delete(key);
+    }
+  }
 
   // 2) localStorage 캐시
   const store = loadLocalCache_();
-  const it = store[key];
-  if (it && it.expireAt > now && it.summary) {
-    __memSummaryCache.set(key, it);
-    return it.summary;
+  const it = store ? store[key] : null;
+  if (it) {
+    if (it.expireAt <= now) {
+      // 만료 제거
+      try { delete store[key]; saveLocalCache_(store); } catch (_) {}
+      return null;
+    }
+    if (it.summary && isValidSummaryForCache(it.summary)) {
+      __memSummaryCache.set(key, it);
+      return it.summary;
+    }
+    // 깨진/빈 캐시 제거
+    try { delete store[key]; saveLocalCache_(store); } catch (_) {}
   }
   return null;
 }
 
 function setSummaryCache(key, summary) {
+  // ✅ 빈/깨진 summary는 캐시에 저장하지 않음 (데이터 없음 고착 방지)
+  if (!isValidSummaryForCache(summary)) return;
+
   const now = Date.now();
   const pack = {
     expireAt: now + SUMMARY_CACHE_TTL_MS,
@@ -259,15 +332,26 @@ function setSummaryCache(key, summary) {
   const store = loadLocalCache_();
   store[key] = pack;
 
-  // 너무 커지는 것 방지: 만료된 것 정리
-  for (const k of Object.keys(store)) {
-    if (!store[k] || store[k].expireAt <= now) delete store[k];
-  }
+  // store 정리(만료/깨진 항목 제거)
+  try {
+    for (const k of Object.keys(store)) {
+      const it = store[k];
+      if (!it || (it.expireAt && it.expireAt <= now) || !isValidSummaryForCache(it.summary)) {
+        delete store[k];
+      }
+    }
+  } catch (_) {}
+
   saveLocalCache_(store);
 }
 
 // ====== init ======
 document.addEventListener("DOMContentLoaded", () => {
+  // ✅ 캐시 꼬였을 때: URL에 ?nocache=1 붙이면 요약 캐시 초기화
+  try {
+    const sp = new URLSearchParams(location.search);
+    if (sp.get("nocache") === "1") clearAllSummaryCache();
+  } catch (_) {}
   // elements
   const loginCard = $("loginCard");
   const adminArea = $("adminArea");
