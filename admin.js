@@ -266,24 +266,8 @@ function setSummaryCache(key, summary) {
   saveLocalCache_(store);
 }
 
-
-function injectSelectOptionStyles_() {
-  if (document.getElementById("adminSelectOptionStyles")) return;
-  const style = document.createElement("style");
-  style.id = "adminSelectOptionStyles";
-  style.textContent = `
-    /* 드롭다운 옵션 글씨가 안 보이는 문제 방지 */
-    select option {
-      color: #111 !important;
-      background: #fff !important;
-    }
-  `;
-  document.head.appendChild(style);
-}
-
 // ====== init ======
 document.addEventListener("DOMContentLoaded", () => {
-  injectSelectOptionStyles_();
   // elements
   const loginCard = $("loginCard");
   const adminArea = $("adminArea");
@@ -480,26 +464,24 @@ document.addEventListener("DOMContentLoaded", () => {
     summary.move       = (mv.status === "fulfilled")  ? mv.value  : { ok:false, error:String(mv.reason || "") };
     summary.eduscore   = (edu.status === "fulfilled") ? edu.value : { ok:false, error:String(edu.reason || "") };
 
-    // 성적 요약 (✅ 학부모 대시보드와 동일: 시험목록 + grade_summary 표)
+    // 성적 요약
     try {
       const exams = await apiPost("grade_exams", { token });
       if (exams.ok && Array.isArray(exams.items) && exams.items.length) {
-        summary.gradeExams = exams.items; // [{exam,label,sheetName,...}]
-        const last = exams.items[exams.items.length - 1];
-        const lastExam = last.exam;
-        const gs = await apiPost("grade_summary", { token, exam: lastExam });
-        summary.grade = gs.ok ? { ok:true, exam:lastExam, sheetName: gs.sheetName || last.label || last.sheetName || lastExam, subjects: gs.subjects || {} }
-                              : { ok:false, error: gs.error || "grade_summary 실패" };
+        const lastExam = exams.items[exams.items.length - 1].exam;
+        const gd = await apiPost("grade_detail", { token, exam: lastExam });
+        summary.grade = gd.ok ? {
+          ok: true,
+          sheetName: gd.sheetName,
+          kor: gd.subjects?.kor,
+          math: gd.subjects?.math,
+          eng: gd.subjects?.eng,
+        } : { ok:false, error: gd.error || "grade_detail 실패" };
       } else {
-        summary.gradeExams = [];
         summary.grade = { ok:false, error:"시험 목록 없음" };
       }
     } catch (e) {
-      summary.gradeExams = [];
       summary.grade = { ok:false, error: e?.message || "성적 오류" };
-    }
-
-;
     }
 
     return summary;
@@ -664,33 +646,13 @@ document.addEventListener("DOMContentLoaded", () => {
         <section class="card" style="padding:14px;">
           <div class="card-title" style="font-size:15px;">성적 요약</div>
           <div class="card-sub">
-            ${(() => {
-            if (loading) return "불러오는 중…";
-            if (!grd || !grd.ok) return "데이터 없음";
-
-            const exams = Array.isArray(summary.gradeExams) ? summary.gradeExams : [];
-            const rows = buildGradeTableRows_(grd.subjects || {});
-            const currentExam = grd.exam || (exams[exams.length - 1] && exams[exams.length - 1].exam) || "";
-
-            const options = exams.length
-              ? exams.map(it => {
-                  const val = String(it.exam || "");
-                  const label = String(it.label || it.sheetName || it.name || it.exam || "");
-                  const sel = (val === currentExam) ? "selected" : "";
-                  return `<option value="${escapeHtml(val)}" ${sel}>${escapeHtml(label)}</option>`;
-                }).join("")
-              : `<option value="${escapeHtml(currentExam)}" selected>${escapeHtml(grd.sheetName || currentExam)}</option>`;
-
-            return `
-              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;">
-                <div style="opacity:.85;">${escapeHtml(grd.sheetName || "")}</div>
-                <select id="gradeSummarySelect" style="padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06); color:rgba(255,255,255,.92);">
-                  ${options}
-                </select>
-              </div>
-              ${renderGradeTableHtml_(rows)}
-            `;
-          })()} </div>
+            ${grd && grd.ok ? `
+              (${escapeHtml(grd.sheetName || "")})<br>
+              국어: <b>${grd.kor?.raw_total ?? grd.kor?.raw ?? "-"}</b> / 등급 <b>${grd.kor?.grade ?? "-"}</b><br>
+              수학: <b>${grd.math?.raw_total ?? grd.math?.raw ?? "-"}</b> / 등급 <b>${grd.math?.grade ?? "-"}</b><br>
+              영어: <b>${grd.eng?.raw ?? "-"}</b> / 등급 <b>${grd.eng?.grade ?? "-"}</b>
+            ` : (loading ? "불러오는 중…" : "데이터 없음")}
+          </div>
         </section>
       </div>
     `;
@@ -701,32 +663,6 @@ document.addEventListener("DOMContentLoaded", () => {
     $("btnMoveDetail").addEventListener("click", () => loadDetail("move_detail"));
     $("btnEduDetail").addEventListener("click", () => loadDetail("eduscore_detail"));
     $("btnGradeDetail").addEventListener("click", () => loadDetail("grade_detail"));
-
-    // ✅ 성적 요약 드롭다운 변경 시 (학부모와 동일 기준) 다시 로드
-    const sel = document.getElementById("gradeSummarySelect");
-    if (sel) {
-      sel.addEventListener("change", async () => {
-        try {
-          const sKey = __activeStudentKey;
-          if (!sKey) return;
-          const token = (__lastIssuedTokenByStudentKey && __lastIssuedTokenByStudentKey[sKey]) ? __lastIssuedTokenByStudentKey[sKey] : null;
-          if (!token) return;
-          const exam = sel.value;
-          const gs = await apiPost("grade_summary", { token, exam });
-          if (!gs.ok) return;
-          // 현재 카드만 업데이트
-          const card = sel.closest(".card");
-          if (!card) return;
-          const sub = card.querySelector(".card-sub");
-          if (!sub) return;
-          const rows = buildGradeTableRows_(gs.subjects || {});
-          // sheetName 라인과 select는 유지하고, 테이블만 교체
-          const tableWrap = sub.querySelector("div[style*=\"overflow:auto;\"]");
-          if (tableWrap) tableWrap.outerHTML = renderGradeTableHtml_(rows);
-        } catch (_) {}
-      });
-    }
-
   }
 
   
