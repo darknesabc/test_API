@@ -15,6 +15,75 @@
 // ✅ 여기에 Apps Script Web App URL(…/exec) 넣기
 const API_BASE = "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec";
 
+/** =========================
+ * ✅ 출결(관리자) - 학부모 출결 상세와 동일한 "이동 기록 반영" 로직
+ * - 스케줄 공란인 교시는 move_detail(이동) 사유로 채워서 표시/집계 기준을 동일하게 맞춤
+ * ========================= */
+const PERIODS_ATT_ = [
+  { p: 1, start: "08:00", end: "08:30" },
+  { p: 2, start: "08:50", end: "10:10" },
+  { p: 3, start: "10:30", end: "12:00" },
+  { p: 4, start: "13:10", end: "14:30" },
+  { p: 5, start: "14:50", end: "15:50" },
+  { p: 6, start: "16:10", end: "17:30" },
+  { p: 7, start: "18:40", end: "20:10" },
+  { p: 8, start: "20:30", end: "22:00" },
+];
+
+function hhmmToMin_(t) {
+  const m = String(t || "").trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return NaN;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+function inferStartPeriodByTime_(timeHHMM) {
+  const t = hhmmToMin_(timeHHMM);
+  if (!Number.isFinite(t)) return 0;
+
+  for (let i = 0; i < PERIODS_ATT_.length; i++) {
+    const cur = PERIODS_ATT_[i];
+    const s = hhmmToMin_(cur.start);
+    const e = hhmmToMin_(cur.end);
+
+    if (t >= s && t <= e) return cur.p;
+
+    const next = PERIODS_ATT_[i + 1];
+    if (next) {
+      const ns = hhmmToMin_(next.start);
+      if (t > e && t < ns) return next.p;
+    }
+  }
+  return 0;
+}
+
+// moveMap[iso][period] = reason
+function buildMoveMapFromItems_(items) {
+  const map = {};
+  const arr = Array.isArray(items) ? items : [];
+  for (const it of arr) {
+    const iso = String(it?.date || "").trim();
+    if (!iso) continue;
+
+    const time = String(it?.time || "").trim();           // "HH:MM"
+    const reason = String(it?.reason || "").trim();
+    const rp = parseInt(String(it?.returnPeriod || "").trim(), 10) || 0;
+
+    if (!reason || rp <= 0) continue;
+
+    const sp = inferStartPeriodByTime_(time); // 0이면 추정불가
+    const from = sp > 0 ? sp : Math.max(1, rp - 1);
+    const to = rp;
+    const start = (from <= to) ? from : Math.max(1, rp - 1);
+
+    map[iso] = map[iso] || {};
+    for (let p = start; p <= to; p++) {
+      map[iso][p] = reason;
+    }
+  }
+  return map;
+}
+
+
 const ADMIN_SESSION_KEY = "admin_session_v1";
 
 // ====== 캐시 설정 ======
@@ -551,9 +620,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const token = await issueStudentToken_(seat, studentId);
 
       if (kind === "attendance") {
-        const data = await apiPost("attendance", { token });
-        if (!data.ok) return showError(data);
-        detailResult.innerHTML = renderAttendanceDetail_(data);
+        // ✅ 학부모 출결 상세와 동일 기준을 위해 이동(move_detail)도 함께 조회해서 스케줄 공란을 채웁니다.
+        const [att, mv] = await Promise.all([
+          apiPost("attendance", { token }),
+          apiPost("move_detail", { token, days: 14 }),
+        ]);
+
+        if (!att.ok) return showError(att);
+        const moveMap = (mv && mv.ok) ? buildMoveMapFromItems_(mv.items) : {};
+
+        detailResult.innerHTML = renderAttendanceDetail_(att, moveMap);
         return;
       }
 
@@ -631,7 +707,7 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
   }
 
- function renderAttendanceDetail_(data) {
+ function renderAttendanceDetail_(data, moveMap) {
   const dates = data.dates || [];
   const rows = data.rows || [];
   if (!dates.length || !rows.length) return "출결 상세 데이터가 없습니다.";
@@ -661,7 +737,6 @@ function mapAttendance_(val) {
     const t = (t0 === "1") ? "출석" : (t0 === "3") ? "결석" : t0;
     if (!t || t === "-" ) return "opacity:.55;";
     if (t.includes("출석")) return "background: rgba(46, 204, 113, .22);";
-    if (t.includes("결석(미집계)")) return "background: rgba(255,255,255,.06); opacity:.75;";
     if (t.includes("결석")) return "background: rgba(231, 76, 60, .22);";
     if (t.includes("지각")) return "background: rgba(241, 196, 15, .22);";
     if (t.includes("조퇴")) return "background: rgba(155, 89, 182, .22);";
@@ -696,17 +771,15 @@ function mapAttendance_(val) {
     const tds = lastIdx.map(i => {
       const c = cells[i] || {};
       const sRaw = String(c.s ?? "").trim();  // 스케줄(원본)
+      const iso = String(d?.iso || "").trim();
+      const mvReason = (moveMap && moveMap[iso] && moveMap[iso][r.period]) ? String(moveMap[iso][r.period]) : "";
+      const s = sRaw || mvReason; // ✅ 스케줄 공란이면 이동 사유로 채움
       const aRaw = String(c.a ?? "").trim();   // 원본(1/3 등)
-      let aText = mapAttendance_(aRaw);        // 표시용(출석/결석)
-
-      // ✅ 요약과 동일 기준: 스케줄이 있는 결석(3)은 집계 제외 → "결석(미집계)"로 표기
-      if (aRaw === "3" && sRaw) {
-        aText = "결석(미집계)";
-      }
+      const aText = mapAttendance_(aRaw);      // 표시용(출석/결석)
 
       return `
         <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
-          ${escapeHtml(sRaw || "-")}
+          ${escapeHtml(s || "-")}
         </td>
         <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap; ${statusStyle_(aText)}">
           ${escapeHtml(aText)}
@@ -726,10 +799,6 @@ function mapAttendance_(val) {
 
   // ====== 최종 테이블 ======
   return `
-    <div style="margin:8px 0 10px; opacity:.8; font-size:13px;">
-      * 결석 집계는 <b>스케줄 공란 + 결석(3)</b>만 포함합니다. (오늘 기준, 미래 교시 제외)
-      <span style="margin-left:8px; opacity:.75;">※ 스케줄이 있는 결석은 <b>결석(미집계)</b>로 표시</span>
-    </div>
     <div style="overflow:auto; border-radius:14px; border:1px solid rgba(255,255,255,.08);">
       <table style="width:max-content; min-width:100%; border-collapse:separate; border-spacing:0; font-size:14px;">
         <thead style="background: rgba(255,255,255,.03);">
