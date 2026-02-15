@@ -177,45 +177,6 @@ function renderGradeTableHtml_(rows) {
               <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">${escapeHtml(r.tam2)}</td>
             </tr>
           `).join("")}
-
-
-/**
- * 관리자: 성적 상세(드롭다운)에서 선택된 값을 "성적 요약" 카드에도 동일하게 반영
- * - 요약 카드 DOM(#gradeSummaryBox)이 있을 때만 갱신
- * - 정오표(추후 상세에 추가 예정)는 요약에는 표시하지 않음
- */
-function updateGradeSummaryBoxFromDetail_(grd) {
-  const box = document.getElementById("gradeSummaryBox");
-  if (!box) return;
-  if (!grd) { box.textContent = "데이터 없음"; return; }
-
-  const rows = buildGradeTableRows_({
-    kor: grd.kor || {},
-    math: grd.math || {},
-    eng: grd.eng || {},
-    hist: grd.hist || {},
-    tam1: grd.tam1 || {},
-    tam2: grd.tam2 || {}
-  });
-
-  box.innerHTML = `
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-      <div style="opacity:.9;">(${escapeHtml(grd.sheetName || "")})</div>
-    </div>
-    ${renderGradeTableHtml_(rows)}
-  `;
-}
-
-/** 다크테마에서 select option 글씨가 안보이는 문제 보정 */
-function ensureSelectOptionStyle_() {
-  if (document.getElementById("adminSelectOptionFix")) return;
-  const style = document.createElement("style");
-  style.id = "adminSelectOptionFix";
-  style.textContent = `
-    select option { color:#111 !important; background:#fff !important; }
-  `;
-  document.head.appendChild(style);
-}
         </tbody>
       </table>
     </div>
@@ -386,9 +347,7 @@ function setSummaryCache(key, summary) {
 
 // ====== init ======
 document.addEventListener("DOMContentLoaded", () => {
-  
-  try { ensureSelectOptionStyle_(); } catch(_) {}
-// ✅ 캐시 꼬였을 때: URL에 ?nocache=1 붙이면 요약 캐시 초기화
+  // ✅ 캐시 꼬였을 때: URL에 ?nocache=1 붙이면 요약 캐시 초기화
   try {
     const sp = new URLSearchParams(location.search);
     if (sp.get("nocache") === "1") clearAllSummaryCache();
@@ -770,19 +729,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         <section class="card" style="padding:14px;">
           <div class="card-title" style="font-size:15px;">성적 요약</div>
-          <div class="card-sub" id="gradeSummaryBox">
+          <div class="card-sub">
             ${grd && grd.ok ? `
-              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-                <div style="opacity:.9;">(${escapeHtml(grd.sheetName || "")})</div>
-              </div>
-              ${renderGradeTableHtml_(buildGradeTableRows_({
-                kor: grd.kor || {},
-                math: grd.math || {},
-                eng: grd.eng || {},
-                hist: grd.hist || {},
-                tam1: grd.tam1 || {},
-                tam2: grd.tam2 || {}
-              }))}
+              (${escapeHtml(grd.sheetName || "")})<br>
+              국어: <b>${grd.kor?.raw_total ?? grd.kor?.raw ?? "-"}</b> / 등급 <b>${grd.kor?.grade ?? "-"}</b><br>
+              수학: <b>${grd.math?.raw_total ?? grd.math?.raw ?? "-"}</b> / 등급 <b>${grd.math?.grade ?? "-"}</b><br>
+              영어: <b>${grd.eng?.raw ?? "-"}</b> / 등급 <b>${grd.eng?.grade ?? "-"}</b>
             ` : (loading ? "불러오는 중…" : "데이터 없음")}
           </div>
         </section>
@@ -857,8 +809,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const rows = buildGradeTableRows_(data);
         wrap.innerHTML = renderGradeTableHtml_(rows);
-        try { updateGradeSummaryBoxFromDetail_({ sheetName: data.sheetName || data.examLabel || data.exam || '', kor: data.kor, math: data.math, eng: data.eng, hist: data.hist, tam1: data.tam1, tam2: data.tam2 }); } catch(_) {}
-
         wrap.style.display = "block";
         loading.textContent = "";
       } catch (e) {
