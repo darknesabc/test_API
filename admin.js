@@ -346,6 +346,63 @@ function setSummaryCache(key, summary) {
 }
 
 // ====== init ======
+
+
+/** =========================
+ * ✅ 정오표(Errata) 렌더
+ * ========================= */
+function renderErrataHtml_(errata) {
+  if (!errata || !errata.subjects) return "";
+  const s = errata.subjects;
+
+  const join = (arr) => (arr && arr.length) ? arr.join(", ") : "-";
+
+  const line = (label, value) => `
+    <div class="row" style="display:flex; gap:10px; padding:6px 0; border-top:1px solid rgba(255,255,255,0.06);">
+      <div style="width:120px; color:rgba(255,255,255,0.75);">${label}</div>
+      <div style="flex:1;">${value}</div>
+    </div>
+  `;
+
+  const kor = `
+    ${line("국어(공통)", join(s.kor?.common))}
+    ${line("국어(선택)", join(s.kor?.choice))}
+  `;
+  const math = `
+    ${line("수학(공통)", join(s.math?.common))}
+    ${line("수학(선택)", join(s.math?.choice))}
+  `;
+  const eng = `${line("영어", join(s.eng?.all))}`;
+  const tam1Label = s.tam1?.name ? `탐구1(${escapeHtml_(s.tam1.name)})` : "탐구1";
+  const tam2Label = s.tam2?.name ? `탐구2(${escapeHtml_(s.tam2.name)})` : "탐구2";
+  const tams = `
+    ${line(tam1Label, join(s.tam1?.all))}
+    ${line(tam2Label, join(s.tam2?.all))}
+  `;
+
+  const hasAny =
+    (s.kor?.all && s.kor.all.length) ||
+    (s.math?.all && s.math.all.length) ||
+    (s.eng?.all && s.eng.all.length) ||
+    (s.tam1?.all && s.tam1.all.length) ||
+    (s.tam2?.all && s.tam2.all.length);
+
+  return `
+    <div class="card" style="margin-top:14px;">
+      <div class="card-head" style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="font-weight:800;">정오표</div>
+        <div style="color:rgba(255,255,255,0.6); font-size:12px;">${escapeHtml_(String(errata.errataSheetName || ""))}</div>
+      </div>
+      <div class="card-body" style="padding-top:6px;">
+        ${hasAny ? "" : `<div style="color:rgba(255,255,255,0.7); padding:10px 0;">정오표 데이터가 없습니다.</div>`}
+        ${kor}
+        ${math}
+        ${eng}
+        ${tams}
+      </div>
+    </div>
+  `;
+}
 document.addEventListener("DOMContentLoaded", () => {
   // ✅ 셀렉트(옵션) 글씨가 안 보이는 문제 방지
   (function ensureSelectTheme_() {
@@ -869,8 +926,15 @@ return summary;
         const data = await apiPost("grade_summary", { token, exam: String(exam || "") });
         if (!data.ok) throw new Error(data.error || "성적 불러오기 실패");
 
+        // ✅ 정오표(선택)도 같이 조회
+        let errata = null;
+        try {
+          const e2 = await apiPost("grade_errata", { token, exam: String(exam || "") });
+          if (e2 && e2.ok) errata = e2;
+        } catch (_) { /* ignore */ }
+
         const rows = buildGradeTableRows_(data);
-        wrap.innerHTML = renderGradeTableHtml_(rows);
+        wrap.innerHTML = renderGradeTableHtml_(rows) + (errata ? renderErrataHtml_(errata) : "");
         wrap.style.display = "block";
         loading.textContent = "";
       } catch (e) {
