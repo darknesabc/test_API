@@ -53,6 +53,31 @@
     /* ✅ 오늘만(1일) 뷰: 2컬럼(스케줄/출결) 비율 */
     table.att.one-day th.col-sched, table.att.one-day td.col-sched { width: 70%; }
     table.att.one-day th.col-status, table.att.one-day td.col-status { width: 30%; }
+  
+    /* period time tooltip */
+    .period-cell { position: sticky; left: 0; z-index: 2; cursor: help; }
+    .period-cell::after{
+      content: attr(data-time);
+      position: absolute;
+      left: 100%;
+      top: 50%;
+      transform: translate(10px, -50%);
+      padding: 6px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.55);
+      color: rgba(255,255,255,0.95);
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .12s ease;
+    }
+    .period-cell:hover::after,
+    .period-cell.show-tip::after{
+      opacity: 1;
+    }
+
   </style>
 </head>
 
@@ -183,6 +208,34 @@
       return { data: { ...data, rows }, datesNorm: dates };
     }
 
+    
+    function periodTimeRange(p) {
+      const n = Number(p);
+      const obj = (PERIODS || []).find(x => x.p === n);
+      if (!obj) return "";
+      return `${obj.start} ~ ${obj.end}`;
+    }
+
+    function wirePeriodTips() {
+      const cells = document.querySelectorAll(".period-cell");
+      cells.forEach(td => {
+        // 모바일 터치 지원: 누르면 잠깐 표시
+        td.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          td.classList.toggle("show-tip");
+          // 2초 후 자동 해제(원하면 제거 가능)
+          if (td.classList.contains("show-tip")) {
+            setTimeout(() => td.classList.remove("show-tip"), 2000);
+          }
+        }, { passive: true });
+      });
+
+      document.addEventListener("click", () => {
+        document.querySelectorAll(".period-cell.show-tip").forEach(x => x.classList.remove("show-tip"));
+      }, { passive: true });
+    }
+
+
     function setupToggleButton() {
       const btn = document.getElementById("toggleViewBtn");
       if (!btn) return;
@@ -265,11 +318,13 @@
 
         return `
           <tr>
-            <td class="sticky-left col-period">${r.period || ""}</td>
+            <td class="sticky-left col-period period-cell" data-time="${periodTimeRange(r.period)}">${r.period || ""}</td>
             ${tds}
           </tr>
         `;
       }).join("");
+
+      wirePeriodTips();
     }
 
     // ===== 요약 =====
@@ -313,6 +368,14 @@
       });
       if (!weekIdx.length) return;
 
+
+      // ✅ 오늘은 "현재 교시" 이후(미래 교시)는 집계에서 제외
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
+      const curPeriod = inferStartPeriodByTime(`${hh}:${mm}`); // 0이면 아직 수업 전/종료 후
+
+
       let present = 0;
       let absent = 0;
       const absEvents = [];
@@ -324,6 +387,13 @@
           const cell = cells[i] || {};
           const sched = String(cell.s ?? "").trim();
           const status = attText(cell.a);
+
+          // 오늘 날짜의 미래 교시는 제외
+          if (datesNorm[i] && String(datesNorm[i].iso || "").trim() === todayIso) {
+            const pNum = Number(period);
+            if (curPeriod > 0 && pNum > curPeriod) continue;
+            if (curPeriod === 0) continue; // 수업 전/종료 후면 오늘 건은 아직 집계하지 않음
+          }
 
           if (status === "출석") present++;
           if (isCountedAbsence(sched, status)) {
