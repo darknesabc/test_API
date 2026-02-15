@@ -79,11 +79,8 @@
     }
 
   
-    /* PERIOD_TOOLTIP_START */
+    /* PERIOD_HINT */
     .col-period{ cursor:help; }
-    .col-period:active{ opacity:0.9; }
-    /* PERIOD_TOOLTIP_END */
-
   </style>
 </head>
 
@@ -376,6 +373,8 @@
       });
       if (!weekIdx.length) return;
 
+      const curPeriod = getCurrentPeriodForSummary();
+
 
       // ✅ 오늘은 "현재 교시" 이후(미래 교시)는 집계에서 제외
       const now = new Date();
@@ -393,6 +392,12 @@
         const cells = r.cells || [];
         for (const i of weekIdx) {
           const cell = cells[i] || {};
+
+          // ✅ 오늘 날짜는 '현재 교시 이후'는 미래이므로 집계 제외
+          if (datesNorm[i]?.iso === todayIso) {
+            const pNum = Number(period) || 0;
+            if (curPeriod && pNum && pNum > curPeriod) continue;
+          }
           const sched = String(cell.s ?? "").trim();
           const status = attText(cell.a);
 
@@ -425,28 +430,6 @@
     }
 
     // ===== 이동으로 스케줄 공백 채우기(옵션) =====
-    
-    // ===== 교시 시간 힌트(겹침 방지: 테이블 위에 표시) =====
-    function periodTimeText(p){
-      const it = PERIODS.find(x => x.p === Number(p));
-      return it ? `${it.start} ~ ${it.end}` : "";
-    }
-    function showPeriodHint(p){
-      const box = document.getElementById("periodHint");
-      if (!box) return;
-      const t = periodTimeText(p);
-      if (!t) { box.style.display = "none"; return; }
-      box.textContent = `${p}교시  ${t}`;
-      box.style.display = "";
-    }
-    function hidePeriodHint(){
-      const box = document.getElementById("periodHint");
-      if (!box) return;
-      box.style.display = "none";
-      box.textContent = "";
-    }
-
-
     const PERIODS = [
       { p: 1, start: "08:00", end: "08:30" },
       { p: 2, start: "08:50", end: "10:10" },
@@ -457,6 +440,80 @@
       { p: 7, start: "18:40", end: "20:10" },
       { p: 8, start: "20:30", end: "22:00" },
     ];
+
+// ===== 교시 시간 안내(표 위에 표시: 겹침 방지) =====
+function periodTimeText(p){
+  const it = PERIODS.find(x => x.p === Number(p));
+  return it ? `${it.start} ~ ${it.end}` : "";
+}
+function showPeriodHint(p){
+  const box = document.getElementById("periodHint");
+  if (!box) return;
+  const t = periodTimeText(p);
+  if (!t) { box.style.display = "none"; box.textContent=""; return; }
+  box.textContent = `${p}교시  ${t}`;
+  box.style.display = "";
+}
+function hidePeriodHint(){
+  const box = document.getElementById("periodHint");
+  if (!box) return;
+  box.style.display = "none";
+  box.textContent = "";
+}
+function bindPeriodHintEvents(){
+  const tbody = document.getElementById("tbody");
+  if (!tbody) return;
+
+  // 마우스: 올리면 표시 / 나가면 숨김
+  tbody.addEventListener("mouseover", (e) => {
+    const td = e.target.closest && e.target.closest("td.col-period");
+    if (!td) return;
+    const p = td.getAttribute("data-period");
+    if (p) showPeriodHint(p);
+  });
+  tbody.addEventListener("mouseout", (e) => {
+    const td = e.target.closest && e.target.closest("td.col-period");
+    if (!td) return;
+    hidePeriodHint();
+  });
+
+  // 모바일: 터치(클릭)하면 잠깐 표시
+  tbody.addEventListener("click", (e) => {
+    const td = e.target.closest && e.target.closest("td.col-period");
+    if (!td) return;
+    const p = td.getAttribute("data-period");
+    if (!p) return;
+    showPeriodHint(p);
+    clearTimeout(window.__periodHintTimer__);
+    window.__periodHintTimer__ = setTimeout(hidePeriodHint, 2000);
+  }, { passive:true });
+}
+
+    function getCurrentPeriodForSummary(){
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,"0");
+  const mm = String(now.getMinutes()).padStart(2,"0");
+  const t = `${hh}:${mm}`;
+
+  // PERIODS 기준으로 현재 교시 추정 (해당 교시 시간 안이면 그 교시, 쉬는시간이면 직전 교시로 처리)
+  const min = hhmmToMin(t);
+  if (!Number.isFinite(min)) return 0;
+
+  let cur = 0;
+  for (let i=0;i<PERIODS.length;i++){
+    const s = hhmmToMin(PERIODS[i].start);
+    const e = hhmmToMin(PERIODS[i].end);
+    if (min >= s && min <= e) return PERIODS[i].p;
+    // 쉬는시간이면 직전 교시를 현재로 간주
+    if (i < PERIODS.length-1){
+      const ns = hhmmToMin(PERIODS[i+1].start);
+      if (min > e && min < ns) return PERIODS[i].p;
+    }
+    cur = PERIODS[i].p;
+  }
+  return cur;
+}
+
     function hhmmToMin(t) {
       const m = String(t ?? "").trim().match(/^(\d{1,2}):(\d{2})$/);
       if (!m) return NaN;
@@ -594,7 +651,7 @@
         setupToggleButton();
         renderTable(data, datesNorm);
 
-        // ✅ 교시 시간 힌트 이벤트 연결
+        // ✅ 교시 시간 안내 이벤트 연결(겹침 방지)
         bindPeriodHintEvents();
 
       } catch (e) {
