@@ -347,6 +347,23 @@ function setSummaryCache(key, summary) {
 
 // ====== init ======
 document.addEventListener("DOMContentLoaded", () => {
+  // ✅ 셀렉트(옵션) 글씨가 안 보이는 문제 방지
+  (function ensureSelectTheme_() {
+    const id = "adminSelectThemePatch";
+    if (document.getElementById(id)) return;
+    const st = document.createElement("style");
+    st.id = id;
+    st.textContent = `
+      select, option {
+        color: #111 !important;
+      }
+      select {
+        background: rgba(255,255,255,0.9) !important;
+      }
+    `;
+    document.head.appendChild(st);
+  })();
+
   // ✅ 캐시 꼬였을 때: URL에 ?nocache=1 붙이면 요약 캐시 초기화
   try {
     const sp = new URLSearchParams(location.search);
@@ -551,8 +568,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // 성적 요약
     try {
       const exams = await apiPost("grade_exams", { token });
-      if (exams.ok && Array.isArray(exams.items) && exams.items.length) {
-        const last = exams.items[exams.items.length - 1] || {};
+      const items = (exams && exams.ok && Array.isArray(exams.items)) ? exams.items : [];
+      if (items.length) {
+        const last = items[items.length - 1] || {};
         const lastExam = String(last.exam || "");
         const gs = await apiPost("grade_summary", { token, exam: lastExam });
 
@@ -560,16 +578,17 @@ document.addEventListener("DOMContentLoaded", () => {
           ok: true,
           exam: lastExam,
           sheetName: gs.sheetName || last.label || last.name || "",
-          data: gs, // ✅ 학부모/관리자 상세와 동일한 데이터(표 렌더용)
-        } : { ok:false, error: gs.error || "grade_summary 실패" };
+          exams: items, // ✅ 요약 드롭다운용
+          data: gs,     // ✅ 표 렌더용(학부모/관리자 상세와 동일)
+        } : { ok:false, error: gs.error || "grade_summary 실패", exams: items };
       } else {
-        summary.grade = { ok:false, error:"시험 목록 없음" };
+        summary.grade = { ok:false, error:"시험 목록 없음", exams: [] };
       }
     } catch (e) {
-      summary.grade = { ok:false, error: e?.message || "성적 오류" };
+      summary.grade = { ok:false, error: e?.message || "성적 오류", exams: [] };
     }
 
-    return summary;
+return summary;
   }
 
   // ====== load student detail (summary) ======
@@ -729,12 +748,28 @@ document.addEventListener("DOMContentLoaded", () => {
         </section>
 
         <section class="card" style="padding:14px;">
-          <div class="card-title" style="font-size:15px;">성적 요약</div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <div class="card-title" style="font-size:15px;">성적 요약</div>
+            ${grd && grd.ok && Array.isArray(grd.exams) && grd.exams.length ? `
+              <select id="gradeSummarySelect" class="select" style="min-width:140px;">
+                ${grd.exams.map(it => {
+                  const ex = String(it.exam || "");
+                  const label = String(it.label || it.name || ex || "");
+                  const sel = (ex === String(grd.exam || "")) ? "selected" : "";
+                  return `<option value="${escapeHtml(ex)}" ${sel}>${escapeHtml(label)}</option>`;
+                }).join("")}
+              </select>
+            ` : ``}
+          </div>
+
           <div class="card-sub">
             ${grd && grd.ok ? `
-              <div style="margin-bottom:8px;">(${escapeHtml(grd.sheetName || "")})</div>
-              ${renderGradeTableHtml_(buildGradeTableRows_(grd.data || grd || {}))}
-            ` : (loading ? "불러오는 중…" : "데이터 없음")}</div>
+              <div id="gradeSummaryLabel" style="margin-bottom:8px;">(${escapeHtml(grd.sheetName || "")})</div>
+              <div id="gradeSummaryTable">
+                ${renderGradeTableHtml_(buildGradeTableRows_(grd.data || grd || {}))}
+              </div>
+            ` : (loading ? "불러오는 중…" : "데이터 없음")}
+          </div>
         </section>
       </div>
     `;
@@ -745,6 +780,35 @@ document.addEventListener("DOMContentLoaded", () => {
     $("btnMoveDetail").addEventListener("click", () => loadDetail("move_detail"));
     $("btnEduDetail").addEventListener("click", () => loadDetail("eduscore_detail"));
     $("btnGradeDetail").addEventListener("click", () => loadDetail("grade_detail"));
+
+    // ✅ 성적 요약 드롭다운 변경 시: 같은 토큰(좌석/학번) 기준으로 grade_summary 다시 조회 후 요약 카드만 갱신
+    const gradeSel = $("gradeSummarySelect");
+    if (gradeSel) {
+      gradeSel.addEventListener("change", async () => {
+        try {
+          const seat2 = String(st.seat || "").trim();
+          const studentId2 = String(st.studentId || "").trim();
+          if (!seat2 && !studentId2) return;
+
+          const exam = String(gradeSel.value || "");
+          const labelHost = $("gradeSummaryLabel");
+          const tableHost = $("gradeSummaryTable");
+          if (tableHost) tableHost.innerHTML = `<div style="opacity:.8;">불러오는 중…</div>`;
+
+          const token2 = await issueStudentToken_(seat2, studentId2);
+          const gs2 = await apiPost("grade_summary", { token: token2, exam });
+
+          if (!gs2.ok) throw new Error(gs2.error || "grade_summary 실패");
+
+          if (labelHost) labelHost.innerHTML = `(${escapeHtml(gs2.sheetName || "")})`;
+          if (tableHost) tableHost.innerHTML = renderGradeTableHtml_(buildGradeTableRows_(gs2));
+        } catch (e) {
+          const tableHost = $("gradeSummaryTable");
+          if (tableHost) tableHost.innerHTML = `<div style="color:#ff6b6b;">${escapeHtml(e?.message || "성적 조회 오류")}</div>`;
+        }
+      });
+    }
+
   }
 
   
