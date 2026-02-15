@@ -215,8 +215,7 @@
           btn.textContent = SHOW_WEEK_ALL ? "오늘만 보기" : "주간 전체 보기";
           const cache = window.__ATT_CACHE__;
           if (cache) renderTable(cache.data, cache.datesNorm);
-        
-        });
+        if (typeof bindPeriodHintEvents==='function') });
       }
     }
 
@@ -228,6 +227,14 @@
       const view = SHOW_WEEK_ALL ? { data, datesNorm } : sliceToTodayView(data, datesNorm);
       const dNorm = view.datesNorm;
       const rows = view.data.rows || [];
+
+
+    // ===== 교시 시간 힌트(겹침 방지: 테이블 위에 표시) =====
+~ ${it.end}` : "";
+    }
+box.textContent = `${p}교시  ${t}`;
+      box.style.display = "";
+    }
 , { passive:true });
       });
     }
@@ -292,6 +299,9 @@ function getCurrentPeriod(){
           `;
         }).join("");
 
+      // ✅ 교시 시간(모바일 터치) 바인딩
+      bindPeriodInlineTime();
+
         return `
           <tr>
             <td class="sticky-left col-period" data-period="${r.period || ""}"><div class="period-num">${r.period || ""}</div><div class="period-time">${periodRangeText(r.period || "")}</div></td>
@@ -300,9 +310,11 @@ function getCurrentPeriod(){
         `;
       }).join("");
 
+      // ✅ 교시 시간(모바일 터치) 바인딩
+      bindPeriodInlineTime();
+
       // ✅ 교시 시간 힌트 바인딩(렌더 후)
-      
-    }
+      if (typeof bindPeriodHintEvents==='function') }
 
     // ===== 요약 =====
     function parseIso(iso) {
@@ -351,6 +363,14 @@ function getCurrentPeriod(){
 
       // ✅ 오늘은 '현재 교시' 이후(미래 교시) 집계 제외
       const curP = getCurrentPeriod();
+
+
+    // ===== 교시 시간 힌트(겹침 방지: 테이블 위에 표시) =====
+~ ${it.end}` : "";
+    }
+box.textContent = `${p}교시  ${t}`;
+      box.style.display = "";
+    }
 , { passive:true });
       });
     }
@@ -399,6 +419,27 @@ function getCurrentPeriod(){
     }
 
     // ===== 이동으로 스케줄 공백 채우기(옵션) =====
+    
+    function periodRangeText(p){
+      const it = PERIODS.find(x => x.p === Number(p));
+      return it ? `${it.start} ~ ${it.end}` : "";
+    }
+    function bindPeriodInlineTime(){
+      const tbody = document.getElementById("tbody");
+      if (!tbody) return;
+      const cells = tbody.querySelectorAll("td.col-period[data-period]");
+      cells.forEach(td => {
+        if (td.__periodInlineBound) return;
+        td.__periodInlineBound = true;
+        td.addEventListener("click", () => {
+          td.classList.add("show-time");
+          clearTimeout(td.__periodInlineTimer);
+          td.__periodInlineTimer = setTimeout(() => td.classList.remove("show-time"), 2000);
+        }, { passive:true });
+      });
+    }
+
+
     const PERIODS = [
       { p: 1, start: "08:00", end: "08:30" },
       { p: 2, start: "08:50", end: "10:10" },
@@ -430,30 +471,6 @@ function getCurrentPeriod(){
       }
       return 0;
     }
-
-
-    function periodRangeText(p){
-      const it = PERIODS.find(x => x.p === Number(p));
-      return it ? `${it.start} ~ ${it.end}` : "";
-    }
-
-    function bindPeriodInlineTime(){
-      const tbody = document.getElementById("tbody");
-      if (!tbody) return;
-      const cells = tbody.querySelectorAll("td.col-period[data-period]");
-      cells.forEach(td => {
-        if (td.__periodInlineBound) return;
-        td.__periodInlineBound = true;
-
-        td.addEventListener("click", () => {
-          // 모바일/터치: 토글 + 2초 후 자동 해제
-          td.classList.add("show-time");
-          clearTimeout(td.__periodInlineTimer);
-          td.__periodInlineTimer = setTimeout(() => td.classList.remove("show-time"), 2000);
-        }, { passive:true });
-      });
-    }
-
     function normalizeMoveDateToIso(dateVal) {
       const s = String(dateVal ?? "").trim();
       if (!s) return "";
@@ -571,9 +588,7 @@ function getCurrentPeriod(){
         renderTable(data, datesNorm);
 
         // ✅ 교시 힌트 이벤트 바인딩
-        
-
-      } catch (e) {
+        if (typeof bindPeriodHintEvents==='function') } catch (e) {
         showError(e.message || String(e));
       }
     })();
