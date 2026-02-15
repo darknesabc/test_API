@@ -183,81 +183,6 @@ function renderGradeTableHtml_(rows) {
   `;
 }
 
-function renderAdminGradeErrata_(items) {
-  if (!items || typeof items !== "object") return '<div class="muted">정오표 데이터 없음</div>';
-
-  const order = [
-    ["kor", "국어"],
-    ["math", "수학"],
-    ["eng", "영어"],
-    ["hist", "한국사"],
-    ["tam1", "탐구1"],
-    ["tam2", "탐구2"],
-  ];
-
-  const pill = (n) => `<span style="display:inline-block; padding:2px 8px; border:1px solid rgba(255,255,255,.18); border-radius:999px; margin:2px; font-size:12px;">${n}</span>`;
-
-  const rangePills = (arr) => arr && arr.length ? arr.map(pill).join("") : '<span class="muted">없음</span>';
-
-  let html = `
-    <div class="card">
-      <div class="card-title">정오표</div>
-      <div class="muted" style="margin:-6px 0 10px;">* O/X 기반으로 틀린 문항만 표시합니다.</div>
-  `;
-
-  order.forEach(([k,label]) => {
-    const it = items[k];
-    if (!it) return;
-
-    const wrong = Array.isArray(it.wrong) ? it.wrong : [];
-    const split = it.split;
-
-    let wrongCommon = wrong;
-    let wrongElect = [];
-
-    if (split && split.common && split.elective) {
-      const [c1,c2] = split.common;
-      const [e1,e2] = split.elective;
-      wrongCommon = wrong.filter(n => n>=c1 && n<=c2);
-      wrongElect = wrong.filter(n => n>=e1 && n<=e2);
-    }
-
-    html += `
-      <div style="padding:10px 0; border-top:1px solid rgba(255,255,255,.08);">
-        <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
-          <div style="font-weight:800;">${escapeHtml(it.subjectName || label)}</div>
-          ${it.score!=null ? `<div class="muted">점수: ${it.score}</div>` : ``}
-          <div class="muted">(${it.correctCount || 0}/${it.qCount || 0} 정답 · ${it.wrongCount || 0} 오답)</div>
-        </div>
-    `;
-
-    if (split && split.common && split.elective) {
-      html += `
-        <div style="margin-top:8px;">
-          <div class="muted" style="margin-bottom:4px;">공통 (${split.common[0]}~${split.common[1]})</div>
-          <div>${rangePills(wrongCommon)}</div>
-        </div>
-        <div style="margin-top:10px;">
-          <div class="muted" style="margin-bottom:4px;">선택 (${split.elective[0]}~${split.elective[1]})</div>
-          <div>${rangePills(wrongElect)}</div>
-        </div>
-      `;
-    } else {
-      html += `
-        <div style="margin-top:8px;">
-          <div class="muted" style="margin-bottom:4px;">틀린 문항</div>
-          <div>${rangePills(wrong)}</div>
-        </div>
-      `;
-    }
-
-    html += `</div>`;
-  });
-
-  html += `</div>`;
-  return html;
-}
-
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (m) => ({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
@@ -422,6 +347,23 @@ function setSummaryCache(key, summary) {
 
 // ====== init ======
 document.addEventListener("DOMContentLoaded", () => {
+  // ✅ 셀렉트(옵션) 글씨가 안 보이는 문제 방지
+  (function ensureSelectTheme_() {
+    const id = "adminSelectThemePatch";
+    if (document.getElementById(id)) return;
+    const st = document.createElement("style");
+    st.id = id;
+    st.textContent = `
+      select, option {
+        color: #111 !important;
+      }
+      select {
+        background: rgba(255,255,255,0.9) !important;
+      }
+    `;
+    document.head.appendChild(st);
+  })();
+
   // ✅ 캐시 꼬였을 때: URL에 ?nocache=1 붙이면 요약 캐시 초기화
   try {
     const sp = new URLSearchParams(location.search);
@@ -626,24 +568,27 @@ document.addEventListener("DOMContentLoaded", () => {
     // 성적 요약
     try {
       const exams = await apiPost("grade_exams", { token });
-      if (exams.ok && Array.isArray(exams.items) && exams.items.length) {
-        const lastExam = exams.items[exams.items.length - 1].exam;
-        const gd = await apiPost("grade_detail", { token, exam: lastExam });
-        summary.grade = gd.ok ? {
+      const items = (exams && exams.ok && Array.isArray(exams.items)) ? exams.items : [];
+      if (items.length) {
+        const last = items[items.length - 1] || {};
+        const lastExam = String(last.exam || "");
+        const gs = await apiPost("grade_summary", { token, exam: lastExam });
+
+        summary.grade = gs.ok ? {
           ok: true,
-          sheetName: gd.sheetName,
-          kor: gd.subjects?.kor,
-          math: gd.subjects?.math,
-          eng: gd.subjects?.eng,
-        } : { ok:false, error: gd.error || "grade_detail 실패" };
+          exam: lastExam,
+          sheetName: gs.sheetName || last.label || last.name || "",
+          exams: items, // ✅ 요약 드롭다운용
+          data: gs,     // ✅ 표 렌더용(학부모/관리자 상세와 동일)
+        } : { ok:false, error: gs.error || "grade_summary 실패", exams: items };
       } else {
-        summary.grade = { ok:false, error:"시험 목록 없음" };
+        summary.grade = { ok:false, error:"시험 목록 없음", exams: [] };
       }
     } catch (e) {
-      summary.grade = { ok:false, error: e?.message || "성적 오류" };
+      summary.grade = { ok:false, error: e?.message || "성적 오류", exams: [] };
     }
 
-    return summary;
+return summary;
   }
 
   // ====== load student detail (summary) ======
@@ -803,13 +748,26 @@ document.addEventListener("DOMContentLoaded", () => {
         </section>
 
         <section class="card" style="padding:14px;">
-          <div class="card-title" style="font-size:15px;">성적 요약</div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <div class="card-title" style="font-size:15px;">성적 요약</div>
+            ${grd && grd.ok && Array.isArray(grd.exams) && grd.exams.length ? `
+              <select id="gradeSummarySelect" class="select" style="min-width:140px;">
+                ${grd.exams.map(it => {
+                  const ex = String(it.exam || "");
+                  const label = String(it.label || it.name || ex || "");
+                  const sel = (ex === String(grd.exam || "")) ? "selected" : "";
+                  return `<option value="${escapeHtml(ex)}" ${sel}>${escapeHtml(label)}</option>`;
+                }).join("")}
+              </select>
+            ` : ``}
+          </div>
+
           <div class="card-sub">
             ${grd && grd.ok ? `
-              (${escapeHtml(grd.sheetName || "")})<br>
-              국어: <b>${grd.kor?.raw_total ?? grd.kor?.raw ?? "-"}</b> / 등급 <b>${grd.kor?.grade ?? "-"}</b><br>
-              수학: <b>${grd.math?.raw_total ?? grd.math?.raw ?? "-"}</b> / 등급 <b>${grd.math?.grade ?? "-"}</b><br>
-              영어: <b>${grd.eng?.raw ?? "-"}</b> / 등급 <b>${grd.eng?.grade ?? "-"}</b>
+              <div id="gradeSummaryLabel" style="margin-bottom:8px;">(${escapeHtml(grd.sheetName || "")})</div>
+              <div id="gradeSummaryTable">
+                ${renderGradeTableHtml_(buildGradeTableRows_(grd.data || grd || {}))}
+              </div>
             ` : (loading ? "불러오는 중…" : "데이터 없음")}
           </div>
         </section>
@@ -822,6 +780,35 @@ document.addEventListener("DOMContentLoaded", () => {
     $("btnMoveDetail").addEventListener("click", () => loadDetail("move_detail"));
     $("btnEduDetail").addEventListener("click", () => loadDetail("eduscore_detail"));
     $("btnGradeDetail").addEventListener("click", () => loadDetail("grade_detail"));
+
+    // ✅ 성적 요약 드롭다운 변경 시: 같은 토큰(좌석/학번) 기준으로 grade_summary 다시 조회 후 요약 카드만 갱신
+    const gradeSel = $("gradeSummarySelect");
+    if (gradeSel) {
+      gradeSel.addEventListener("change", async () => {
+        try {
+          const seat2 = String(st.seat || "").trim();
+          const studentId2 = String(st.studentId || "").trim();
+          if (!seat2 && !studentId2) return;
+
+          const exam = String(gradeSel.value || "");
+          const labelHost = $("gradeSummaryLabel");
+          const tableHost = $("gradeSummaryTable");
+          if (tableHost) tableHost.innerHTML = `<div style="opacity:.8;">불러오는 중…</div>`;
+
+          const token2 = await issueStudentToken_(seat2, studentId2);
+          const gs2 = await apiPost("grade_summary", { token: token2, exam });
+
+          if (!gs2.ok) throw new Error(gs2.error || "grade_summary 실패");
+
+          if (labelHost) labelHost.innerHTML = `(${escapeHtml(gs2.sheetName || "")})`;
+          if (tableHost) tableHost.innerHTML = renderGradeTableHtml_(buildGradeTableRows_(gs2));
+        } catch (e) {
+          const tableHost = $("gradeSummaryTable");
+          if (tableHost) tableHost.innerHTML = `<div style="color:#ff6b6b;">${escapeHtml(e?.message || "성적 조회 오류")}</div>`;
+        }
+      });
+    }
+
   }
 
   
@@ -839,7 +826,6 @@ document.addEventListener("DOMContentLoaded", () => {
         <p id="adminGradeLoading" class="muted" style="margin-top:10px;">불러오는 중...</p>
         <p id="adminGradeError" class="msg" style="margin-top:6px;"></p>
         <div id="adminGradeTableWrap" style="display:none;"></div>
-        <div id="adminGradeErrataWrap" style="display:none; margin-top:12px;"></div>
       </div>
     `;
 
@@ -886,21 +872,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const rows = buildGradeTableRows_(data);
         wrap.innerHTML = renderGradeTableHtml_(rows);
         wrap.style.display = "block";
-
-        // ✅ 정오표(옵션) - 백엔드 grade_errata 있으면 표시
-        try {
-          const errWrap = $("adminGradeErrataWrap");
-          if (errWrap) {
-            errWrap.style.display = "none";
-            errWrap.innerHTML = "";
-            const err = await apiPost("grade_errata", { token, exam: String(exam || "") });
-            if (err && err.ok && err.items && Object.keys(err.items).length) {
-              errWrap.innerHTML = renderAdminGradeErrata_(err.items);
-              errWrap.style.display = "block";
-            }
-          }
-        } catch (_) { /* 정오표는 실패해도 본문은 유지 */ }
-
         loading.textContent = "";
       } catch (e) {
         loading.textContent = "";
