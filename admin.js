@@ -108,13 +108,22 @@ function clearAdminSession() {
 
 // ====== fetch helper ======
 async function apiPost(path, body) {
-  const url = `${API_BASE}?path=${encodeURIComponent(path)}`;
+  const sep = API_BASE.includes("?") ? "&" : "?";
+  const url = `${API_BASE}${sep}path=${encodeURIComponent(path)}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify(body || {})
   });
-  return await res.json();
+
+  // ✅ Apps Script가 JSON이 아닌 에러/HTML을 리턴할 때 원인 메시지를 그대로 보여주기
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    const head = text.replace(/\s+/g, " ").slice(0, 200);
+    throw new Error(`API 응답이 JSON이 아닙니다: ${head}`);
+  }
 }
 
 // ====== UI helpers ======
