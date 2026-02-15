@@ -108,22 +108,13 @@ function clearAdminSession() {
 
 // ====== fetch helper ======
 async function apiPost(path, body) {
-  const sep = API_BASE.includes("?") ? "&" : "?";
-  const url = `${API_BASE}${sep}path=${encodeURIComponent(path)}`;
+  const url = `${API_BASE}?path=${encodeURIComponent(path)}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify(body || {})
   });
-
-  // ✅ Apps Script가 JSON이 아닌 에러/HTML을 리턴할 때 원인 메시지를 그대로 보여주기
-  const text = await res.text();
-  try {
-    return JSON.parse(text);
-  } catch (_) {
-    const head = text.replace(/\s+/g, " ").slice(0, 200);
-    throw new Error(`API 응답이 JSON이 아닙니다: ${head}`);
-  }
+  return await res.json();
 }
 
 // ====== UI helpers ======
@@ -530,8 +521,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // ✅ 1) 캐시가 있으면 즉시 표시(초고속)
       const cached = getSummaryCache(key);
-      const hasAny = !!(cached && (cached.attendance || cached.sleep || cached.move || cached.eduscore || cached.grade || (Array.isArray(cached.gradeExams) && cached.gradeExams.length)));
-      if (hasAny) {
+      if (cached) {
         data.summary = cached;
         renderStudentDetail(data);
 
@@ -539,6 +529,7 @@ document.addEventListener("DOMContentLoaded", () => {
         (async () => {
           try {
             const fresh = await loadSummariesForStudent_(seat, studentId);
+            // 클릭이 다른 학생으로 넘어갔으면 반영 X
             if (__activeStudentKey !== key) return;
             setSummaryCache(key, fresh || {});
             data.summary = fresh || {};
@@ -546,7 +537,7 @@ document.addEventListener("DOMContentLoaded", () => {
           } catch (_) {}
         })();
 
-        return; // 캐시가 '유효'하면 여기서 끝(백그라운드 갱신만)
+        return; // 캐시 있으면 여기서 끝(백그라운드 갱신만)
       }
 
       // ✅ 캐시가 없으면 로딩 표시 후 실제 호출
