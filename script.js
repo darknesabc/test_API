@@ -42,33 +42,6 @@ function safeText_(v, fallback = "-") {
 }
 
 /* =========================================================
-   ✅ 공용 API POST (핵심)
-   - ✅ URL에 ?path= 붙이지 않음
-   - ✅ body에 {path, ...payload}로 전송
-   - ✅ Content-Type text/plain 유지(프리플라이트 최소화)
-========================================================= */
-async function postApi(path, payload = {}) {
-  const res = await fetch(API_BASE, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ path, ...payload }),
-  });
-
-  const text = await res.text();
-
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error(
-      "서버 응답이 JSON이 아닙니다. (배포 권한/리다이렉트/CORS 가능) 응답 앞부분: " +
-      text.slice(0, 160)
-    );
-  }
-  return data;
-}
-
-/* =========================================================
    ✅ 공지 상태 (TDZ 방지: var로 최상단 선선언)
 ========================================================= */
 var __noticeItems = [];
@@ -86,17 +59,24 @@ var __noticeModalSwipeBound = false;
 
 /* =========================================================
    ✅ (중요) select UI 깨짐 방지
+   - 기존 HTML에서 select에 btn 클래스를 줬을 때(깨짐) 자동으로 교정
+   - styles.css의 .select-ghost를 실제로 적용
 ========================================================= */
 function fixSelectUi_() {
   const sel = $("gradeExamSelect");
   if (!sel) return;
 
+  // ✅ btn류 클래스가 select에 붙어있으면 제거(브라우저 드롭다운 UI랑 충돌 방지)
+  // 대신 .select-ghost를 붙여서 안정적으로 표시
   sel.classList.add("select-ghost");
 
+  // 혹시 HTML에서 btn 클래스가 붙어있다면 제거
   sel.classList.remove("btn");
   sel.classList.remove("btn-ghost");
   sel.classList.remove("btn-mini");
 
+  // ✅ inline style padding이 있으면 select-ghost와 충돌할 수 있어서 제거 권장
+  // (원하면 주석 처리 가능)
   sel.style.padding = "";
 }
 
@@ -119,7 +99,13 @@ async function demoLogin(name, parent4) {
 
 // ====== (실전) Apps Script 로그인 ======
 async function apiLogin(name, parent4) {
-  const data = await postApi("login", { name, parent4 });
+  const res = await fetch(`${API_BASE}?path=login`, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ name, parent4 })
+  });
+
+  const data = await res.json();
   if (!data.ok) throw new Error(data.error || "로그인 실패");
 
   return {
@@ -195,6 +181,7 @@ async function apiLogin(name, parent4) {
     return;
   }
 
+  // ✅ select UI 깨짐 방지(대시보드 들어오자마자)
   fixSelectUi_();
 
   const userLine = $("userLine");
@@ -206,13 +193,16 @@ async function apiLogin(name, parent4) {
     location.href = "index.html";
   });
 
+  // ✅ 요약들 로드
   loadAttendanceSummary(session);
   loadSleepSummary(session);
   loadMoveSummary(session);
   loadEduScoreSummary(session);
 
+  // ✅ 성적(표)
   loadGradeSummary(session);
 
+  // ✅ 공지
   loadNoticeList(session);
 })();
 
@@ -240,46 +230,28 @@ async function loadAttendanceSummary(session) {
     error.textContent = "";
     box.style.display = "none";
 
-    const data = await postApi("attendance_summary", { token: session.token });
-    if (!data || !data.ok) throw new Error(data?.error || "출결 요약 불러오기 실패");
+    const res = await fetch(`${API_BASE}?path=attendance_summary`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: session.token })
+    });
+
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "출결 요약 불러오기 실패");
 
     loading.textContent = "";
 
-    const present =
-      safeNum_(data.present,
-        safeNum_(data.week?.present,
-          safeNum_(data.summary?.present, 0)
-        )
-      );
+    const present = Number(data.present ?? 0);
+    const absent = Number(data.absent ?? 0);
+    const rec = Array.isArray(data.recentAbsences) ? data.recentAbsences : [];
 
-    const absent =
-      safeNum_(data.absent,
-        safeNum_(data.week?.absent,
-          safeNum_(data.summary?.absent, 0)
-        )
-      );
-
-    const todayIso = safeText_(data.todayIso, "");
-    const todayTag = todayIso ? ` · 서버 오늘(${todayIso})` : "";
-
-    counts.innerHTML = `이번 주 출결 요약<br>출석 ${present}회 · 결석 ${absent}회${todayTag}`;
-
-    const rec = Array.isArray(data.recentAbsences) ? data.recentAbsences
-              : Array.isArray(data.recent) ? data.recent
-              : [];
+    counts.innerHTML = `이번 주 출결 요약<br>출석 ${present}회 · 결석 ${absent}회`;
 
     if (!rec.length) {
       recent.textContent = "최근 결석: 없음";
     } else {
-      const items = rec.slice(0, 2).map(x => {
-        const md = x.md ?? x.dateMd ?? x.mdDow ?? "";
-        const dow = x.dow ?? x.day ?? "";
-        const p = x.period ?? x.p ?? x.classPeriod ?? "";
-        const left = fmtMdDow_(md, dow) || safeText_(x.date || "", "");
-        return p ? `${left} ${p}교시` : left;
-      }).filter(Boolean);
-
-      recent.textContent = items.length ? `최근 결석: ${items.join(", ")}` : "최근 결석: 없음";
+      const items = rec.map(x => `${fmtMdDow_(x.md, x.dow)} ${x.period}교시`);
+      recent.textContent = `최근 결석: ${items.join(", ")}`;
     }
 
     box.style.display = "";
@@ -305,7 +277,13 @@ async function loadSleepSummary(session) {
     error.textContent = "";
     box.style.display = "none";
 
-    const data = await postApi("sleep_summary", { token: session.token });
+    const res = await fetch(`${API_BASE}?path=sleep_summary`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: session.token })
+    });
+
+    const data = await res.json();
     if (!data.ok) throw new Error(data.error || "취침 요약 불러오기 실패");
 
     const total = (data.sleepTotal7d !== undefined && data.sleepTotal7d !== null)
@@ -338,7 +316,13 @@ async function loadMoveSummary(session) {
     error.textContent = "";
     box.style.display = "none";
 
-    const data = await postApi("move_summary", { token: session.token });
+    const res = await fetch(`${API_BASE}?path=move_summary`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: session.token })
+    });
+
+    const data = await res.json();
     if (!data.ok) throw new Error(data.error || "이동 요약 불러오기 실패");
 
     loading.textContent = "";
@@ -381,7 +365,13 @@ async function loadEduScoreSummary(session) {
     error.textContent = "";
     box.style.display = "none";
 
-    const data = await postApi("eduscore_summary", { token: session.token });
+    const res = await fetch(`${API_BASE}?path=eduscore_summary`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: session.token })
+    });
+
+    const data = await res.json();
     if (!data.ok) throw new Error(data.error || "교육점수 요약 불러오기 실패");
 
     loading.textContent = "";
@@ -429,6 +419,7 @@ async function loadGradeSummary(session) {
 
   if (!sel || !loading || !error || !wrap || !tbody) return;
 
+  // ✅ 혹시 대시보드 렌더 전에 클래스가 다시 붙었을 수 있어서 한번 더 보정
   fixSelectUi_();
 
   sel.addEventListener("change", () => fetchAndRender());
@@ -442,7 +433,13 @@ async function loadGradeSummary(session) {
       tbody.innerHTML = "";
 
       const exam = String(sel.value || "mar");
-      const data = await postApi("grade_summary", { token: session.token, exam });
+      const res = await fetch(`${API_BASE}?path=grade_summary`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ token: session.token, exam })
+      });
+
+      const data = await res.json();
       if (!data.ok) throw new Error(data.error || "성적 불러오기 실패");
 
       const rows = buildGradeTableRows_(data);
@@ -527,7 +524,13 @@ async function loadNoticeList(session) {
 
     stopNoticeAutoplay_();
 
-    const data = await postApi("notice_list", { token: session.token });
+    const res = await fetch(`${API_BASE}?path=notice_list`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: session.token })
+    });
+
+    const data = await res.json();
     if (!data.ok) throw new Error(data.error || "공지 불러오기 실패");
 
     const items = Array.isArray(data.items) ? data.items : [];
@@ -977,7 +980,13 @@ function closeNoticeModal_() {
       wrap.style.display = "none";
       tbody.innerHTML = "";
 
-      const data = await postApi("move_detail", { token: session.token, days });
+      const res = await fetch(`${API_BASE}?path=move_detail`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ token: session.token, days })
+      });
+
+      const data = await res.json();
       if (!data.ok) throw new Error(data.error || "이동 상세 불러오기 실패");
 
       const items = Array.isArray(data.items) ? data.items : [];
@@ -1065,9 +1074,14 @@ function closeNoticeModal_() {
   try {
     if (monthLine) {
       monthLine.textContent = "이번 달 누적 불러오는 중...";
-      const s = await postApi("eduscore_summary", { token: session.token });
-      if (s.ok) {
-        const total = Number(s.monthTotal ?? 0);
+      const res = await fetch(`${API_BASE}?path=eduscore_summary`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ token: session.token })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const total = Number(data.monthTotal ?? 0);
         monthLine.textContent = `이번 달 누적: ${total}점`;
       } else {
         monthLine.textContent = "";
@@ -1092,7 +1106,13 @@ function closeNoticeModal_() {
       tbody.innerHTML = "";
       if (empty) empty.style.display = "none";
 
-      const data = await postApi("eduscore_detail", { token: session.token, days });
+      const res = await fetch(`${API_BASE}?path=eduscore_detail`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ token: session.token, days })
+      });
+
+      const data = await res.json();
       if (!data.ok) throw new Error(data.error || "교육점수 상세 불러오기 실패");
 
       const items = Array.isArray(data.items) ? data.items : [];
