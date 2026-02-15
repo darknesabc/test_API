@@ -202,7 +202,7 @@
           btn.textContent = SHOW_WEEK_ALL ? "오늘만 보기" : "주간 전체 보기";
           const cache = window.__ATT_CACHE__;
           if (cache) renderTable(cache.data, cache.datesNorm);
-        try { bindPeriodHintEvents(); } catch(_) {}
+        if (typeof bindPeriodHintEvents==='function') bindPeriodHintEvents();
         });
       }
     }
@@ -237,7 +237,31 @@
       box.textContent = "";
     }
 
-    function getCurrentPeriod(){
+    
+
+    function bindPeriodHintEvents(){
+      const box = document.getElementById("periodHint");
+      const tbody = document.getElementById("tbody");
+      if (!box || !tbody) return;
+
+      const cells = tbody.querySelectorAll("td.col-period[data-period]");
+      cells.forEach(td => {
+        if (td.__periodHintBound) return;
+        td.__periodHintBound = true;
+
+        const p = td.getAttribute("data-period");
+
+        td.addEventListener("mouseenter", () => showPeriodHint(p));
+        td.addEventListener("mouseleave", () => hidePeriodHint());
+
+        td.addEventListener("click", () => {
+          showPeriodHint(p);
+          clearTimeout(window.__periodHintTimer__);
+          window.__periodHintTimer__ = setTimeout(hidePeriodHint, 2000);
+        }, { passive:true });
+      });
+    }
+function getCurrentPeriod(){
       const now = new Date();
       const hh = String(now.getHours()).padStart(2,"0");
       const mm = String(now.getMinutes()).padStart(2,"0");
@@ -307,7 +331,7 @@
       }).join("");
 
       // ✅ 교시 시간 힌트 바인딩(렌더 후)
-      try { bindPeriodHintEvents(); } catch(_) {}
+      if (typeof bindPeriodHintEvents==='function') bindPeriodHintEvents();
     }
 
     // ===== 요약 =====
@@ -379,7 +403,31 @@
       box.textContent = "";
     }
 
-    function getCurrentPeriod(){
+    
+
+    function bindPeriodHintEvents(){
+      const box = document.getElementById("periodHint");
+      const tbody = document.getElementById("tbody");
+      if (!box || !tbody) return;
+
+      const cells = tbody.querySelectorAll("td.col-period[data-period]");
+      cells.forEach(td => {
+        if (td.__periodHintBound) return;
+        td.__periodHintBound = true;
+
+        const p = td.getAttribute("data-period");
+
+        td.addEventListener("mouseenter", () => showPeriodHint(p));
+        td.addEventListener("mouseleave", () => hidePeriodHint());
+
+        td.addEventListener("click", () => {
+          showPeriodHint(p);
+          clearTimeout(window.__periodHintTimer__);
+          window.__periodHintTimer__ = setTimeout(hidePeriodHint, 2000);
+        }, { passive:true });
+      });
+    }
+function getCurrentPeriod(){
       const now = new Date();
       const hh = String(now.getHours()).padStart(2,"0");
       const mm = String(now.getMinutes()).padStart(2,"0");
@@ -572,7 +620,7 @@
         renderTable(data, datesNorm);
 
         // ✅ 교시 힌트 이벤트 바인딩
-        try { bindPeriodHintEvents(); } catch(_) {}
+        if (typeof bindPeriodHintEvents==='function') bindPeriodHintEvents();
 
       } catch (e) {
         showError(e.message || String(e));
