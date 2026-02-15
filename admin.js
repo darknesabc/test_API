@@ -771,7 +771,7 @@ function mapAttendance_(val) {
     const tds = lastIdx.map(i => {
       const c = cells[i] || {};
       const sRaw = String(c.s ?? "").trim();  // 스케줄(원본)
-      const iso = String(d?.iso || "").trim();
+      const iso = String((dates[i] && dates[i].iso) || "").trim();
       const mvReason = (moveMap && moveMap[iso] && moveMap[iso][r.period]) ? String(moveMap[iso][r.period]) : "";
       const s = sRaw || mvReason; // ✅ 스케줄 공란이면 이동 사유로 채움
       const aRaw = String(c.a ?? "").trim();   // 원본(1/3 등)
