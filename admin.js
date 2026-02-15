@@ -661,6 +661,7 @@ function mapAttendance_(val) {
     const t = (t0 === "1") ? "출석" : (t0 === "3") ? "결석" : t0;
     if (!t || t === "-" ) return "opacity:.55;";
     if (t.includes("출석")) return "background: rgba(46, 204, 113, .22);";
+    if (t.includes("결석(미집계)")) return "background: rgba(255,255,255,.06); opacity:.75;";
     if (t.includes("결석")) return "background: rgba(231, 76, 60, .22);";
     if (t.includes("지각")) return "background: rgba(241, 196, 15, .22);";
     if (t.includes("조퇴")) return "background: rgba(155, 89, 182, .22);";
@@ -694,13 +695,18 @@ function mapAttendance_(val) {
 
     const tds = lastIdx.map(i => {
       const c = cells[i] || {};
-      const s = String(c.s ?? "").trim();  // 스케줄
+      const sRaw = String(c.s ?? "").trim();  // 스케줄(원본)
       const aRaw = String(c.a ?? "").trim();   // 원본(1/3 등)
-      const aText = mapAttendance_(aRaw);      // 표시용(출석/결석)
+      let aText = mapAttendance_(aRaw);        // 표시용(출석/결석)
+
+      // ✅ 요약과 동일 기준: 스케줄이 있는 결석(3)은 집계 제외 → "결석(미집계)"로 표기
+      if (aRaw === "3" && sRaw) {
+        aText = "결석(미집계)";
+      }
 
       return `
         <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;">
-          ${escapeHtml(s || "-")}
+          ${escapeHtml(sRaw || "-")}
         </td>
         <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap; ${statusStyle_(aText)}">
           ${escapeHtml(aText)}
@@ -720,6 +726,10 @@ function mapAttendance_(val) {
 
   // ====== 최종 테이블 ======
   return `
+    <div style="margin:8px 0 10px; opacity:.8; font-size:13px;">
+      * 결석 집계는 <b>스케줄 공란 + 결석(3)</b>만 포함합니다. (오늘 기준, 미래 교시 제외)
+      <span style="margin-left:8px; opacity:.75;">※ 스케줄이 있는 결석은 <b>결석(미집계)</b>로 표시</span>
+    </div>
     <div style="overflow:auto; border-radius:14px; border:1px solid rgba(255,255,255,.08);">
       <table style="width:max-content; min-width:100%; border-collapse:separate; border-spacing:0; font-size:14px;">
         <thead style="background: rgba(255,255,255,.03);">
