@@ -41,6 +41,57 @@ function safeText_(v, fallback = "-") {
   return s ? s : fallback;
 }
 
+
+/* =========================================================
+   ✅ 선택과목 축약 표시(학부모용 성적 표)
+   - 예: "언어와 매체" / "언어와매체" / "언매" -> "언매"
+========================================================= */
+const __CHOICE_ABBR_ALIASES = {
+  "언매": ["언매", "언어와매체", "언어와 매체"],
+  "화작": ["화작", "화법과작문", "화법과 작문"],
+  "미적": ["미적", "미적분"],
+  "확통": ["확통", "확률과통계", "확률과 통계"],
+  "기하": ["기하"],
+  "생윤": ["생윤", "생활과윤리", "생활과 윤리"],
+  "윤사": ["윤사", "윤리와사상", "윤리와 사상"],
+  "한지": ["한지", "한국지리", "한국 지리"],
+  "세지": ["세지", "세계지리", "세계 지리"],
+  "동사": ["동사", "동아시아사", "동아시아 사"],
+  "세사": ["세사", "세계사", "세계 사"],
+  "경제": ["경제"],
+  "정법": ["정법", "정치와법", "정치와 법"],
+  "사문": ["사문", "사회문화", "사회 문화"],
+
+  // 과탐
+  "물1": ["물1", "물I", "물Ⅰ", "물리학1", "물리학I", "물리학Ⅰ", "물리학 1", "물리학 I", "물리학 Ⅰ"],
+  "물2": ["물2", "물II", "물Ⅱ", "물리학2", "물리학II", "물리학Ⅱ", "물리학 2", "물리학 II", "물리학 Ⅱ"],
+
+  "화1": ["화1", "화I", "화Ⅰ", "화학1", "화학I", "화학Ⅰ", "화학 1", "화학 I", "화학 Ⅰ"],
+  "화2": ["화2", "화II", "화Ⅱ", "화학2", "화학II", "화학Ⅱ", "화학 2", "화학 II", "화학 Ⅱ"],
+
+  "생1": ["생1", "생I", "생Ⅰ", "생명과학1", "생명과학I", "생명과학Ⅰ", "생명과학 1", "생명과학 I", "생명과학 Ⅰ"],
+  "생2": ["생2", "생II", "생Ⅱ", "생명과학2", "생명과학II", "생명과학Ⅱ", "생명과학 2", "생명과학 II", "생명과학 Ⅱ"],
+
+  "지1": ["지1", "지I", "지Ⅰ", "지구과학1", "지구과학I", "지구과학Ⅰ", "지구과학 1", "지구과학 I", "지구과학 Ⅰ"],
+  "지2": ["지2", "지II", "지Ⅱ", "지구과학2", "지구과학II", "지구과학Ⅱ", "지구과학 2", "지구과학 II", "지구과학 Ⅱ"],
+};
+
+const __CHOICE_ABBR_LOOKUP = (() => {
+  const map = new Map();
+  const norm = (s) => String(s ?? "").toLowerCase().replace(/\s+/g, "").replace(/[·ㆍ]/g, "");
+  for (const [abbr, aliases] of Object.entries(__CHOICE_ABBR_ALIASES)) {
+    for (const a of aliases) map.set(norm(a), abbr);
+  }
+  return { map, norm };
+})();
+
+function shortenChoiceName_(name) {
+  const raw = String(name ?? "").trim();
+  if (!raw || raw === "-") return "-";
+  const key = __CHOICE_ABBR_LOOKUP.norm(raw);
+  return __CHOICE_ABBR_LOOKUP.map.get(key) || raw;
+}
+
 /* =========================================================
    ✅ 공지 상태 (TDZ 방지: var로 최상단 선선언)
 ========================================================= */
@@ -486,7 +537,7 @@ function buildGradeTableRows_(data) {
   };
 
   return [
-    { label: "선택과목", kor: fmt(kor.choice), math: fmt(math.choice), eng: dash, hist: dash, tam1: fmt(tam1.name), tam2: fmt(tam2.name) },
+    { label: "선택과목", kor: shortenChoiceName_(fmt(kor.choice)), math: shortenChoiceName_(fmt(math.choice)), eng: dash, hist: dash, tam1: shortenChoiceName_(fmt(tam1.name)), tam2: shortenChoiceName_(fmt(tam2.name)) },
     { label: "원점수",   kor: fmtNum(kor.raw_total), math: fmtNum(math.raw_total), eng: fmtNum(eng.raw), hist: fmtNum(hist.raw), tam1: fmtNum(tam1.raw), tam2: fmtNum(tam2.raw) },
     { label: "표준점수", kor: fmtNum(kor.std), math: fmtNum(math.std), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_std), tam2: fmtNum(tam2.expected_std) },
     { label: "백분위",   kor: fmtNum(kor.pct), math: fmtNum(math.pct), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_pct), tam2: fmtNum(tam2.expected_pct) },
