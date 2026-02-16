@@ -363,7 +363,30 @@ function renderErrataHtml_(errata) {
     return m;
   };
 
-  const renderTable = (title, oxArr, rateArr, qFrom, qTo) => {
+  // ✅ 아코디언(접기/펼치기) 섹션
+  const section = (title, meta, innerHtml, open = false) => `
+    <details class="err-acc" ${open ? "open" : ""} style="margin-top:12px; border:1px solid rgba(255,255,255,.08); border-radius:14px; overflow:hidden;">
+      <summary style="
+        list-style:none;
+        cursor:pointer;
+        padding:10px 12px;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
+        background: rgba(255,255,255,.04);
+        font-weight:800;
+      ">
+        <span>${escapeHtml(title)}</span>
+        <span style="opacity:.7; font-size:12px; font-weight:600;">${escapeHtml(meta || "")}</span>
+      </summary>
+      <div style="padding:10px 12px;">
+        ${innerHtml}
+      </div>
+    </details>
+  `;
+
+  const renderTable = (oxArr, rateArr, qFrom, qTo) => {
     const oxMap = asMap(oxArr, "q");
     const rtMap = asMap(rateArr, "q");
 
@@ -374,7 +397,7 @@ function renderErrataHtml_(errata) {
       rows.push(`
         <tr>
           <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; width:52px;">${q}</td>
-          <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:center; width:52px; font-weight:800;">${escapeHtml(ox || "")}</td>
+          <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:center; width:52px; font-weight:900;">${escapeHtml(ox || "")}</td>
           <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; width:90px;">${escapeHtml(pctText(rt?.pct))}</td>
           <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; opacity:.8;">${rt ? `${rt.o}/${rt.n}` : "-"}</td>
         </tr>
@@ -382,52 +405,86 @@ function renderErrataHtml_(errata) {
     }
 
     return `
-      <div style="margin-top:12px;">
-        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px;">
-          <div style="font-weight:800;">${escapeHtml(title)}</div>
-          <div style="opacity:.7; font-size:12px;">문항 ${qFrom}~${qTo}</div>
-        </div>
-        <div style="margin-top:6px; overflow:auto; border:1px solid rgba(255,255,255,.08); border-radius:12px;">
-          <table style="width:100%; border-collapse:collapse; font-size:13px;">
-            <thead>
-              <tr style="background:rgba(255,255,255,.04);">
-                <th style="padding:8px; text-align:right;">문항</th>
-                <th style="padding:8px; text-align:center;">O/X</th>
-                <th style="padding:8px; text-align:right;">정답률</th>
-                <th style="padding:8px; text-align:right;">O/응시</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows.join("")}
-            </tbody>
-          </table>
-        </div>
+      <div style="overflow:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <thead>
+            <tr style="background:rgba(255,255,255,.03);">
+              <th style="padding:8px; text-align:right;">문항</th>
+              <th style="padding:8px; text-align:center;">O/X</th>
+              <th style="padding:8px; text-align:right;">정답률</th>
+              <th style="padding:8px; text-align:right;">O/응시</th>
+            </tr>
+          </thead>
+          <tbody>${rows.join("")}</tbody>
+        </table>
       </div>
     `;
   };
 
   const info = errata.info || {};
-  const korChoice = info.korChoice ? ` (선택: ${info.korChoice})` : "";
-  const mathChoice = info.mathChoice ? ` (선택: ${info.mathChoice})` : "";
+  const korChoice = info.korChoice ? `선택: ${info.korChoice}` : "";
+  const mathChoice = info.mathChoice ? `선택: ${info.mathChoice}` : "";
 
   const blocks = [];
 
+  // ✅ 기본은 국어 공통만 열어두고 나머지는 접혀있게
+  let firstOpenUsed = false;
+  const pushAcc = (title, meta, html) => {
+    const open = !firstOpenUsed; // 첫 섹션만 open
+    if (!firstOpenUsed) firstOpenUsed = true;
+    blocks.push(section(title, meta, html, open));
+  };
+
   // 국어
-  if (s.kor?.common) blocks.push(renderTable(`국어 공통${korChoice}`, s.kor.common.ox, s.kor.common.rate, 1, 34));
-  if (s.kor?.choice) blocks.push(renderTable(`국어 선택${korChoice}`, s.kor.choice.ox, s.kor.choice.rate, 35, 45));
+  if (s.kor?.common) {
+    pushAcc(
+      "국어 공통",
+      "문항 1~34" + (korChoice ? ` · ${korChoice}` : ""),
+      renderTable(s.kor.common.ox, s.kor.common.rate, 1, 34)
+    );
+  }
+  if (s.kor?.choice) {
+    pushAcc(
+      "국어 선택",
+      "문항 35~45" + (korChoice ? ` · ${korChoice}` : ""),
+      renderTable(s.kor.choice.ox, s.kor.choice.rate, 35, 45)
+    );
+  }
 
   // 수학
-  if (s.math?.common) blocks.push(renderTable(`수학 공통${mathChoice}`, s.math.common.ox, s.math.common.rate, 1, 22));
-  if (s.math?.choice) blocks.push(renderTable(`수학 선택${mathChoice}`, s.math.choice.ox, s.math.choice.rate, 23, 30));
+  if (s.math?.common) {
+    pushAcc(
+      "수학 공통",
+      "문항 1~22" + (mathChoice ? ` · ${mathChoice}` : ""),
+      renderTable(s.math.common.ox, s.math.common.rate, 1, 22)
+    );
+  }
+  if (s.math?.choice) {
+    pushAcc(
+      "수학 선택",
+      "문항 23~30" + (mathChoice ? ` · ${mathChoice}` : ""),
+      renderTable(s.math.choice.ox, s.math.choice.rate, 23, 30)
+    );
+  }
 
   // 영어
-  if (s.eng?.all) blocks.push(renderTable("영어", s.eng.all.ox, s.eng.all.rate, 1, 45));
+  if (s.eng?.all) {
+    pushAcc(
+      "영어",
+      "문항 1~45",
+      renderTable(s.eng.all.ox, s.eng.all.rate, 1, 45)
+    );
+  }
 
   // 탐구(같은 과목이면 탐구1/2 합산된 정답률이 내려옴)
   const tamItems = Array.isArray(s.tam?.items) ? s.tam.items : [];
   tamItems.forEach(it => {
     if (!it?.name || !it?.all) return;
-    blocks.push(renderTable(`탐구 (${it.name})`, it.all.ox, it.all.rate, 1, 20));
+    pushAcc(
+      `탐구 (${it.name})`,
+      "문항 1~20",
+      renderTable(it.all.ox, it.all.rate, 1, 20)
+    );
   });
 
   const hasAny = blocks.length > 0;
@@ -440,10 +497,16 @@ function renderErrataHtml_(errata) {
       </div>
       <div class="card-body" style="padding-top:6px;">
         ${hasAny ? blocks.join("") : `<div style="color:rgba(255,255,255,0.7); padding:10px 0;">정오표 데이터가 없습니다.</div>`}
+        <style>
+          /* ✅ details 기본 삼각형/마커 제거 + hover */
+          details.err-acc > summary::-webkit-details-marker { display:none; }
+          details.err-acc > summary:hover { background: rgba(255,255,255,.06) !important; }
+        </style>
       </div>
     </div>
   `;
 }
+
 document.addEventListener("DOMContentLoaded", () => {
   // ✅ 셀렉트(옵션) 글씨가 안 보이는 문제 방지
   (function ensureSelectTheme_() {
