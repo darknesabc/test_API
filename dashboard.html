@@ -26,6 +26,53 @@
     <!-- ✅ 4칸 그리드 -->
     <section class="grid-4">
 
+      <!-- ④ 공지 (슬라이드 + 스와이프 + 자동전환) -->
+      <section class="card" id="noticeCard">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <h2 class="card-title" style="margin:0;">공지</h2>
+          <button
+            id="noticeOpenBtn"
+            class="btn btn-ghost btn-mini"
+            type="button"
+            style="display:none;"
+          >
+            전체보기
+          </button>
+        </div>
+
+        <p id="noticeLoading" class="muted">불러오는 중...</p>
+        <p id="noticeError" class="msg"></p>
+
+        <div id="noticeSwipeArea" style="display:none; margin-top:8px;">
+          <div id="noticeSlider">
+
+            <div
+              id="noticeTapArea"
+              role="button"
+              tabindex="0"
+              aria-label="공지 전체보기 열기"
+              style="cursor:pointer;"
+            >
+              <div id="noticeTitle" style="font-weight:900;"></div>
+              <div id="noticeMeta" class="muted" style="margin-top:6px; font-size:12px;"></div>
+
+              <div
+                id="noticePreview"
+                class="muted"
+                style="margin-top:8px; line-height:1.5;"
+              ></div>
+            </div>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
+              <button id="noticePrevBtn" class="btn btn-ghost btn-mini" type="button">◀</button>
+              <div id="noticeDots" class="muted" style="font-size:12px;"></div>
+              <button id="noticeNextBtn" class="btn btn-ghost btn-mini" type="button">▶</button>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
       <!-- ① 출결 -->
       <section class="card" id="attCard">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
@@ -109,53 +156,6 @@
         </div>
       </section>
 
-      <!-- ④ 공지 (슬라이드 + 스와이프 + 자동전환) -->
-      <section class="card" id="noticeCard">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-          <h2 class="card-title" style="margin:0;">공지</h2>
-          <button
-            id="noticeOpenBtn"
-            class="btn btn-ghost btn-mini"
-            type="button"
-            style="display:none;"
-          >
-            전체보기
-          </button>
-        </div>
-
-        <p id="noticeLoading" class="muted">불러오는 중...</p>
-        <p id="noticeError" class="msg"></p>
-
-        <div id="noticeSwipeArea" style="display:none; margin-top:8px;">
-          <div id="noticeSlider">
-
-            <div
-              id="noticeTapArea"
-              role="button"
-              tabindex="0"
-              aria-label="공지 전체보기 열기"
-              style="cursor:pointer;"
-            >
-              <div id="noticeTitle" style="font-weight:900;"></div>
-              <div id="noticeMeta" class="muted" style="margin-top:6px; font-size:12px;"></div>
-
-              <div
-                id="noticePreview"
-                class="muted"
-                style="margin-top:8px; line-height:1.5;"
-              ></div>
-            </div>
-
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
-              <button id="noticePrevBtn" class="btn btn-ghost btn-mini" type="button">◀</button>
-              <div id="noticeDots" class="muted" style="font-size:12px;"></div>
-              <button id="noticeNextBtn" class="btn btn-ghost btn-mini" type="button">▶</button>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
       <!-- ⑤ 이동 -->
       <section class="card" id="moveCard">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
@@ -190,6 +190,8 @@
           </div>
         </div>
       </section>
+
+
 
     </section>
   </main>
