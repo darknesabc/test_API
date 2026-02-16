@@ -895,17 +895,9 @@ return summary;
         ${fmtKeyVal("담임", st.teacher || "-")}
       </div>
 
-      <div style="display:flex; gap:10px; flex-wrap:wrap; margin:12px 0;">
-        <button class="btn" id="btnAttDetail">출결 상세</button>
-        <button class="btn" id="btnSleepDetail">취침 상세</button>
-        <button class="btn" id="btnMoveDetail">이동 상세</button>
-        <button class="btn" id="btnEduDetail">교육점수 상세</button>
-        <button class="btn" id="btnGradeDetail">성적 상세</button>
-      </div>
-
       <div class="grid-2" style="margin-top:10px;">
         <section class="card" style="padding:14px;">
-          <div class="card-title" style="font-size:15px;">출결 요약</div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;"><div class="card-title" style="font-size:15px;">출결 요약</div><button class="btn btn-ghost btn-mini" id="btnAttDetail" style="padding:6px 10px;">상세</button></div>
           <div class="card-sub">
             ${att && att.ok ? `
               이번주 출석: <b>${att.present ?? 0}</b><br>
@@ -922,7 +914,7 @@ return summary;
         </section>
 
         <section class="card" style="padding:14px;">
-          <div class="card-title" style="font-size:15px;">취침 요약</div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;"><div class="card-title" style="font-size:15px;">취침 요약</div><button class="btn btn-ghost btn-mini" id="btnSleepDetail" style="padding:6px 10px;">상세</button></div>
           <div class="card-sub">
             ${slp && slp.ok ? `
               최근 7일 취침일수: <b>${slp.sleepCount7d ?? 0}</b><br>
@@ -932,7 +924,7 @@ return summary;
         </section>
 
         <section class="card" style="padding:14px;">
-          <div class="card-title" style="font-size:15px;">이동 요약</div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;"><div class="card-title" style="font-size:15px;">이동 요약</div><button class="btn btn-ghost btn-mini" id="btnMoveDetail" style="padding:6px 10px;">상세</button></div>
           <div class="card-sub">
             ${mv && mv.ok ? `
               최근 이동: <b>${escapeHtml(mv.latestText || "-")}</b><br>
@@ -942,7 +934,7 @@ return summary;
         </section>
 
         <section class="card" style="padding:14px;">
-          <div class="card-title" style="font-size:15px;">교육점수 요약</div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;"><div class="card-title" style="font-size:15px;">교육점수 요약</div><button class="btn btn-ghost btn-mini" id="btnEduDetail" style="padding:6px 10px;">상세</button></div>
           <div class="card-sub">
             ${edu && edu.ok ? `
               이번달 누적점수: <b>${edu.monthTotal ?? 0}</b><br>
@@ -954,7 +946,7 @@ return summary;
 
         <section class="card" style="padding:14px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-            <div class="card-title" style="font-size:15px;">성적 요약</div>
+            <div style="display:flex; align-items:center; gap:10px;"><div class="card-title" style="font-size:15px;">성적 요약</div><button class="btn btn-ghost btn-mini" id="btnGradeDetail" style="padding:6px 10px;">상세</button></div>
             ${grd && grd.ok && Array.isArray(grd.exams) && grd.exams.length ? `
               <select id="gradeSummarySelect" class="select" style="min-width:140px;">
                 ${grd.exams.map(it => {
