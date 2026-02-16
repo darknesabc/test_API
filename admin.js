@@ -106,6 +106,34 @@ function clearAdminSession() {
   localStorage.removeItem(ADMIN_SESSION_KEY);
 }
 
+// ====== admin header label ======
+function getAdminLabel_(sess) {
+  const role = sess?.role || "";
+  const name = sess?.adminName || "";
+  if (role === "super") return "전체 관리자";
+  if (name) return `${name} 관리자`;
+  return "관리자";
+}
+
+function applyAdminHeaderLabel_(sess) {
+  // 페이지 상단 좌측 타이틀(.top-title)을 찾아서 표시
+  const el =
+    document.querySelector(".top-title") ||
+    document.querySelector("header .top-title") ||
+    document.querySelector("header h1") ||
+    document.querySelector("header h2");
+
+  if (!el) return;
+
+  // 원본 제목 보관(중복 덧붙임 방지)
+  if (!el.dataset.baseTitle) el.dataset.baseTitle = el.textContent.trim() || "관리자";
+
+  const label = getAdminLabel_(sess);
+  // 요청: 예) "임용해 관리자", "전체 관리자"
+  el.textContent = label;
+}
+
+
 // ====== fetch helper ======
 async function apiPost(path, body) {
   const url = `${API_BASE}?path=${encodeURIComponent(path)}`;
@@ -565,6 +593,10 @@ document.addEventListener("DOMContentLoaded", () => {
     loginCard.style.display = "none";
     adminArea.style.display = "block";
     logoutBtn.style.display = "inline-flex";
+    applyAdminHeaderLabel_(sess);
+  } else {
+    // 로그인 전 기본 표기
+    applyAdminHeaderLabel_(null);
   }
 
   // ✅ 로그인 Enter 지원
@@ -586,7 +618,8 @@ document.addEventListener("DOMContentLoaded", () => {
         setHint(loginMsg, data.error || "로그인 실패", true);
         return;
       }
-      setAdminSession({ adminToken: data.adminToken });
+      setAdminSession({ adminToken: data.adminToken, adminId: data.adminId, role: data.role, adminName: data.adminName });
+      applyAdminHeaderLabel_(getAdminSession());
       setHint(loginMsg, "로그인 성공");
 
       loginCard.style.display = "none";
