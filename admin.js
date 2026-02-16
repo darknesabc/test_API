@@ -169,8 +169,74 @@ function buildGradeTableRows_(data) {
     return Number.isFinite(n) && String(v).trim() !== "" ? String(n) : dash;
   };
 
+// ✅ 선택과목명 축약 표시(관리자 페이지용)
+const _choiceMap = new Map([
+  // 국어
+  ["언어와매체", "언매"], ["언어와매체", "언매"],
+  ["화법과작문", "화작"], ["화법과작문", "화작"],
+  // 수학
+  ["미적분", "미적"], ["확률과통계", "확통"], ["기하", "기하"],
+  // 탐구(사회)
+  ["생활과윤리", "생윤"], ["윤리와사상", "윤사"],
+  ["한국지리", "한지"], ["세계지리", "세지"],
+  ["동아시아사", "동사"], ["세계사", "세사"],
+  ["정치와법", "정법"], ["경제", "경제"], ["사회문화", "사문"],
+  // 탐구(과학) - 로마숫자/특수문자 변형은 normalize에서 처리
+  ["물리학1", "물1"], ["물리학2", "물2"],
+  ["화학1", "화1"], ["화학2", "화2"],
+  ["생명과학1", "생1"], ["생명과학2", "생2"],
+  ["지구과학1", "지1"], ["지구과학2", "지2"],
+]);
+
+function normalizeChoiceName(v) {
+  if (v == null) return "";
+  let s = String(v).trim();
+  if (!s) return "";
+
+  // 공백 제거
+  s = s.replace(/\s+/g, "");
+
+  // '언어와매체' / '언어와매체' 같은 표기 통일 (공백 제거로 대부분 해결)
+  // 로마숫자/유니코드 숫자 통일
+  s = s
+    .replace(/Ⅰ|I/gi, "1")
+    .replace(/Ⅱ|II/gi, "2")
+    .replace(/ⅰ/gi, "1")
+    .replace(/ⅱ/gi, "2");
+
+  // 과목명 통일: 물리학 -> 물리학, 생명과학 등은 그대로 두되 숫자만 정리
+  // '물리학1' 같은 형태로 맞추기 위해, 끝에 숫자가 있으면 붙여둠
+  return s;
+}
+
+function shortenChoiceName(v) {
+  const key = normalizeChoiceName(v);
+
+  // 미리 정의한 키로 바로 매핑
+  if (_choiceMap.has(key)) return _choiceMap.get(key);
+
+  // 과학 과목의 다양한 표기를 조금 더 흡수
+  // 예) 물리학I, 물리학Ⅰ, 물I, 물Ⅰ → normalize 후 물리학1 또는 물1 형태일 수 있음
+  const alt = key
+    .replace(/^물[1-2]$/, (m) => (m === "물1" ? "물리학1" : "물리학2"))
+    .replace(/^화[1-2]$/, (m) => (m === "화1" ? "화학1" : "화학2"))
+    .replace(/^생[1-2]$/, (m) => (m === "생1" ? "생명과학1" : "생명과학2"))
+    .replace(/^지[1-2]$/, (m) => (m === "지1" ? "지구과학1" : "지구과학2"));
+
+  if (_choiceMap.has(alt)) return _choiceMap.get(alt);
+
+  // 못 찾으면 원문 반환
+  return String(v ?? "").trim();
+}
+
+const fmtChoice = (v) => {
+  const s = String(v ?? "").trim();
+  if (!s) return dash;
+  return shortenChoiceName(s);
+};
+
   return [
-    { label: "선택과목", kor: fmt(kor.choice), math: fmt(math.choice), eng: dash, hist: dash, tam1: fmt(tam1.name), tam2: fmt(tam2.name) },
+    { label: "선택과목", kor: fmtChoice(kor.choice), math: fmtChoice(math.choice), eng: dash, hist: dash, tam1: fmtChoice(tam1.name), tam2: fmtChoice(tam2.name) },
     { label: "원점수",   kor: fmtNum(kor.raw_total), math: fmtNum(math.raw_total), eng: fmtNum(eng.raw), hist: fmtNum(hist.raw), tam1: fmtNum(tam1.raw), tam2: fmtNum(tam2.raw) },
     { label: "표준점수", kor: fmtNum(kor.std), math: fmtNum(math.std), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_std), tam2: fmtNum(tam2.expected_std) },
     { label: "백분위",   kor: fmtNum(kor.pct), math: fmtNum(math.pct), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_pct), tam2: fmtNum(tam2.expected_pct) },
