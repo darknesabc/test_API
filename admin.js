@@ -15,11 +15,6 @@
 // ✅ 여기에 Apps Script Web App URL(…/exec) 넣기
 const API_BASE = "https://script.google.com/macros/s/AKfycbwxYd2tK4nWaBSZRyF0A3_oNES0soDEyWz0N0suAsuZU35QJOSypO2LFC-Z2dpbDyoD/exec";
 
-// ✅ 학생 토큰 캐시(요약 여러개 호출 시 token 재발급 최소화)
-const __studentTokenCache = new Map(); // key seat|studentId -> { token, exp }
-const __studentTokenCacheTTL = 60 * 1000; // 60초
-
-
 /** =========================
  * ✅ 출결(관리자) - 학부모 출결 상세와 동일한 "이동 기록 반영" 로직
  * - 스케줄 공란인 교시는 move_detail(이동) 사유로 채워서 표시/집계 기준을 동일하게 맞춤
@@ -815,22 +810,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // ====== issue token for student (admin_issue_token) ======
   async function issueStudentToken_(seat, studentId) {
     const sess = getAdminSession();
-    const k = `${String(seat||"").trim()}|${String(studentId||"").trim()}`;
-
-    const now = Date.now();
-    const hit = __studentTokenCache.get(k);
-    if (hit && hit.token && hit.exp > now) return hit.token;
-
     const data = await apiPost("admin_issue_token", {
       adminToken: sess.adminToken,
       seat,
       studentId
     });
-    if (!data.ok) throw new Error(data.error || "token 발급 실패");
-
-    __studentTokenCache.set(k, { token: data.token, exp: now + __studentTokenCacheTTL });
-    return data.token;
-  });
     if (!data.ok) throw new Error(data.error || "token 발급 실패");
     return data.token;
   }
