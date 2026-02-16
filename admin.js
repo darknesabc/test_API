@@ -1012,8 +1012,10 @@ return summary;
 
         <section class="card" style="padding:14px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-            <div style="display:flex; align-items:center; gap:10px;"><div class="card-title" style="font-size:15px;">성적 요약</div><button class="btn btn-ghost btn-mini" id="btnGradeDetail" style="padding:6px 10px;">상세</button></div>
-            ${grd && grd.ok && Array.isArray(grd.exams) && grd.exams.length ? `
+            <div class="card-title" style="font-size:15px;">성적 요약</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button class="btn btn-ghost btn-mini" id="btnGradeDetail" style="padding:6px 10px;">상세</button>
+              ${grd && grd.ok && Array.isArray(grd.exams) && grd.exams.length ? `
               <select id="gradeSummarySelect" class="select" style="min-width:140px;">
                 ${grd.exams.map(it => {
                   const ex = String(it.exam || "");
@@ -1076,7 +1078,7 @@ return summary;
 
   
   // ====== grade detail (관리자) - 학부모와 동일 양식 ======
-  async function loadAdminGradeDetailUI_(token) {
+  async function loadAdminGradeDetailUI_(token, initialExam) {
     const host = $("detailResult");
     if (!host) return;
 
@@ -1212,7 +1214,8 @@ return summary;
       }
 
       if (kind === "grade_detail") {
-        await loadAdminGradeDetailUI_(token);
+        const picked = $("gradeSummarySelect")?.value || null;
+        await loadAdminGradeDetailUI_(token, picked);
         return;
       }
 
