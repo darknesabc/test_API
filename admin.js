@@ -394,10 +394,13 @@ function renderErrataHtml_(errata) {
     for (let q = qFrom; q <= qTo; q++) {
       const ox = oxMap.get(q)?.ox || "";
       const rt = rtMap.get(q);
+
+      // ✅ 정답률 70% 이상인데 X인 문항 강조
+      const highX = (ox === "X" && rt && typeof rt.pct === "number" && rt.pct >= 70);
       rows.push(`
         <tr>
           <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; width:52px;">${q}</td>
-          <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:center; width:52px; font-weight:900;">${escapeHtml(ox || "")}</td>
+          <td class="${highX ? "errata-x-high" : ""}" style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:center; width:52px; font-weight:900;">${escapeHtml(ox || "")}</td>
           <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; width:90px;">${escapeHtml(pctText(rt?.pct))}</td>
           <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; opacity:.8;">${rt ? `${rt.o}/${rt.n}` : "-"}</td>
         </tr>
@@ -501,6 +504,14 @@ function renderErrataHtml_(errata) {
           /* ✅ details 기본 삼각형/마커 제거 + hover */
           details.err-acc > summary::-webkit-details-marker { display:none; }
           details.err-acc > summary:hover { background: rgba(255,255,255,.06) !important; }
+
+/* ✅ 정답률 70% 이상인데 X인 문항 강조 */
+td.errata-x-high {
+  background: rgba(255, 90, 90, 0.18);
+  color: #ff6b6b;
+  font-weight: 900;
+  border-radius: 8px;
+}
         </style>
       </div>
     </div>
