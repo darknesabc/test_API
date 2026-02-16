@@ -355,50 +355,91 @@ function renderErrataHtml_(errata) {
   if (!errata || !errata.subjects) return "";
   const s = errata.subjects;
 
-  const join = (arr) => (arr && arr.length) ? arr.join(", ") : "-";
+  // rate: [{q,pct,o,x,n}] / ox: [{q,ox}]
+  const pctText = (pct) => (pct === null || pct === undefined) ? "-" : `${pct}%`;
+  const asMap = (arr, key) => {
+    const m = new Map();
+    (arr || []).forEach(it => { if (it && it[key] !== undefined) m.set(it[key], it); });
+    return m;
+  };
 
-  const line = (label, value) => `
-    <div class="row" style="display:flex; gap:10px; padding:6px 0; border-top:1px solid rgba(255,255,255,0.06);">
-      <div style="width:120px; color:rgba(255,255,255,0.75);">${label}</div>
-      <div style="flex:1;">${value}</div>
-    </div>
-  `;
+  const renderTable = (title, oxArr, rateArr, qFrom, qTo) => {
+    const oxMap = asMap(oxArr, "q");
+    const rtMap = asMap(rateArr, "q");
 
-  const kor = `
-    ${line("국어(공통)", join(s.kor?.common))}
-    ${line("국어(선택)", join(s.kor?.choice))}
-  `;
-  const math = `
-    ${line("수학(공통)", join(s.math?.common))}
-    ${line("수학(선택)", join(s.math?.choice))}
-  `;
-  const eng = `${line("영어", join(s.eng?.all))}`;
-  const tam1Label = s.tam1?.name ? `탐구1(${escapeHtml_(s.tam1.name)})` : "탐구1";
-  const tam2Label = s.tam2?.name ? `탐구2(${escapeHtml_(s.tam2.name)})` : "탐구2";
-  const tams = `
-    ${line(tam1Label, join(s.tam1?.all))}
-    ${line(tam2Label, join(s.tam2?.all))}
-  `;
+    const rows = [];
+    for (let q = qFrom; q <= qTo; q++) {
+      const ox = oxMap.get(q)?.ox || "";
+      const rt = rtMap.get(q);
+      rows.push(`
+        <tr>
+          <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; width:52px;">${q}</td>
+          <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:center; width:52px; font-weight:800;">${escapeHtml(ox || "")}</td>
+          <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; width:90px;">${escapeHtml(pctText(rt?.pct))}</td>
+          <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; opacity:.8;">${rt ? `${rt.o}/${rt.n}` : "-"}</td>
+        </tr>
+      `);
+    }
 
-  const hasAny =
-    (s.kor?.all && s.kor.all.length) ||
-    (s.math?.all && s.math.all.length) ||
-    (s.eng?.all && s.eng.all.length) ||
-    (s.tam1?.all && s.tam1.all.length) ||
-    (s.tam2?.all && s.tam2.all.length);
+    return `
+      <div style="margin-top:12px;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px;">
+          <div style="font-weight:800;">${escapeHtml(title)}</div>
+          <div style="opacity:.7; font-size:12px;">문항 ${qFrom}~${qTo}</div>
+        </div>
+        <div style="margin-top:6px; overflow:auto; border:1px solid rgba(255,255,255,.08); border-radius:12px;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="background:rgba(255,255,255,.04);">
+                <th style="padding:8px; text-align:right;">문항</th>
+                <th style="padding:8px; text-align:center;">O/X</th>
+                <th style="padding:8px; text-align:right;">정답률</th>
+                <th style="padding:8px; text-align:right;">O/응시</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  };
+
+  const info = errata.info || {};
+  const korChoice = info.korChoice ? ` (선택: ${info.korChoice})` : "";
+  const mathChoice = info.mathChoice ? ` (선택: ${info.mathChoice})` : "";
+
+  const blocks = [];
+
+  // 국어
+  if (s.kor?.common) blocks.push(renderTable(`국어 공통${korChoice}`, s.kor.common.ox, s.kor.common.rate, 1, 34));
+  if (s.kor?.choice) blocks.push(renderTable(`국어 선택${korChoice}`, s.kor.choice.ox, s.kor.choice.rate, 35, 45));
+
+  // 수학
+  if (s.math?.common) blocks.push(renderTable(`수학 공통${mathChoice}`, s.math.common.ox, s.math.common.rate, 1, 22));
+  if (s.math?.choice) blocks.push(renderTable(`수학 선택${mathChoice}`, s.math.choice.ox, s.math.choice.rate, 23, 30));
+
+  // 영어
+  if (s.eng?.all) blocks.push(renderTable("영어", s.eng.all.ox, s.eng.all.rate, 1, 45));
+
+  // 탐구(같은 과목이면 탐구1/2 합산된 정답률이 내려옴)
+  const tamItems = Array.isArray(s.tam?.items) ? s.tam.items : [];
+  tamItems.forEach(it => {
+    if (!it?.name || !it?.all) return;
+    blocks.push(renderTable(`탐구 (${it.name})`, it.all.ox, it.all.rate, 1, 20));
+  });
+
+  const hasAny = blocks.length > 0;
 
   return `
     <div class="card" style="margin-top:14px;">
       <div class="card-head" style="display:flex; align-items:center; justify-content:space-between;">
         <div style="font-weight:800;">정오표</div>
-        <div style="color:rgba(255,255,255,0.6); font-size:12px;">${escapeHtml_(String(errata.errataSheetName || ""))}</div>
+        <div style="color:rgba(255,255,255,0.6); font-size:12px;">${escapeHtml(String(errata.errataSheetName || ""))}</div>
       </div>
       <div class="card-body" style="padding-top:6px;">
-        ${hasAny ? "" : `<div style="color:rgba(255,255,255,0.7); padding:10px 0;">정오표 데이터가 없습니다.</div>`}
-        ${kor}
-        ${math}
-        ${eng}
-        ${tams}
+        ${hasAny ? blocks.join("") : `<div style="color:rgba(255,255,255,0.7); padding:10px 0;">정오표 데이터가 없습니다.</div>`}
       </div>
     </div>
   `;
