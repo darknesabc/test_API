@@ -106,6 +106,35 @@ function clearAdminSession() {
   localStorage.removeItem(ADMIN_SESSION_KEY);
 }
 
+// ✅ 상단 타이틀에 로그인 관리자 표시
+function updateAdminHeaderLabel_() {
+  const s = getAdminSession();
+  updateAdminHeaderLabel_();
+  const role = String(s?.role || "").toLowerCase();
+  const adminName = String(s?.adminName || "").trim();
+
+  const label = (role === "super" || role === "master" || role === "all")
+    ? "전체 관리자"
+    : (adminName ? `${adminName} 관리자` : "관리자");
+
+  // 가능한 타겟들(HTML 구조가 달라도 최대한 잡히게)
+  const el =
+    document.querySelector("#adminTitle")
+    || document.querySelector("[data-admin-title]")
+    || document.querySelector(".top-title")
+    || document.querySelector("header h1")
+    || document.querySelector("h1");
+
+  if (el) el.textContent = label;
+
+  // 서브텍스트도 있으면 그대로 유지하거나 기본 세팅
+  const sub =
+    document.querySelector(".top-sub")
+    || document.querySelector("#adminSub")
+    || document.querySelector("[data-admin-sub]");
+  if (sub && !sub.textContent.trim()) sub.textContent = "학생 검색 · 상세 조회";
+}
+
 // ====== fetch helper ======
 async function apiPost(path, body) {
   const url = `${API_BASE}?path=${encodeURIComponent(path)}`;
@@ -586,7 +615,8 @@ document.addEventListener("DOMContentLoaded", () => {
         setHint(loginMsg, data.error || "로그인 실패", true);
         return;
       }
-      setAdminSession({ adminToken: data.adminToken });
+      setAdminSession({ adminToken: data.adminToken, role: data.role || data.adminRole || "", adminName: data.adminName || data.name || "" });
+      updateAdminHeaderLabel_();
       setHint(loginMsg, "로그인 성공");
 
       loginCard.style.display = "none";
