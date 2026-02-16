@@ -1012,17 +1012,20 @@ return summary;
 
         <section class="card" style="padding:14px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-            <div style="display:flex; align-items:center; gap:10px;"><div class="card-title" style="font-size:15px;">성적 요약</div><button class="btn btn-ghost btn-mini" id="btnGradeDetail" style="padding:6px 10px;">상세</button></div>
-            ${grd && grd.ok && Array.isArray(grd.exams) && grd.exams.length ? `
-              <select id="gradeSummarySelect" class="select" style="min-width:140px;">
-                ${grd.exams.map(it => {
-                  const ex = String(it.exam || "");
-                  const label = String(it.label || it.name || ex || "");
-                  const sel = (ex === String(grd.exam || "")) ? "selected" : "";
-                  return `<option value="${escapeHtml(ex)}" ${sel}>${escapeHtml(label)}</option>`;
-                }).join("")}
-              </select>
-            ` : ``}
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div class="card-title" style="font-size:15px;">성적 요약</div>
+              ${grd && grd.ok && Array.isArray(grd.exams) && grd.exams.length ? `
+                <select id="gradeSummarySelect" class="select" style="min-width:140px;">
+                  ${grd.exams.map(it => {
+                    const ex = String(it.exam || "");
+                    const label = String(it.label || it.name || ex || "");
+                    const sel = (ex === String(grd.exam || "")) ? "selected" : "";
+                    return `<option value="${escapeHtml(ex)}" ${sel}>${escapeHtml(label)}</option>`;
+                  }).join("")}
+                </select>
+              ` : ``}
+            </div>
+            <button class="btn btn-ghost btn-mini" id="btnGradeDetail" style="padding:6px 10px;">상세</button>
           </div>
 
           <div class="card-sub">
@@ -1076,7 +1079,7 @@ return summary;
 
   
   // ====== grade detail (관리자) - 학부모와 동일 양식 ======
-  async function loadAdminGradeDetailUI_(token) {
+  async function loadAdminGradeDetailUI_(token, initialExam) {
     const host = $("detailResult");
     if (!host) return;
 
@@ -1111,8 +1114,14 @@ return summary;
         return `<option value="${escapeHtml(v)}">${escapeHtml(lab)}</option>`;
       }).join("");
 
-      // 기본 선택: 마지막(최신)
-      sel.value = String(exams.items[exams.items.length - 1].exam || "");
+      // 기본 선택: (1) 호출자가 지정한 시험, 없으면 (2) 마지막(최신)
+      const preferred = (initialExam != null) ? String(initialExam).trim() : "";
+      const fallback = String(exams.items[exams.items.length - 1].exam || "");
+      if (preferred && Array.from(sel.options).some(o => o.value === preferred)) {
+        sel.value = preferred;
+      } else {
+        sel.value = fallback;
+      }
 
       sel.addEventListener("change", () => fetchAndRender(sel.value));
       await fetchAndRender(sel.value);
@@ -1212,7 +1221,10 @@ return summary;
       }
 
       if (kind === "grade_detail") {
-        await loadAdminGradeDetailUI_(token);
+        // ✅ 요약에서 선택된 시험으로 상세(정오표) 열기
+        const summarySel = document.getElementById("gradeSummarySelect");
+        const initialExam = summarySel ? String(summarySel.value || "").trim() : "";
+        await loadAdminGradeDetailUI_(token, initialExam);
         return;
       }
 
