@@ -1223,30 +1223,3 @@ function escapeHtml_(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[m]));
 }
-
-/**
- * ✅ 학부모용 비밀번호 변경
- */
-async function parentChangePassword() {
-  const sess = getSession();
-  if (!sess || !sess.token) return alert("로그인이 필요합니다.");
-
-  const newPw = prompt("새로운 부모4자리 비밀번호를 입력하세요.\n(숫자 4자리)", "");
-  if (!newPw) return;
-  if (!/^\d{4}$/.test(newPw)) return alert("비밀번호는 숫자 4자리여야 합니다.");
-
-  try {
-    const res = await apiPost("change_password", {
-      token: sess.token,
-      newPassword: newPw
-    });
-
-    if (res.ok) {
-      alert("비밀번호가 성공적으로 변경되었습니다.");
-    } else {
-      alert("변경 실패: " + (res.error || "오류 발생"));
-    }
-  } catch (e) {
-    alert("네트워크 오류가 발생했습니다.");
-  }
-}
