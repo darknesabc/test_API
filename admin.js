@@ -961,6 +961,15 @@ return summary;
         ${fmtKeyVal("담임", st.teacher || "-")}
       </div>
 
+      <div style="margin: 15px 0; padding-bottom: 15px; border-bottom: 1px dashed rgba(255,255,255,.1);">
+        <button id="btnResetPw" class="btn" style="background: #e74c3c; color: white; padding: 8px 16px; font-size: 13px;">
+          🔒 비밀번호 초기화
+        </button>
+        <p style="font-size: 11px; color: rgba(255,255,255,.5); margin-top: 6px;">
+          * 초기화 시 학생은 다시 기존 4자리 번호로 로그인해야 합니다.
+        </p>
+      </div>
+
       <div class="grid-2" style="margin-top:10px;">
         <section class="card" style="padding:14px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;"><div class="card-title" style="font-size:15px;">출결 요약</div><button class="btn btn-ghost btn-mini" id="btnAttDetail" style="padding:6px 10px;">상세</button></div>
@@ -1046,6 +1055,40 @@ return summary;
     $("btnMoveDetail").addEventListener("click", () => loadDetail("move_detail"));
     $("btnEduDetail").addEventListener("click", () => loadDetail("eduscore_detail"));
     $("btnGradeDetail").addEventListener("click", () => loadDetail("grade_detail"));
+
+    // bind detail buttons 라고 적힌 곳 근처에 추가하세요 (약 620라인 부근)
+    const btnResetPw = $("btnResetPw");
+    if (btnResetPw) {
+      btnResetPw.onclick = async () => {
+        const adminSess = getAdminSession();
+        if (!adminSess?.adminToken) return alert("관리자 권한이 없습니다.");
+
+        if (!confirm(`${st.studentName} 학생의 비밀번호를 초기화하시겠습니까?\n(변경된 10자리 번호가 삭제됩니다.)`)) return;
+
+        try {
+          btnResetPw.disabled = true;
+          btnResetPw.textContent = "처리 중...";
+
+          const res = await apiPost("admin_reset_password", {
+            adminToken: adminSess.adminToken,
+            studentId: st.studentId
+          });
+
+          if (res.ok) {
+            alert("비밀번호가 성공적으로 초기화되었습니다.\n이제 기존 4자리 번호로 로그인이 가능합니다.");
+            // 캐시가 남아있을 수 있으므로 해당 학생 캐시 삭제
+            clearSummaryCache(makeStudentKey(st.seat, st.studentId));
+          } else {
+            alert("초기화 실패: " + res.error);
+          }
+        } catch (e) {
+          alert("네트워크 오류가 발생했습니다.");
+        } finally {
+          btnResetPw.disabled = false;
+          btnResetPw.textContent = "🔒 비밀번호 초기화";
+        }
+      };
+    }
 
     // ✅ 성적 요약 드롭다운 변경 시: 같은 토큰(좌석/학번) 기준으로 grade_summary 다시 조회 후 요약 카드만 갱신
     const gradeSel = $("gradeSummarySelect");
@@ -1423,6 +1466,7 @@ function mapAttendance_(val) {
     _origRender(data);
   };
 });
+
 
 
 
