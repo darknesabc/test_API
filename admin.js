@@ -820,46 +820,19 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ====== ✅ 요약 로드 (네 API 경로들 기준) ======
-  async function loadSummariesForStudent_(seat, studentId) {
-    const summary = {};
-    const token = await issueStudentToken_(seat, studentId);
+    async function loadSummariesForStudent_(seat, studentId) {
+    const sess = getAdminSession();
+    if (!sess?.adminToken) throw new Error("관리자 로그인이 필요합니다.");
 
-    const [att, slp, mv, edu] = await Promise.allSettled([
-      apiPost("attendance_summary", { token }),
-      apiPost("sleep_summary", { token }),
-      apiPost("move_summary", { token }),
-      apiPost("eduscore_summary", { token }),
-    ]);
+    // 통합 API 호출로 최적화
+    const res = await apiPost("admin_student_full_summary", {
+      adminToken: sess.adminToken,
+      seat,
+      studentId
+    });
 
-    summary.attendance = (att.status === "fulfilled") ? att.value : { ok:false, error:String(att.reason || "") };
-    summary.sleep      = (slp.status === "fulfilled") ? slp.value : { ok:false, error:String(slp.reason || "") };
-    summary.move       = (mv.status === "fulfilled")  ? mv.value  : { ok:false, error:String(mv.reason || "") };
-    summary.eduscore   = (edu.status === "fulfilled") ? edu.value : { ok:false, error:String(edu.reason || "") };
-
-    // 성적 요약
-    try {
-      const exams = await apiPost("grade_exams", { token });
-      const items = (exams && exams.ok && Array.isArray(exams.items)) ? exams.items : [];
-      if (items.length) {
-        const last = items[items.length - 1] || {};
-        const lastExam = String(last.exam || "");
-        const gs = await apiPost("grade_summary", { token, exam: lastExam });
-
-        summary.grade = gs.ok ? {
-          ok: true,
-          exam: lastExam,
-          sheetName: gs.sheetName || last.label || last.name || "",
-          exams: items, // ✅ 요약 드롭다운용
-          data: gs,     // ✅ 표 렌더용(학부모/관리자 상세와 동일)
-        } : { ok:false, error: gs.error || "grade_summary 실패", exams: items };
-      } else {
-        summary.grade = { ok:false, error:"시험 목록 없음", exams: [] };
-      }
-    } catch (e) {
-      summary.grade = { ok:false, error: e?.message || "성적 오류", exams: [] };
-    }
-
-return summary;
+    if (!res.ok) throw new Error(res.error || "통합 데이터 로드 실패");
+    return res;
   }
 
   // ====== load student detail (summary) ======
