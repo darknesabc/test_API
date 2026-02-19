@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="ko">
 <head>
@@ -9,24 +8,23 @@
 </head>
 
 <body data-needs-login="1">
-  <!-- ================= HEADER ================= -->
   <header class="topbar">
     <div class="topbar-inner">
       <div>
         <div class="top-title">학생 현황 대시보드</div>
         <div id="userLine" class="top-sub"></div>
       </div>
-      <button id="logoutBtn" class="btn btn-ghost" type="button">로그아웃</button>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button id="pwChangeBtn" class="btn btn-ghost btn-mini" type="button">비밀번호 변경</button>
+        <button id="logoutBtn" class="btn btn-ghost" type="button">로그아웃</button>
+      </div>
     </div>
   </header>
 
-  <!-- ================= MAIN ================= -->
   <main class="wrap">
 
-    <!-- ✅ 4칸 그리드 -->
     <section class="grid-4">
 
-      <!-- ④ 공지 (슬라이드 + 스와이프 + 자동전환) -->
       <section class="card" id="noticeCard">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
           <h2 class="card-title" style="margin:0;">공지</h2>
@@ -73,7 +71,6 @@
         </div>
       </section>
 
-      <!-- ① 출결 -->
       <section class="card" id="attCard">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
           <h2 class="card-title" style="margin:0;">출결</h2>
@@ -92,16 +89,10 @@
         </div>
       </section>
 
-      <!-- ② 성적 (✅ 표 + 시험회차 드롭다운) -->
       <section class="card" id="gradeCard">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
           <h2 class="card-title" style="margin:0;">성적</h2>
 
-          <!--
-            ✅ value(exam)는 백엔드 grade_summary / grade_detail 로 그대로 전달됨
-            ✅ 백엔드의 GRADE_SHEETS 키와 반드시 일치해야 함
-            예) mar -> "3월 성적", apr -> "4월 성적" ...
-          -->
           <select id="gradeExamSelect" class="btn btn-ghost btn-mini" style="padding:6px 10px;">
             <option value="mar" selected>3월 더 프리미엄 모의고사</option>
             <option value="apr">4월 더 프리미엄 모의고사</option>
@@ -138,7 +129,6 @@
         </div>
       </section>
 
-      <!-- ③ 취침 -->
       <section class="card" id="sleepCard">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
           <h2 class="card-title" style="margin:0;">취침</h2>
@@ -156,7 +146,6 @@
         </div>
       </section>
 
-      <!-- ⑤ 이동 -->
       <section class="card" id="moveCard">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
           <h2 class="card-title" style="margin:0;">이동</h2>
@@ -172,7 +161,6 @@
         </div>
       </section>
 
-      <!-- ⑥ 교육점수 -->
       <section class="card" id="eduScoreCard">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
           <h2 class="card-title" style="margin:0;">교육점수</h2>
@@ -191,12 +179,25 @@
         </div>
       </section>
 
-
-
     </section>
   </main>
 
-  <!-- ================= 공지 모달 ================= -->
+  <div id="pwModal" class="modal" style="display:none;">
+    <div class="modal-backdrop" onclick="closePwModal()"></div>
+    <div class="modal-panel" style="max-width:340px;">
+      <div class="modal-header">
+        <div style="font-weight:900;">비밀번호 변경</div>
+        <button class="btn btn-ghost btn-mini" onclick="closePwModal()">닫기</button>
+      </div>
+      <div class="modal-body">
+        <p class="muted" style="font-size:12px; margin-bottom:12px;">변경 후에는 새로운 비밀번호로 다시 로그인해야 합니다.</p>
+        <input id="newPwInput" class="input" type="password" placeholder="새 비밀번호 (숫자 4~10자리)" style="width:100%;" inputmode="numeric">
+        <button id="pwSubmitBtn" class="btn" style="width:100%; margin-top:12px;">변경하기</button>
+        <p id="pwMsg" class="msg" style="font-size:12px; margin-top:8px;"></p>
+      </div>
+    </div>
+  </div>
+
   <div id="noticeModal" class="modal" style="display:none;">
     <div class="modal-backdrop" data-close="1"></div>
 
@@ -221,7 +222,6 @@
     </div>
   </div>
 
-  <!-- ================= SCRIPT ================= -->
   <script src="script.js"></script>
 </body>
 </html>
