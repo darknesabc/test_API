@@ -1,6 +1,6 @@
 /***********************
  * Frontend (GitHub Pages)
- * - 로그인: name + parentPw -> Apps Script login -> sessionStorage 저장
+ * - 로그인: name + parent4 -> Apps Script login -> sessionStorage 저장
  * - 대시보드: 세션 체크 + 출결 요약(attendance_summary) + 취침 요약(sleep_summary) + 이동 요약(move_summary)
  * - 이동 상세: move_detail (move.html)
  * - ✅ 교육점수 요약: eduscore_summary
@@ -134,9 +134,9 @@ function fixSelectUi_() {
 /* =========================================================
    ====== (데모) 로그인 ======
 ========================================================= */
-async function demoLogin(name, parentPw) {
+async function demoLogin(name, parent4) {
   if (!name || name.trim().length < 1) throw new Error("이름을 입력하세요.");
-  if (!/^\d{4,10}$/.test(parentPw)) throw new Error("비밀번호는 숫자 4~10자리로 입력하세요.");
+  if (!/^\d{4}$/.test(parent4)) throw new Error("부모4자리는 숫자 4자리로 입력하세요.");
 
   return {
     ok: true,
@@ -149,11 +149,11 @@ async function demoLogin(name, parentPw) {
 }
 
 // ====== (실전) Apps Script 로그인 ======
-async function apiLogin(name, parentPw) {
+async function apiLogin(name, parent4) {
   const res = await fetch(`${API_BASE}?path=login`, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ name, parentPw })
+    body: JSON.stringify({ name, parent4 })
   });
 
   const data = await res.json();
@@ -187,10 +187,10 @@ async function apiLogin(name, parentPw) {
     if (msg) msg.textContent = "";
 
     const name = $("studentName")?.value ?? "";
-    const parentPw = $("last4")?.value ?? "";
+    const parent4 = $("last4")?.value ?? "";
 
     try {
-      const result = DEMO_MODE ? await demoLogin(name, parentPw) : await apiLogin(name, parentPw);
+      const result = DEMO_MODE ? await demoLogin(name, parent4) : await apiLogin(name, parent4);
 
       setSession({
         studentName: result.studentName,
@@ -1223,6 +1223,3 @@ function escapeHtml_(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[m]));
 }
-
-
-
