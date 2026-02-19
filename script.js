@@ -244,6 +244,47 @@ async function apiLogin(name, parent4) {
     location.href = "index.html";
   });
 
+// --- 비밀번호 변경 버튼 기능 추가 시작 ---
+  const changePwBtn = $("changePwBtn");
+  if (changePwBtn) {
+    changePwBtn.addEventListener("click", async () => {
+      const session = getSession();
+      if (!session) return;
+
+      const newPw = prompt("새로 사용할 비밀번호(숫자 4~10자리)를 입력해주세요.");
+      if (!newPw) return; // 취소 누르면 중단
+
+      if (!/^\d{4,10}$/.test(newPw)) {
+        alert("비밀번호는 4~10자리의 숫자로 입력해야 합니다.");
+        return;
+      }
+
+      try {
+        changePwBtn.disabled = true;
+        changePwBtn.textContent = "변경 중...";
+
+        const res = await fetch(`${API_BASE}?path=change_password`, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ token: session.token, newPw: newPw })
+        });
+
+        const data = await res.json();
+        if (data.ok) {
+          alert("비밀번호가 성공적으로 변경되었습니다. 다음 로그인부터 적용됩니다.");
+        } else {
+          alert("변경 실패: " + data.error);
+        }
+      } catch (e) {
+        alert("통신 오류가 발생했습니다.");
+      } finally {
+        changePwBtn.disabled = false;
+        changePwBtn.textContent = "비밀번호 변경";
+      }
+    });
+  }
+  // --- 비밀번호 변경 버튼 기능 추가 끝 ---  
+
   // ✅ 요약들 로드
   loadAttendanceSummary(session);
   loadSleepSummary(session);
@@ -1223,4 +1264,5 @@ function escapeHtml_(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[m]));
 }
+
 
