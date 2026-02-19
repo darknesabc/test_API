@@ -187,7 +187,7 @@ async function apiLogin(name, parentPw) {
     if (msg) msg.textContent = "";
 
     const name = $("studentName")?.value ?? "";
-    const parentpw = $("last4")?.value ?? "";
+    const parentPw = $("last4")?.value ?? "";
 
     try {
       const result = DEMO_MODE ? await demoLogin(name, parentPw) : await apiLogin(name, parentPw);
@@ -1223,5 +1223,6 @@ function escapeHtml_(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[m]));
 }
+
 
 
