@@ -136,7 +136,7 @@ function fixSelectUi_() {
 ========================================================= */
 async function demoLogin(name, parent4) {
   if (!name || name.trim().length < 1) throw new Error("이름을 입력하세요.");
-  if (!/^\d{4}$/.test(parent4)) throw new Error("부모4자리는 숫자 4자리로 입력하세요.");
+  if (!/^\d{4,10}$/.test(parentPw)) throw new Error("비밀번호는 숫자 4~10자리로 입력하세요.");
 
   return {
     ok: true,
@@ -187,7 +187,7 @@ async function apiLogin(name, parent4) {
     if (msg) msg.textContent = "";
 
     const name = $("studentName")?.value ?? "";
-    const parent4 = $("last4")?.value ?? "";
+    const parentpw = $("last4")?.value ?? "";
 
     try {
       const result = DEMO_MODE ? await demoLogin(name, parent4) : await apiLogin(name, parent4);
@@ -1223,3 +1223,4 @@ function escapeHtml_(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[m]));
 }
+
