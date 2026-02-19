@@ -819,17 +819,25 @@ document.addEventListener("DOMContentLoaded", () => {
     return data.token;
   }
 
-  // ====== ✅ 요약 로드 (네 API 경로들 기준) ======
-  async function loadSummariesForStudent_(seat, studentId) {
-    const summary = {};
-    const token = await issueStudentToken_(seat, studentId);
+// ✅ [수정 코드] 5번 호출하던 걸 -> 1번 호출로 변경!
+async function loadSummariesForStudent_(seat, studentId) {
+  const sess = getAdminSession();
+  
+  // 🚀 핵심: 여기서 'admin_student_full_summary' 한 번만 부릅니다.
+  const data = await apiPost("admin_student_full_summary", {
+    adminToken: sess.adminToken,
+    seat: seat,
+    studentId: studentId
+  });
 
-    const [att, slp, mv, edu] = await Promise.allSettled([
-      apiPost("attendance_summary", { token }),
-      apiPost("sleep_summary", { token }),
-      apiPost("move_summary", { token }),
-      apiPost("eduscore_summary", { token }),
-    ]);
+  if (!data.ok) {
+    throw new Error(data.error || "정보를 불러오지 못했습니다.");
+  }
+
+  // 백엔드에서 이미 { attendance:..., sleep:..., ... } 형태로 묶어서 줬으므로
+  // 그대로 리턴만 하면 됩니다.
+  return data; 
+}
 
     summary.attendance = (att.status === "fulfilled") ? att.value : { ok:false, error:String(att.reason || "") };
     summary.sleep      = (slp.status === "fulfilled") ? slp.value : { ok:false, error:String(slp.reason || "") };
@@ -1423,6 +1431,7 @@ function mapAttendance_(val) {
     _origRender(data);
   };
 });
+
 
 
 
