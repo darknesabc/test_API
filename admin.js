@@ -145,6 +145,44 @@ async function apiPost(path, body) {
   return await res.json();
 }
 
+/** ✅ 성적 요약 표의 데이터를 생성 (국/수/탐 모두 예상값 반영) */
+function buildGradeTableRows_(data) {
+  const kor  = data.kor  || {};
+  const math = data.math || {};
+  const eng  = data.eng  || {};
+  const hist = data.hist || {};
+  const tam1 = data.tam1 || {};
+  const tam2 = data.tam2 || {};
+
+  const dash = "-";
+  const fmt = (v) => { const s = String(v ?? "").trim(); return s ? s : dash; };
+  const fmtNum = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && String(v).trim() !== "" ? String(n) : dash;
+  };
+
+  const shortenChoiceName = (v) => {
+    if (v == null) return "";
+    const map = { 
+      "언어와매체":"언매", "화법과작문":"화작", "미적분":"미적", "확률과통계":"확통", "기하":"기하",
+      "생활과윤리":"생윤", "사회문화":"사문", "정치와법":"정법", "윤리와사상":"윤사",
+      "물리학1":"물1", "물리학2":"물2", "화학1":"화1", "화학2":"화2", 
+      "생명과학1":"생1", "생명과학2":"생2", "지구과학1":"지1", "지구과학2":"지2"
+    };
+    let s = String(v).replace(/\s+/g, "").replace(/Ⅰ|I/gi, "1").replace(/Ⅱ|II/gi, "2");
+    return map[s] || s;
+  };
+  const fmtChoice = (v) => { const s = String(v ?? "").trim(); return s ? shortenChoiceName(s) : dash; };
+
+  return [
+    { label: "선택과목", kor: fmtChoice(kor.choice), math: fmtChoice(math.choice), eng: dash, hist: dash, tam1: fmtChoice(tam1.name), tam2: fmtChoice(tam2.name) },
+    { label: "원점수",   kor: fmtNum(kor.raw_total), math: fmtNum(math.raw_total), eng: fmtNum(eng.raw), hist: fmtNum(hist.raw), tam1: fmtNum(tam1.raw), tam2: fmtNum(tam2.raw) },
+    { label: "표준점수", kor: fmtNum(kor.expected_std), math: fmtNum(math.expected_std), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_std), tam2: fmtNum(tam2.expected_std) },
+    { label: "백분위",   kor: fmtNum(kor.expected_pct), math: fmtNum(math.expected_pct), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_pct), tam2: fmtNum(tam2.expected_pct) },
+    { label: "등급",     kor: fmt(kor.expected_grade), math: fmt(math.expected_grade), eng: fmt(eng.grade), hist: fmt(hist.grade), tam1: fmt(tam1.expected_grade), tam2: fmt(tam2.expected_grade) },
+  ];
+}
+
 // ====== UI helpers ======
 
 function renderGradeTableHtml_(rows) {
@@ -1357,8 +1395,9 @@ function mapAttendance_(val) {
     lines.push(fmtKeyVal("이름", st.name || st.studentName || ""));
 
     const rows = [
-      ["국어", s.kor?.raw_total ?? s.kor?.raw ?? "", s.kor?.std ?? "", s.kor?.pct ?? "", s.kor?.grade ?? ""],
-      ["수학", s.math?.raw_total ?? s.math?.raw ?? "", s.math?.std ?? "", s.math?.pct ?? "", s.math?.grade ?? ""],
+      // ✅ 국어와 수학의 표준점수, 백분위, 등급을 'expected_' 필드로 변경
+      ["국어", s.kor?.raw_total ?? s.kor?.raw ?? "", s.kor?.expected_std ?? "", s.kor?.expected_pct ?? "", s.kor?.expected_grade ?? ""],
+      ["수학", s.math?.raw_total ?? s.math?.raw ?? "", s.math?.expected_std ?? "", s.math?.expected_pct ?? "", s.math?.expected_grade ?? ""],
       ["영어", s.eng?.raw ?? "", "", "", s.eng?.grade ?? ""],
       ["한국사", s.hist?.raw ?? "", "", "", s.hist?.grade ?? ""],
       [s.tam1?.name || "탐구1", s.tam1?.raw ?? "", s.tam1?.expected_std ?? "", s.tam1?.expected_pct ?? "", s.tam1?.expected_grade ?? ""],
@@ -1452,6 +1491,7 @@ async function loadAdminGradeTrend(seat, studentId) {
   }
 }
 }); // ✅ 이 닫는 괄호가 파일의 '진짜' 마지막 줄에 딱 하나만 있어야 합니다!
+
 
 
 
