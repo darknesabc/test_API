@@ -958,13 +958,20 @@ return summary;
           </div>
         </section>
 
-        <section class="card" style="padding:14px; grid-column: span 2;">
-          <div class="card-title" style="font-size:15px; margin-bottom:10px;">📈 성적 추이 (백분위)</div>
-          <div style="height: 220px; position: relative;">
-            <canvas id="adminGradeTrendChart"></canvas>
+        <section class="card" style="padding:14px; margin-bottom:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div class="card-title" style="font-size:15px; margin:0;">📈 성적 추이 (백분위/등급)</div>
+          <div id="chartFilters" style="display:flex; gap:5px; flex-wrap:wrap;">
+            <button class="btn btn-mini filter-btn active" data-index="0" style="background:#3498db; border:none;">국어</button>
+            <button class="btn btn-mini filter-btn active" data-index="1" style="background:#e74c3c; border:none;">수학</button>
+            <button class="btn btn-mini filter-btn active" data-index="2" style="background:#2ecc71; border:none;">탐구1</button>
+            <button class="btn btn-mini filter-btn active" data-index="3" style="background:#f1c40f; border:none;">탐구2</button>
+            <button class="btn btn-mini filter-btn active" data-index="4" style="background:#9b59b6; border:none;">영어</button>
           </div>
-          <div id="trendChartLoading" class="muted" style="font-size:12px; margin-top:5px;">데이터 분석 중...</div>
-        </section>
+        </div>
+        <div style="height: 240px; position: relative;"><canvas id="adminGradeTrendChart"></canvas></div>
+        <div id="trendChartLoading" class="muted" style="font-size:12px; margin-top:5px;">데이터 분석 중...</div>
+      </section>
 
         <section class="card" style="padding:14px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;"><div class="card-title" style="font-size:15px;">교육점수 요약</div><button class="btn btn-ghost btn-mini" id="btnEduDetail" style="padding:6px 10px;">상세</button></div>
@@ -1482,10 +1489,28 @@ function mapAttendance_(val) {
           }
         }
       });
-    } catch (e) {
+      // ✅ [여기에 2단계 코드를 추가하세요]
+      const filterBtns = document.querySelectorAll(".filter-btn");
+      filterBtns.forEach(btn => {
+        btn.onclick = function() {
+          if (!window.adminChart) return;
+          const index = parseInt(this.dataset.index);
+          const isVisible = window.adminChart.isDatasetVisible(index);
+
+          if (isVisible) {
+            window.adminChart.hide(index); // 선 숨기기
+            this.style.opacity = "0.3";    // 버튼 흐리게
+          } else {
+            window.adminChart.show(index); // 선 보이기
+            this.style.opacity = "1";      // 버튼 밝게
+          }
+        };
+      });
+
+    } catch (e) { // 👈 catch 블록이 시작되기 바로 전입니다.
       if (loadingMsg) loadingMsg.textContent = "그래프 로드 오류 발생";
     }
-  }
 }); // ✅ 이 닫는 괄호가 파일의 '진짜' 마지막 줄에 딱 하나만 있어야 합니다!
+
 
 
