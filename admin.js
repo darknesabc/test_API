@@ -797,7 +797,7 @@ return summary;
       }
 
       // 기본정보 렌더
-      data.summary = data.summary || {};
+      data.summary = { __loading: true }; 
       renderStudentDetail(data);
 
       // ✅ 1) 캐시가 있으면 즉시 표시(초고속)
@@ -1452,6 +1452,7 @@ async function loadAdminGradeTrend(seat, studentId) {
   }
 }
 }); // ✅ 이 닫는 괄호가 파일의 '진짜' 마지막 줄에 딱 하나만 있어야 합니다!
+
 
 
 
