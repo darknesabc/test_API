@@ -176,15 +176,15 @@ function buildGradeTableRows_(data) {
     ["생명과학1", "생1"], ["생명과학2", "생2"], ["지구과학1", "지1"], ["지구과학2", "지2"]
   ]);
 
-  const shortenChoiceName = (v) => {
+ const shortenChoiceName = (v) => {
     if (v == null) return "";
-    const _choiceMap = { "언어와매체":"언매", "화법과작문":"화작", "미적분":"미적", "확률과통계":"확통" };
+    const map = { "언어와매체":"언매", "화법과작문":"화작", "미적분":"미적", "확률과통계":"확통" };
     let s = String(v).replace(/\s+/g, "").replace(/Ⅰ|I/gi, "1").replace(/Ⅱ|II/gi, "2");
-    return _choiceMap[s] || s;
+    return map[s] || s;
   };
   const fmtChoice = (v) => { const s = String(v ?? "").trim(); return s ? shortenChoiceName(s) : dash; };
 
-  // ✅ 국어/수학/탐구를 모두 예상(expected_) 데이터로 연결합니다.
+  // ✅ 데이터 연결: 국어/수학/탐구 모두 'expected_' 필드를 사용합니다.
   return [
     { label: "선택과목", kor: fmtChoice(kor.choice), math: fmtChoice(math.choice), eng: dash, hist: dash, tam1: fmtChoice(tam1.name), tam2: fmtChoice(tam2.name) },
     { label: "원점수",   kor: fmtNum(kor.raw_total), math: fmtNum(math.raw_total), eng: fmtNum(eng.raw), hist: fmtNum(hist.raw), tam1: fmtNum(tam1.raw), tam2: fmtNum(tam2.raw) },
@@ -1499,47 +1499,42 @@ function mapAttendance_(val) {
       if (loadingMsg) loadingMsg.style.display = "none";
       const ctx = canvas.getContext('2d');
       
-      // 기존 차트가 있다면 파괴하고 새로 생성 (중복 방지)
-      if (window.adminChart) window.adminChart.destroy();
+      if (window.adminChart) window.adminChart.destroy(); // 중복 생성 방지
       
       window.adminChart = new Chart(ctx, {
         type: 'line',
         data: {
           labels: res.items.map(it => it.label),
           datasets: [
-            // ✅ 모든 백분위 항목의 라벨에 (예상)을 추가했습니다.
+            // ✅ 백분위 데이터셋 (왼쪽 축 사용)
             { label: '국어(예상)', data: res.items.map(it => it.kor_pct), borderColor: '#3498db', tension: 0.3, fill: false },
             { label: '수학(예상)', data: res.items.map(it => it.math_pct), borderColor: '#e74c3c', tension: 0.3, fill: false },
             { label: '탐구1(예상)', data: res.items.map(it => it.tam1_pct), borderColor: '#2ecc71', tension: 0.3, borderDash: [5, 5], fill: false },
             { label: '탐구2(예상)', data: res.items.map(it => it.tam2_pct), borderColor: '#f1c40f', tension: 0.3, borderDash: [5, 5], fill: false },
-            { label: '영어(등급)', data: res.items.map(it => it.eng_grade), borderColor: '#9b59b6', backgroundColor: '#9b59b6', tension: 0.3, yAxisID: 'y_eng', fill: false, pointStyle: 'rectRot', pointRadius: 6 }
+            // ✅ 영어 등급 데이터셋 (오른쪽 보조축 y_eng 사용)
+            { label: '영어(등급)', data: res.items.map(it => it.eng_grade), borderColor: '#9b59b6', tension: 0.3, yAxisID: 'y_eng', fill: false, pointStyle: 'rectRot', pointRadius: 6 }
           ]
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
+          responsive: true, maintainAspectRatio: false,
           scales: {
-            y: { // 왼쪽 축: 백분위
+            y: { // 왼쪽 백분위 축
               min: 0, max: 100,
               ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10 } },
-              // ✅ 축 제목을 '예상 백분위'로 수정했습니다.
-              title: { display: true, text: '예상 백분위', color: 'rgba(255,255,255,0.5)', font: { size: 10 } }
+              title: { display: true, text: '예상 백분위', color: 'rgba(255,255,255,0.5)' }
             },
-            y_eng: { // 오른쪽 축: 영어 등급
+            y_eng: { // 오른쪽 영어 등급 축
               position: 'right',
               min: 1, max: 9,
-              reverse: true, // 1등급이 가장 위에 오도록 설정
+              reverse: true, // ⭐️ 1등급이 맨 위로 오도록 축 반전
               grid: { drawOnChartArea: false },
-              ticks: { color: '#9b59b6', stepSize: 1, font: { size: 10 } },
-              title: { display: true, text: '영어 등급', color: '#9b59b6', font: { size: 10 } }
+              ticks: { color: '#9b59b6', stepSize: 1 },
+              title: { display: true, text: '영어 등급', color: '#9b59b6' }
             },
             x: { ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 11 } } }
           },
           plugins: {
-            legend: { 
-              position: 'top',
-              labels: { color: '#fff', boxWidth: 10, font: { size: 10 }, padding: 15 }
-            }
+            legend: { position: 'top', labels: { color: '#fff', boxWidth: 10, font: { size: 10 } } }
           }
         }
       });
@@ -1547,5 +1542,5 @@ function mapAttendance_(val) {
       if (loadingMsg) loadingMsg.textContent = "그래프 로드 오류 발생";
     }
   }
-
 }); // ✅ 이 닫는 괄호가 파일의 '진짜' 마지막 줄에 딱 하나만 있어야 합니다!
+
