@@ -1008,6 +1008,14 @@ return summary;
           </div>
         </section>
 
+        <section class="card" style="padding:14px; grid-column: span 2;">
+          <div class="card-title" style="font-size:15px; margin-bottom:10px;">📈 성적 추이 (백분위)</div>
+          <div style="height: 220px; position: relative;">
+            <canvas id="adminGradeTrendChart"></canvas>
+          </div>
+          <div id="trendChartLoading" class="muted" style="font-size:12px; margin-top:5px;">데이터 분석 중...</div>
+        </section>
+
         <section class="card" style="padding:14px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;"><div class="card-title" style="font-size:15px;">교육점수 요약</div><button class="btn btn-ghost btn-mini" id="btnEduDetail" style="padding:6px 10px;">상세</button></div>
           <div class="card-sub">
@@ -1117,7 +1125,8 @@ return summary;
         }
       });
     }
-
+// ✅ 여기에 아래 코드를 추가하세요! (학생 정보를 다 그린 후 그래프 로드 실행)
+    loadAdminGradeTrend(st.seat, st.studentId);
   }
 
   
@@ -1467,6 +1476,66 @@ function mapAttendance_(val) {
   };
 });
 
+/** ✅ 여기에 3단계 함수 코드를 붙여넣으세요! */
+  async function loadAdminGradeTrend(seat, studentId) {
+    const canvas = $("adminGradeTrendChart");
+    const loadingMsg = $("trendChartLoading");
+    if (!canvas) return;
+
+    try {
+      const token = await issueStudentToken_(seat, studentId);
+      const res = await apiPost("grade_trend", { token });
+      
+      if (!res.ok || !res.items || res.items.length === 0) {
+        if (loadingMsg) loadingMsg.textContent = "표시할 성적 데이터가 부족합니다.";
+        return;
+      }
+
+      if (loadingMsg) loadingMsg.style.display = "none";
+      const ctx = canvas.getContext('2d');
+      
+      // 이미 차트가 있다면 파괴하고 새로 그리기 (중복 방지)
+      if (window.adminChart) window.adminChart.destroy();
+      
+      window.adminChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: res.items.map(it => it.label),
+          datasets: [
+            {
+              label: '국어',
+              data: res.items.map(it => it.kor_pct),
+              borderColor: '#3498db',
+              tension: 0.3,
+              fill: false
+            },
+            {
+              label: '수학',
+              data: res.items.map(it => it.math_pct),
+              borderColor: '#e74c3c',
+              tension: 0.3,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { min: 0, max: 100, ticks: { color: 'rgba(255,255,255,0.5)' } },
+            x: { ticks: { color: 'rgba(255,255,255,0.5)' } }
+          },
+          plugins: {
+            legend: { labels: { color: '#fff' } }
+          }
+        }
+      });
+    } catch (e) {
+      if (loadingMsg) loadingMsg.textContent = "그래프 로드 오류 발생";
+    }
+  }
+
+}); // <--- 파일의 진짜 마지막 중괄호입니다.
 
 
 
