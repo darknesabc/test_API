@@ -580,12 +580,17 @@ function buildGradeTableRows_(data) {
   return [
     { label: "선택과목", kor: shortenChoiceName_(fmt(kor.choice)), math: shortenChoiceName_(fmt(math.choice)), eng: dash, hist: dash, tam1: shortenChoiceName_(fmt(tam1.name)), tam2: shortenChoiceName_(fmt(tam2.name)) },
     { label: "원점수",   kor: fmtNum(kor.raw_total), math: fmtNum(math.raw_total), eng: fmtNum(eng.raw), hist: fmtNum(hist.raw), tam1: fmtNum(tam1.raw), tam2: fmtNum(tam2.raw) },
-    { label: "표준점수", kor: fmtNum(kor.std), math: fmtNum(math.std), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_std), tam2: fmtNum(tam2.expected_std) },
-    { label: "백분위",   kor: fmtNum(kor.pct), math: fmtNum(math.pct), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_pct), tam2: fmtNum(tam2.expected_pct) },
-    { label: "등급",     kor: fmt(kor.grade), math: fmt(math.grade), eng: fmt(eng.grade), hist: fmt(hist.grade), tam1: fmt(tam1.expected_grade), tam2: fmt(tam2.expected_grade) },
+    
+    // ⭐️ 표준점수: 국어와 수학을 expected_std로 변경
+    { label: "표준점수", kor: fmtNum(kor.expected_std), math: fmtNum(math.expected_std), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_std), tam2: fmtNum(tam2.expected_std) },
+    
+    // ⭐️ 백분위: 국어와 수학을 expected_pct로 변경
+    { label: "백분위",   kor: fmtNum(kor.expected_pct), math: fmtNum(math.expected_pct), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_pct), tam2: fmtNum(tam2.expected_pct) },
+    
+    // ⭐️ 등급: 국어와 수학을 expected_grade로 변경
+    { label: "등급",     kor: fmt(kor.expected_grade), math: fmt(math.expected_grade), eng: fmt(eng.grade), hist: fmt(hist.grade), tam1: fmt(tam1.expected_grade), tam2: fmt(tam2.expected_grade) },
   ];
 }
-
 /* =========================================================
    ✅ 공지 (dashboard 슬라이드 + 모달 + 스와이프 + 자동전환 + 모달 스와이프)
 ========================================================= */
@@ -1264,5 +1269,6 @@ function escapeHtml_(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[m]));
 }
+
 
 
