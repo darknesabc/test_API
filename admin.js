@@ -1475,7 +1475,7 @@ function mapAttendance_(val) {
     _origRender(data);
   };
 
-/** ✅ 여기에 3단계 함수 코드를 붙여넣으세요! */
+/** ✅ 관리자용 성적 추이 그래프 로드 및 렌더링 함수 (5개 과목 통합) */
   async function loadAdminGradeTrend(seat, studentId) {
     const canvas = $("adminGradeTrendChart");
     const loadingMsg = $("trendChartLoading");
@@ -1493,7 +1493,6 @@ function mapAttendance_(val) {
       if (loadingMsg) loadingMsg.style.display = "none";
       const ctx = canvas.getContext('2d');
       
-      // 이미 차트가 있다면 파괴하고 새로 그리기 (중복 방지)
       if (window.adminChart) window.adminChart.destroy();
       
       window.adminChart = new Chart(ctx, {
@@ -1501,31 +1500,38 @@ function mapAttendance_(val) {
         data: {
           labels: res.items.map(it => it.label),
           datasets: [
-            {
-              label: '국어',
-              data: res.items.map(it => it.kor_pct),
-              borderColor: '#3498db',
-              tension: 0.3,
-              fill: false
-            },
-            {
-              label: '수학',
-              data: res.items.map(it => it.math_pct),
-              borderColor: '#e74c3c',
-              tension: 0.3,
-              fill: false
-            }
+            { label: '국어', data: res.items.map(it => it.kor_pct), borderColor: '#3498db', tension: 0.3, fill: false },
+            { label: '수학', data: res.items.map(it => it.math_pct), borderColor: '#e74c3c', tension: 0.3, fill: false },
+            { label: '탐구1', data: res.items.map(it => it.tam1_pct), borderColor: '#2ecc71', tension: 0.3, borderDash: [5, 5], fill: false },
+            { label: '탐구2', data: res.items.map(it => it.tam2_pct), borderColor: '#f1c40f', tension: 0.3, borderDash: [5, 5], fill: false },
+            // ⭐️ 영어는 전용 축(y_eng)을 사용하도록 설정
+            { label: '영어(등급)', data: res.items.map(it => it.eng_grade), borderColor: '#9b59b6', backgroundColor: '#9b59b6', tension: 0.3, yAxisID: 'y_eng', fill: false, pointStyle: 'rectRot', pointRadius: 6 }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            y: { min: 0, max: 100, ticks: { color: 'rgba(255,255,255,0.5)' } },
-            x: { ticks: { color: 'rgba(255,255,255,0.5)' } }
+            y: { // 왼쪽 축: 백분위 (0~100)
+              min: 0, max: 100,
+              ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10 } },
+              title: { display: true, text: '백분위', color: 'rgba(255,255,255,0.5)', font: { size: 10 } }
+            },
+            y_eng: { // 오른쪽 축: 영어 등급 (1~9)
+              position: 'right',
+              min: 1, max: 9,
+              reverse: true, // ⭐️ 1등급이 가장 위에 오도록 뒤집기!
+              grid: { drawOnChartArea: false }, // 격자선이 겹치지 않게 설정
+              ticks: { color: '#9b59b6', stepSize: 1, font: { size: 10 } },
+              title: { display: true, text: '영어 등급', color: '#9b59b6', font: { size: 10 } }
+            },
+            x: { ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 11 } } }
           },
           plugins: {
-            legend: { labels: { color: '#fff' } }
+            legend: { 
+              position: 'top',
+              labels: { color: '#fff', boxWidth: 10, font: { size: 10 }, padding: 15 }
+            }
           }
         }
       });
@@ -1533,9 +1539,3 @@ function mapAttendance_(val) {
       if (loadingMsg) loadingMsg.textContent = "그래프 로드 오류 발생";
     }
   }
-
-}); // <--- 파일의 진짜 마지막 중괄호입니다.
-
-
-
-
