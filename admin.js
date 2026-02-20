@@ -147,53 +147,6 @@ async function apiPost(path, body) {
 
 // ====== UI helpers ======
 
-/** =========================
- * ✅ 성적(학부모 대시보드와 동일 양식) 렌더 헬퍼
- * - backend: grade_exams (시험목록) + grade_summary (표 데이터)
- * ========================= */
-function buildGradeTableRows_(data) {
-  const kor  = data.kor  || {};
-  const math = data.math || {};
-  const eng  = data.eng  || {};
-  const hist = data.hist || {};
-  const tam1 = data.tam1 || {};
-  const tam2 = data.tam2 || {};
-
-  const dash = "-";
-  const fmt = (v) => { const s = String(v ?? "").trim(); return s ? s : dash; };
-  const fmtNum = (v) => {
-    const n = Number(v);
-    return Number.isFinite(n) && String(v).trim() !== "" ? String(n) : dash;
-  };
-
-  // --- 선택과목 축약 로직 ---
-  const _choiceMap = new Map([
-    ["언어와매체", "언매"], ["화법과작문", "화작"],
-    ["미적분", "미적"], ["확률과통계", "확통"], ["기하", "기하"],
-    ["생활과윤리", "생윤"], ["윤리와사상", "윤사"], ["한국지리", "한지"], ["세계지리", "세지"],
-    ["동아시아사", "동사"], ["세계사", "세사"], ["정치와법", "정법"], ["경제", "경제"], ["사회문화", "사문"],
-    ["물리학1", "물1"], ["물리학2", "물2"], ["화학1", "화1"], ["화학2", "화2"],
-    ["생명과학1", "생1"], ["생명과학2", "생2"], ["지구과학1", "지1"], ["지구과학2", "지2"]
-  ]);
-
- const shortenChoiceName = (v) => {
-    if (v == null) return "";
-    const map = { "언어와매체":"언매", "화법과작문":"화작", "미적분":"미적", "확률과통계":"확통" };
-    let s = String(v).replace(/\s+/g, "").replace(/Ⅰ|I/gi, "1").replace(/Ⅱ|II/gi, "2");
-    return map[s] || s;
-  };
-  const fmtChoice = (v) => { const s = String(v ?? "").trim(); return s ? shortenChoiceName(s) : dash; };
-
-  // ✅ 데이터 연결: 국어/수학/탐구 모두 'expected_' 필드를 사용합니다.
-  return [
-    { label: "선택과목", kor: fmtChoice(kor.choice), math: fmtChoice(math.choice), eng: dash, hist: dash, tam1: fmtChoice(tam1.name), tam2: fmtChoice(tam2.name) },
-    { label: "원점수",   kor: fmtNum(kor.raw_total), math: fmtNum(math.raw_total), eng: fmtNum(eng.raw), hist: fmtNum(hist.raw), tam1: fmtNum(tam1.raw), tam2: fmtNum(tam2.raw) },
-    { label: "표준점수", kor: fmtNum(kor.expected_std), math: fmtNum(math.expected_std), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_std), tam2: fmtNum(tam2.expected_std) },
-    { label: "백분위",   kor: fmtNum(kor.expected_pct), math: fmtNum(math.expected_pct), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_pct), tam2: fmtNum(tam2.expected_pct) },
-    { label: "등급",     kor: fmt(kor.expected_grade), math: fmt(math.expected_grade), eng: fmt(eng.grade), hist: fmt(hist.grade), tam1: fmt(tam1.expected_grade), tam2: fmt(tam2.expected_grade) },
-  ];
-}
-
 function renderGradeTableHtml_(rows) {
   return `
     <div style="margin-top:10px; overflow:auto;">
@@ -1432,85 +1385,74 @@ function mapAttendance_(val) {
     _origRender(data);
   };
 
-/** ✅ 관리자용 성적 추이 그래프 로드 및 렌더링 함수 (예상 백분위 반영) */
-  async function loadAdminGradeTrend(seat, studentId) {
-    const canvas = $("adminGradeTrendChart");
-    const loadingMsg = $("trendChartLoading");
-    if (!canvas) return;
+/** ✅ 관리자용 성적 추이 그래프 로드 및 필터 바인딩 */
+async function loadAdminGradeTrend(seat, studentId) {
+  const canvas = $("adminGradeTrendChart");
+  const loadingMsg = $("trendChartLoading");
+  if (!canvas) return;
 
-    try {
-      const token = await issueStudentToken_(seat, studentId);
-      const res = await apiPost("grade_trend", { token });
-      
-      if (!res.ok || !res.items || res.items.length === 0) {
-        if (loadingMsg) loadingMsg.textContent = "표시할 성적 데이터가 부족합니다.";
-        return;
-      }
-
-      if (loadingMsg) loadingMsg.style.display = "none";
-      const ctx = canvas.getContext('2d');
-      
-      if (window.adminChart) window.adminChart.destroy(); // 중복 생성 방지
-      
-      window.adminChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: res.items.map(it => it.label),
-          datasets: [
-            // ✅ 백분위 데이터셋 (왼쪽 축 사용)
-            { label: '국어(예상)', data: res.items.map(it => it.kor_pct), borderColor: '#3498db', tension: 0.3, fill: false },
-            { label: '수학(예상)', data: res.items.map(it => it.math_pct), borderColor: '#e74c3c', tension: 0.3, fill: false },
-            { label: '탐구1(예상)', data: res.items.map(it => it.tam1_pct), borderColor: '#2ecc71', tension: 0.3, borderDash: [5, 5], fill: false },
-            { label: '탐구2(예상)', data: res.items.map(it => it.tam2_pct), borderColor: '#f1c40f', tension: 0.3, borderDash: [5, 5], fill: false },
-            // ✅ 영어 등급 데이터셋 (오른쪽 보조축 y_eng 사용)
-            { label: '영어(등급)', data: res.items.map(it => it.eng_grade), borderColor: '#9b59b6', tension: 0.3, yAxisID: 'y_eng', fill: false, pointStyle: 'rectRot', pointRadius: 6 }
-          ]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          scales: {
-            y: { // 왼쪽 백분위 축
-              min: 0, max: 100,
-              ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10 } },
-              title: { display: true, text: '예상 백분위', color: 'rgba(255,255,255,0.5)' }
-            },
-            y_eng: { // 오른쪽 영어 등급 축
-              position: 'right',
-              min: 1, max: 9,
-              reverse: true, // ⭐️ 1등급이 맨 위로 오도록 축 반전
-              grid: { drawOnChartArea: false },
-              ticks: { color: '#9b59b6', stepSize: 1 },
-              title: { display: true, text: '영어 등급', color: '#9b59b6' }
-            },
-            x: { ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 11 } } }
-          },
-          plugins: {
-            legend: { position: 'top', labels: { color: '#fff', boxWidth: 10, font: { size: 10 } } }
-          }
-        }
-      });
-      // ✅ [여기에 2단계 코드를 추가하세요]
-      const filterBtns = document.querySelectorAll(".filter-btn");
-      filterBtns.forEach(btn => {
-        btn.onclick = function() {
-          if (!window.adminChart) return;
-          const index = parseInt(this.dataset.index);
-          const isVisible = window.adminChart.isDatasetVisible(index);
-
-          if (isVisible) {
-            window.adminChart.hide(index); // 선 숨기기
-            this.style.opacity = "0.3";    // 버튼 흐리게
-          } else {
-            window.adminChart.show(index); // 선 보이기
-            this.style.opacity = "1";      // 버튼 밝게
-          }
-        };
-      });
-
-    } catch (e) { // 👈 catch 블록이 시작되기 바로 전입니다.
-      if (loadingMsg) loadingMsg.textContent = "그래프 로드 오류 발생";
+  try {
+    const token = await issueStudentToken_(seat, studentId);
+    const res = await apiPost("grade_trend", { token });
+    
+    if (!res.ok || !res.items || res.items.length === 0) {
+      if (loadingMsg) loadingMsg.textContent = "표시할 성적 데이터가 부족합니다.";
+      return;
     }
+
+    if (loadingMsg) loadingMsg.style.display = "none";
+    const ctx = canvas.getContext('2d');
+    
+    if (window.adminChart) window.adminChart.destroy(); // 이전 차트 파괴
+    
+    window.adminChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: res.items.map(it => it.label),
+        datasets: [
+          { label: '국어(예상)', data: res.items.map(it => it.kor_pct), borderColor: '#3498db', tension: 0.3, fill: false },
+          { label: '수학(예상)', data: res.items.map(it => it.math_pct), borderColor: '#e74c3c', tension: 0.3, fill: false },
+          { label: '탐구1(예상)', data: res.items.map(it => it.tam1_pct), borderColor: '#2ecc71', tension: 0.3, borderDash: [5, 5], fill: false },
+          { label: '탐구2(예상)', data: res.items.map(it => it.tam2_pct), borderColor: '#f1c40f', tension: 0.3, borderDash: [5, 5], fill: false },
+          // 영어는 보조축 y_eng 사용
+          { label: '영어(등급)', data: res.items.map(it => it.eng_grade), borderColor: '#9b59b6', backgroundColor: '#9b59b6', tension: 0.3, yAxisID: 'y_eng', fill: false, pointStyle: 'rectRot', pointRadius: 6 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: { min: 0, max: 100, title: { display: true, text: '예상 백분위', color: 'rgba(255,255,255,0.5)' }, ticks: { color: 'rgba(255,255,255,0.5)' } },
+          y_eng: { position: 'right', min: 1, max: 9, reverse: true, grid: { drawOnChartArea: false }, title: { display: true, text: '영어 등급', color: '#9b59b6' }, ticks: { color: '#9b59b6', stepSize: 1 } },
+          x: { ticks: { color: 'rgba(255,255,255,0.5)' } }
+        },
+        plugins: { legend: { display: false } } // 기본 범례 숨김 (커스텀 버튼 사용)
+      }
+    });
+
+    /** ✅ 과목 필터 버튼 클릭 이벤트 연결 */
+    const filterBtns = document.querySelectorAll(".filter-btn");
+    filterBtns.forEach(btn => {
+      btn.onclick = function() {
+        if (!window.adminChart) return;
+        const index = parseInt(this.dataset.index);
+        const isVisible = window.adminChart.isDatasetVisible(index);
+
+        if (isVisible) {
+          window.adminChart.hide(index); // 선 숨기기
+          this.style.opacity = "0.3";    // 버튼 흐리게
+        } else {
+          window.adminChart.show(index); // 선 보이기
+          this.style.opacity = "1";      // 버튼 밝게
+        }
+      };
+    });
+
+  } catch (e) {
+    if (loadingMsg) loadingMsg.textContent = "그래프 로드 중 오류가 발생했습니다.";
+  }
+}
 }); // ✅ 이 닫는 괄호가 파일의 '진짜' 마지막 줄에 딱 하나만 있어야 합니다!
+
 
 
 
