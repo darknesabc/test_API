@@ -1474,7 +1474,6 @@ function mapAttendance_(val) {
     };
     _origRender(data);
   };
-});
 
 /** ✅ 여기에 3단계 함수 코드를 붙여넣으세요! */
   async function loadAdminGradeTrend(seat, studentId) {
@@ -1536,6 +1535,7 @@ function mapAttendance_(val) {
   }
 
 }); // <--- 파일의 진짜 마지막 중괄호입니다.
+
 
 
 
