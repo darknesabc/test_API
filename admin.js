@@ -160,33 +160,39 @@ function buildGradeTableRows_(data) {
   const tam2 = data.tam2 || {};
 
   const dash = "-";
-  const fmt = (v) => {
-    const s = String(v ?? "").trim();
-    return s ? s : dash;
-  };
+  const fmt = (v) => { const s = String(v ?? "").trim(); return s ? s : dash; };
   const fmtNum = (v) => {
     const n = Number(v);
     return Number.isFinite(n) && String(v).trim() !== "" ? String(n) : dash;
   };
 
-// ✅ 선택과목명 축약 표시(관리자 페이지용)
-const _choiceMap = new Map([
-  // 국어
-  ["언어와매체", "언매"], ["언어와매체", "언매"],
-  ["화법과작문", "화작"], ["화법과작문", "화작"],
-  // 수학
-  ["미적분", "미적"], ["확률과통계", "확통"], ["기하", "기하"],
-  // 탐구(사회)
-  ["생활과윤리", "생윤"], ["윤리와사상", "윤사"],
-  ["한국지리", "한지"], ["세계지리", "세지"],
-  ["동아시아사", "동사"], ["세계사", "세사"],
-  ["정치와법", "정법"], ["경제", "경제"], ["사회문화", "사문"],
-  // 탐구(과학) - 로마숫자/특수문자 변형은 normalize에서 처리
-  ["물리학1", "물1"], ["물리학2", "물2"],
-  ["화학1", "화1"], ["화학2", "화2"],
-  ["생명과학1", "생1"], ["생명과학2", "생2"],
-  ["지구과학1", "지1"], ["지구과학2", "지2"],
-]);
+  // --- 선택과목 축약 로직 ---
+  const _choiceMap = new Map([
+    ["언어와매체", "언매"], ["화법과작문", "화작"],
+    ["미적분", "미적"], ["확률과통계", "확통"], ["기하", "기하"],
+    ["생활과윤리", "생윤"], ["윤리와사상", "윤사"], ["한국지리", "한지"], ["세계지리", "세지"],
+    ["동아시아사", "동사"], ["세계사", "세사"], ["정치와법", "정법"], ["경제", "경제"], ["사회문화", "사문"],
+    ["물리학1", "물1"], ["물리학2", "물2"], ["화학1", "화1"], ["화학2", "화2"],
+    ["생명과학1", "생1"], ["생명과학2", "생2"], ["지구과학1", "지1"], ["지구과학2", "지2"]
+  ]);
+
+  const shortenChoiceName = (v) => {
+    if (v == null) return "";
+    const _choiceMap = { "언어와매체":"언매", "화법과작문":"화작", "미적분":"미적", "확률과통계":"확통" };
+    let s = String(v).replace(/\s+/g, "").replace(/Ⅰ|I/gi, "1").replace(/Ⅱ|II/gi, "2");
+    return _choiceMap[s] || s;
+  };
+  const fmtChoice = (v) => { const s = String(v ?? "").trim(); return s ? shortenChoiceName(s) : dash; };
+
+  // ✅ 국어/수학/탐구를 모두 예상(expected_) 데이터로 연결합니다.
+  return [
+    { label: "선택과목", kor: fmtChoice(kor.choice), math: fmtChoice(math.choice), eng: dash, hist: dash, tam1: fmtChoice(tam1.name), tam2: fmtChoice(tam2.name) },
+    { label: "원점수",   kor: fmtNum(kor.raw_total), math: fmtNum(math.raw_total), eng: fmtNum(eng.raw), hist: fmtNum(hist.raw), tam1: fmtNum(tam1.raw), tam2: fmtNum(tam2.raw) },
+    { label: "표준점수", kor: fmtNum(kor.expected_std), math: fmtNum(math.expected_std), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_std), tam2: fmtNum(tam2.expected_std) },
+    { label: "백분위",   kor: fmtNum(kor.expected_pct), math: fmtNum(math.expected_pct), eng: dash, hist: dash, tam1: fmtNum(tam1.expected_pct), tam2: fmtNum(tam2.expected_pct) },
+    { label: "등급",     kor: fmt(kor.expected_grade), math: fmt(math.expected_grade), eng: fmt(eng.grade), hist: fmt(hist.grade), tam1: fmt(tam1.expected_grade), tam2: fmt(tam2.expected_grade) },
+  ];
+}
 
 function normalizeChoiceName(v) {
   if (v == null) return "";
@@ -1475,7 +1481,7 @@ function mapAttendance_(val) {
     _origRender(data);
   };
 
-/** ✅ 관리자용 성적 추이 그래프 로드 및 렌더링 함수 (5개 과목 통합) */
+/** ✅ 관리자용 성적 추이 그래프 로드 및 렌더링 함수 (예상 백분위 반영) */
   async function loadAdminGradeTrend(seat, studentId) {
     const canvas = $("adminGradeTrendChart");
     const loadingMsg = $("trendChartLoading");
@@ -1493,6 +1499,7 @@ function mapAttendance_(val) {
       if (loadingMsg) loadingMsg.style.display = "none";
       const ctx = canvas.getContext('2d');
       
+      // 기존 차트가 있다면 파괴하고 새로 생성 (중복 방지)
       if (window.adminChart) window.adminChart.destroy();
       
       window.adminChart = new Chart(ctx, {
@@ -1500,11 +1507,11 @@ function mapAttendance_(val) {
         data: {
           labels: res.items.map(it => it.label),
           datasets: [
-            { label: '국어', data: res.items.map(it => it.kor_pct), borderColor: '#3498db', tension: 0.3, fill: false },
-            { label: '수학', data: res.items.map(it => it.math_pct), borderColor: '#e74c3c', tension: 0.3, fill: false },
-            { label: '탐구1', data: res.items.map(it => it.tam1_pct), borderColor: '#2ecc71', tension: 0.3, borderDash: [5, 5], fill: false },
-            { label: '탐구2', data: res.items.map(it => it.tam2_pct), borderColor: '#f1c40f', tension: 0.3, borderDash: [5, 5], fill: false },
-            // ⭐️ 영어는 전용 축(y_eng)을 사용하도록 설정
+            // ✅ 모든 백분위 항목의 라벨에 (예상)을 추가했습니다.
+            { label: '국어(예상)', data: res.items.map(it => it.kor_pct), borderColor: '#3498db', tension: 0.3, fill: false },
+            { label: '수학(예상)', data: res.items.map(it => it.math_pct), borderColor: '#e74c3c', tension: 0.3, fill: false },
+            { label: '탐구1(예상)', data: res.items.map(it => it.tam1_pct), borderColor: '#2ecc71', tension: 0.3, borderDash: [5, 5], fill: false },
+            { label: '탐구2(예상)', data: res.items.map(it => it.tam2_pct), borderColor: '#f1c40f', tension: 0.3, borderDash: [5, 5], fill: false },
             { label: '영어(등급)', data: res.items.map(it => it.eng_grade), borderColor: '#9b59b6', backgroundColor: '#9b59b6', tension: 0.3, yAxisID: 'y_eng', fill: false, pointStyle: 'rectRot', pointRadius: 6 }
           ]
         },
@@ -1512,16 +1519,17 @@ function mapAttendance_(val) {
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            y: { // 왼쪽 축: 백분위 (0~100)
+            y: { // 왼쪽 축: 백분위
               min: 0, max: 100,
               ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10 } },
-              title: { display: true, text: '백분위', color: 'rgba(255,255,255,0.5)', font: { size: 10 } }
+              // ✅ 축 제목을 '예상 백분위'로 수정했습니다.
+              title: { display: true, text: '예상 백분위', color: 'rgba(255,255,255,0.5)', font: { size: 10 } }
             },
-            y_eng: { // 오른쪽 축: 영어 등급 (1~9)
+            y_eng: { // 오른쪽 축: 영어 등급
               position: 'right',
               min: 1, max: 9,
-              reverse: true, // ⭐️ 1등급이 가장 위에 오도록 뒤집기!
-              grid: { drawOnChartArea: false }, // 격자선이 겹치지 않게 설정
+              reverse: true, // 1등급이 가장 위에 오도록 설정
+              grid: { drawOnChartArea: false },
               ticks: { color: '#9b59b6', stepSize: 1, font: { size: 10 } },
               title: { display: true, text: '영어 등급', color: '#9b59b6', font: { size: 10 } }
             },
@@ -1539,4 +1547,5 @@ function mapAttendance_(val) {
       if (loadingMsg) loadingMsg.textContent = "그래프 로드 오류 발생";
     }
   }
+
 }); // ✅ 이 닫는 괄호가 파일의 '진짜' 마지막 줄에 딱 하나만 있어야 합니다!
